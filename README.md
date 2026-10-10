@@ -1,6 +1,6 @@
 # ColdRoute SG — Local MVP
 
-ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation in Singapore** using public weather, parking and traffic-camera data. The frontend is **React + TypeScript + Vite + Ant Design**. The backend is **Python + FastAPI**.
+ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation in Singapore** using public weather, parking and traffic-camera data. The frontend is **React + TypeScript + Vite + Tailwind CSS + MapLibre**, a single-screen dispatcher console. See [`frontend/README.md`](frontend/README.md). The backend is **Python + FastAPI**.
 
 This version intentionally has **no AWS integration** and does **not require any API key or registration** to run.
 
@@ -71,25 +71,16 @@ coldroute-sg/
 │  └─ tests/
 │     └─ test_optimization.py
 └─ frontend/
+   ├─ README.md            design system, data and structure
    ├─ package.json
    ├─ vite.config.ts
-   ├─ tsconfig.json
-   ├─ tsconfig.app.json
-   ├─ tsconfig.node.json
-   ├─ .env.example
+   ├─ scripts/fetch-osrm.mjs
    └─ src/
       ├─ App.tsx
-      ├─ main.tsx
-      ├─ styles.css
-      ├─ types.ts
-      ├─ api/client.ts
-      ├─ data/sample.ts
-      └─ components/
-         ├─ Dashboard.tsx
-         ├─ DeliveryForm.tsx
-         ├─ LiveDataPanel.tsx
-         ├─ RouteMap.tsx
-         └─ RouteSummary.tsx
+      ├─ index.css
+      ├─ components/       Shell, StopsEditor, ResultsPanel, MapView, StopCard, Timeline, StyleMenu, ui
+      ├─ lib/              optimizer, explain, time, types
+      └─ data/             sample run, OSRM snapshot
 ```
 
 # Run locally
@@ -142,7 +133,7 @@ Open:
 
 `http://localhost:5173`
 
-The default API URL is already `http://localhost:8000`. You only need a `.env` if you want to change it.
+The console runs on its own. It uses a real OSRM road snapshot, mocked live feeds and an in-browser optimiser, so the backend is optional for the demo. `VITE_API_BASE_URL` (in `.env.production`) is kept for when the UI switches to the FastAPI endpoints. Try `?style=mapfirst`, `?style=dark` or `?style=editorial`, or use **Style** in the top bar.
 
 ## 3. Optional convenience launchers
 

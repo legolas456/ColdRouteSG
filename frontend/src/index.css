@@ -1,0 +1,195 @@
+@import 'tailwindcss';
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Design tokens follow the Manus palette: warm off-white canvas, ink-black
+ * actions, hairline borders and transparent warm-grey fills. Every theme only
+ * swaps CSS variables; components use the semantic utilities below.
+ */
+:root,
+[data-theme='paper'] {
+  --bg-main: #f8f8f7;
+  --bg-panel: #ffffff;
+  --bg-subtle: #f3f3f3;
+  --fill-hover: #37352f0a;
+  --fill-strong: #37352f14;
+  --fill-stronger: #37352f24;
+  --text-1: #1a1a1a;
+  --text-2: #4d4d4d;
+  --text-3: #737373;
+  --text-4: #a6a6a6;
+  --border-main: #0000000f;
+  --border-dark: #00000024;
+  --ink: #1a1a19;
+  --on-ink: #ffffff;
+  --signal-on: #fb494f;
+  --shadow-card: 0 0 0 1px #16191d0d, 0 1px 2px #16191d08, 0 8px 24px #16191d0a;
+  --shadow-float: 0 0 0 1px #16191d14, 0 12px 32px #16191d14;
+  --r-panel: 14px;
+  --r-control: 8px;
+  --panel-border: 1px solid var(--border-main);
+}
+
+[data-theme='editorial'] {
+  --bg-main: #ffffff;
+  --bg-panel: #ffffff;
+  --bg-subtle: #fafafa;
+  --border-main: #00000014;
+  --border-dark: #00000033;
+  --shadow-card: none;
+  --shadow-float: 0 0 0 1px #00000014, 0 10px 30px #0000000d;
+  --r-panel: 2px;
+  --r-control: 2px;
+}
+
+[data-theme='dark'] {
+  --bg-main: #1a1a1a;
+  --bg-panel: #212121;
+  --bg-subtle: #2a2a2a;
+  --fill-hover: #ffffff0a;
+  --fill-strong: #ffffff14;
+  --fill-stronger: #ffffff24;
+  --text-1: #e6e6e6;
+  --text-2: #b3b3b3;
+  --text-3: #8c8c8c;
+  --text-4: #595959;
+  --border-main: #ffffff0f;
+  --border-dark: #ffffff1f;
+  --ink: #f2f2f2;
+  --on-ink: #141414;
+  --signal-on: #eb4d4d;
+  --shadow-card: 0 0 0 1px #ffffff0d;
+  --shadow-float: 0 0 0 1px #ffffff14, 0 16px 40px #00000066;
+}
+
+[data-signal='off'] {
+  --signal: var(--ink);
+}
+[data-signal='on'] {
+  --signal: var(--signal-on);
+}
+
+@theme inline {
+  --color-canvas: var(--bg-main);
+  --color-panel: var(--bg-panel);
+  --color-subtle: var(--bg-subtle);
+  --color-hover: var(--fill-hover);
+  --color-strong: var(--fill-strong);
+  --color-stronger: var(--fill-stronger);
+  --color-fg: var(--text-1);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+  --color-fg-4: var(--text-4);
+  --color-line: var(--border-main);
+  --color-line-strong: var(--border-dark);
+  --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
+  --color-signal: var(--signal);
+  --radius-panel: var(--r-panel);
+  --radius-control: var(--r-control);
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+}
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', Helvetica, Arial,
+    sans-serif;
+  --font-serif: 'Libre Baskerville', Georgia, Cambria, 'Times New Roman', serif;
+  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+  --animate-rise: rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pulse-ring: pulse-ring 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-canvas text-fg font-sans antialiased;
+    font-size: 13px;
+    line-height: 1.45;
+    font-feature-settings: 'tnum' 1;
+  }
+  ::selection {
+    background: var(--fill-stronger);
+  }
+  button {
+    cursor: pointer;
+  }
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    letter-spacing: -0.01em;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .hatch {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--fill-stronger) 0 1px,
+      transparent 1px 6px
+    );
+  }
+  .hatch-signal {
+    background-image: repeating-linear-gradient(135deg, var(--signal) 0 1.5px, transparent 1.5px 5px);
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--fill-stronger) transparent;
+  }
+}
+
+/* MapLibre chrome, restyled to match */
+.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--bg-panel) 80%, transparent) !important;
+  color: var(--text-3) !important;
+  font-size: 10px !important;
+  border-radius: 6px !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--text-3) !important;
+}
+.maplibregl-ctrl-attrib-button {
+  filter: grayscale(1);
+}
+[data-theme='dark'] .maplibregl-ctrl-attrib-button {
+  filter: invert(1) grayscale(1);
+}
