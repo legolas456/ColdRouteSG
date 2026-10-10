@@ -43,7 +43,7 @@ The brand colour is **Safety Orange** on warm paper, the high-vis orange used ac
 
 | Role | Light | Used for |
 | --- | --- | --- |
-| Brand | `#d4470a` | Primary buttons, stop numbers, unloading blocks, selection. Deep enough for AA contrast with white text. |
+| Brand | `#d3460a` | Primary buttons, stop numbers, unloading blocks, selection. 4.52:1 contrast with white text (WCAG AA). |
 | Route | `#ec5d13` | The ColdRoute line on the map. Brighter than the brand colour so it reads on map tiles. |
 | Green (`ok`) | `#079455` | Improvements vs the shortest route, on time, live data |
 | Amber (`warn`) | `#ca8504` | Medium risk, addresses that need review. Yellow-amber, so it is not confused with the brand orange. |

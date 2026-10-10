@@ -69,7 +69,7 @@ const LIGHT: Theme = {
     '--border-dark': '#d6d3cf',
     '--ink': '#1c1917',
     '--on-ink': '#ffffff',
-    '--brand': '#d4470a',
+    '--brand': '#d3460a',
     '--brand-hover': '#bd3f09',
     '--brand-soft': '#fef1e8',
     '--brand-text': '#c2410c',
