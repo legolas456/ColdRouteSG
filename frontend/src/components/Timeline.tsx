@@ -33,10 +33,10 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
       <div className="flex items-center gap-4">
         <h2 className="text-[13px] font-semibold">Timeline</h2>
         <div className="flex-1" />
-        <Legend swatch={<span className="h-2 w-5 rounded-[2px] bg-strong" />} label="Delivery window" />
-        <Legend swatch={<span className="h-2 w-3 rounded-[2px] bg-ink" />} label="Unloading" />
+        <Legend swatch={<span className="h-2 w-5 rounded-[2px] bg-brand-soft shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_25%,transparent)]" />} label="Delivery window" />
+        <Legend swatch={<span className="h-2 w-3 rounded-[2px] bg-brand" />} label="Unloading" />
         <Legend swatch={<span className="hatch-signal h-2 w-4 rounded-[2px]" />} label="Late" />
-        <Legend swatch={<span className="hatch h-2 w-4 rounded-[2px] shadow-[inset_0_0_0_1px_var(--border-dark)]" />} label={`${RAIN.label} · ${RAIN.area}`} />
+        <Legend swatch={<span className="hatch-rain h-2 w-4 rounded-[2px]" />} label={`${RAIN.label} · ${RAIN.area}`} />
         {ghost && <Legend swatch={<span className="h-2 w-3 rounded-[2px] shadow-[inset_0_0_0_1.5px_var(--text-3)]" />} label="Shortest route" />}
       </div>
 
@@ -51,7 +51,7 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
               </div>
             ))}
             <div
-              className="hatch absolute top-[18px] bottom-0 shadow-[inset_1px_0_0_var(--border-dark),inset_-1px_0_0_var(--border-dark)]"
+              className="hatch-rain absolute top-[18px] bottom-0 shadow-[inset_1px_0_0_color-mix(in_srgb,var(--rain)_35%,transparent),inset_-1px_0_0_color-mix(in_srgb,var(--rain)_35%,transparent)]"
               style={{ left: x(RAIN.start), width: w(RAIN.start, RAIN.end) }}
             />
           </div>
@@ -68,7 +68,7 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
                 onClick={() => onSelect(selected ? null : row.id)}
                 className={clsx(
                   'group grid h-[22px] w-full grid-cols-[150px_1fr] items-center rounded-[6px] text-left',
-                  selected ? 'bg-hover' : 'hover:bg-hover',
+                  selected ? 'bg-brand-soft/60' : 'hover:bg-hover',
                 )}
               >
                 <span className="flex min-w-0 items-center gap-2 pl-1">
@@ -77,7 +77,7 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
                 </span>
                 <span className="relative h-full">
                   <span
-                    className="absolute top-1/2 h-[9px] -translate-y-1/2 rounded-[3px] bg-strong"
+                    className="absolute top-1/2 h-[9px] -translate-y-1/2 rounded-[3px] bg-brand-soft shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_25%,transparent)]"
                     style={{ left: x(s.windowStart), width: w(s.windowStart, s.windowEnd) }}
                   />
                   {row.wait > 1 && (
@@ -101,7 +101,7 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
                   <span
                     className={clsx(
                       'absolute top-1/2 h-[13px] -translate-y-1/2 rounded-[3px] transition-transform',
-                      row.late > 0 ? 'bg-signal' : 'bg-ink',
+                      row.late > 0 ? 'bg-bad' : 'bg-brand',
                       selected && 'scale-y-125',
                     )}
                     style={{ left: x(row.start), width: `max(4px, ${w(row.start, row.finish)})` }}

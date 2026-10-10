@@ -1,27 +1,35 @@
 import { Check, Loader2, Send } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { MapView, type Layers } from './components/MapView'
 import { ResultsPanel, type View } from './components/ResultsPanel'
 import { NavRail, TopBar } from './components/Shell'
 import { StopCard } from './components/StopCard'
 import { OPTIMISE_STEPS, StopsEditor } from './components/StopsEditor'
-import { StyleMenu, type Preset } from './components/StyleMenu'
+import { StyleMenu, type Layout } from './components/StyleMenu'
 import { Timeline } from './components/Timeline'
 import { Button, StatusPill } from './components/ui'
 import { DEPARTURE, DEPOT, PROFILES, SAMPLE_STOPS } from './data/sample'
 import { optimise } from './lib/optimizer'
+import { applyTheme, THEME_BY_ID, type ThemeId } from './lib/themes'
 import type { OptimiseResult, ProfileId, Stop } from './lib/types'
 
 type Phase = 'draft' | 'optimising' | 'optimised'
 
-const initialPreset = (): Preset => {
-  const p = new URLSearchParams(location.search).get('style')
-  return p === 'editorial' || p === 'mapfirst' || p === 'dark' ? p : 'paper'
+const params = new URLSearchParams(location.search)
+const initialTheme = (): ThemeId => {
+  const t = params.get('theme')
+  if (t && t in THEME_BY_ID) return t as ThemeId
+  // links from the first mock-up used ?style=
+  const legacy = params.get('style')
+  if (legacy === 'dark') return 'night'
+  if (legacy === 'paper' || legacy === 'editorial') return 'mono'
+  return 'teal'
 }
+const initialLayout = (): Layout => (params.get('layout') === 'float' || params.get('style') === 'mapfirst' ? 'float' : 'split')
 
 export default function App() {
-  const [preset, setPreset] = useState<Preset>(initialPreset)
-  const [signal, setSignal] = useState(false)
+  const [themeId, setThemeId] = useState<ThemeId>(initialTheme)
+  const [layout, setLayout] = useState<Layout>(initialLayout)
   const [phase, setPhase] = useState<Phase>('draft')
   const [stops, setStops] = useState<Stop[]>(SAMPLE_STOPS)
   const [departure, setDeparture] = useState(DEPARTURE)
@@ -34,18 +42,23 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null)
   const timers = useRef<number[]>([])
 
-  const theme = preset === 'dark' ? 'dark' : preset === 'editorial' ? 'editorial' : 'paper'
-  const floating = preset === 'mapfirst'
+  const theme = THEME_BY_ID[themeId]
+  const floating = layout === 'float'
   const stopById = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s])), [stops])
   const names = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s.short])), [stops])
 
+  // before paint, so there is no flash of the default theme
+  useLayoutEffect(() => applyTheme(theme), [theme])
+
   useEffect(() => {
     const url = new URL(location.href)
-    if (preset === 'paper') url.searchParams.delete('style')
-    else url.searchParams.set('style', preset)
+    url.searchParams.delete('style')
+    if (themeId === 'teal') url.searchParams.delete('theme')
+    else url.searchParams.set('theme', themeId)
+    if (layout === 'split') url.searchParams.delete('layout')
+    else url.searchParams.set('layout', layout)
     history.replaceState(null, '', url)
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', preset === 'dark' ? '#1a1a1a' : '#f8f8f7')
-  }, [preset])
+  }, [themeId, layout])
 
   const runOptimise = useCallback(
     (instant = false) => {
@@ -110,7 +123,7 @@ export default function App() {
         <Loader2 size={11} className="animate-spin" /> Optimising
       </StatusPill>
     ) : (
-      <StatusPill tone="ink">
+      <StatusPill tone="ok">
         <Check size={11} strokeWidth={2.5} /> Optimised
       </StatusPill>
     )
@@ -177,7 +190,7 @@ export default function App() {
 
   const map = (insetLeft: number, insetBottom: number) => (
     <MapView
-      theme={preset === 'dark' ? 'dark' : 'light'}
+      palette={theme.map}
       depot={DEPOT}
       stops={stops}
       result={phase === 'optimised' ? result : null}
@@ -196,14 +209,14 @@ export default function App() {
   )
 
   return (
-    <div data-theme={theme} data-signal={signal ? 'on' : 'off'} className="flex h-full bg-canvas text-fg">
+    <div className="flex h-full bg-canvas text-fg">
       <NavRail />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           status={status}
           primary={primary}
           updatedAt="09:05"
-          extra={<StyleMenu preset={preset} setPreset={setPreset} signal={signal} setSignal={setSignal} phase={phase} jump={jump} />}
+          extra={<StyleMenu themeId={themeId} setThemeId={setThemeId} layout={layout} setLayout={setLayout} phase={phase} jump={jump} />}
         />
         {floating ? (
           <main className="relative min-h-0 flex-1">

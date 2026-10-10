@@ -4,7 +4,7 @@ import { RAIN } from '../data/sample'
 import { explainStop } from '../lib/explain'
 import { duration, hm } from '../lib/time'
 import type { OptimiseResult, Stop } from '../lib/types'
-import { Button, Tag } from './ui'
+import { Button, CargoTag } from './ui'
 
 interface Props {
   stop: Stop
@@ -66,7 +66,7 @@ export function StopCard({ stop, result, names, departure, onClose }: Props) {
             <div className="flex items-center gap-2">
               <span className="eyebrow">Stop {String(rec.seq).padStart(2, '0')}</span>
               {isRisk && (
-                <span className="num rounded-[4px] bg-ink px-1.5 py-[1px] text-[9.5px] font-semibold tracking-[0.06em] text-on-ink">
+                <span className="num rounded-full bg-bad-soft px-1.5 py-[1px] text-[9.5px] font-semibold tracking-[0.06em] text-bad">
                   HIGHEST RISK
                 </span>
               )}
@@ -87,7 +87,7 @@ export function StopCard({ stop, result, names, departure, onClose }: Props) {
           <Fact label="ETA" value={hm(rec.arrival)} />
           <Fact label="Window" value={`${hm(stop.windowStart)}–${hm(stop.windowEnd)}`} />
           <Fact label="Unload" value={`${stop.service}`} sub="min" />
-          <Fact label="Cargo" value={<Tag className="h-4 text-[9px]">{stop.cargo}</Tag>} />
+          <Fact label="Cargo" value={<CargoTag cargo={stop.cargo} className="h-4" />} />
         </dl>
       </div>
 
@@ -101,7 +101,7 @@ export function StopCard({ stop, result, names, departure, onClose }: Props) {
           <span className="eyebrow">Risk factors</span>
           <span className="flex items-center gap-3 text-[10.5px] text-fg-3">
             <span className="flex items-center gap-1">
-              <span className="h-1.5 w-3 rounded-full bg-ink" /> ColdRoute
+              <span className="h-1.5 w-3 rounded-full bg-brand" /> ColdRoute
             </span>
             <span className="flex items-center gap-1">
               <span className="h-1.5 w-3 rounded-full bg-stronger" /> Shortest
@@ -122,7 +122,7 @@ export function StopCard({ stop, result, names, departure, onClose }: Props) {
                   <div className="flex items-center gap-2">
                     <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-hover">
                       <span
-                        className={clsx('block h-full rounded-full', a >= 0.66 ? 'bg-signal' : 'bg-ink')}
+                        className={clsx('block h-full rounded-full', a >= 0.66 ? 'bg-bad' : a >= 0.33 ? 'bg-warn' : 'bg-brand')}
                         style={{ width: `${Math.max(4, a * 100)}%` }}
                       />
                     </span>

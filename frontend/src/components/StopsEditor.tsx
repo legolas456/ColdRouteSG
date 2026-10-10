@@ -16,7 +16,7 @@ import { ADDRESS_BOOK, DEPOT, PROFILES } from '../data/sample'
 import { travel } from '../lib/optimizer'
 import { duration, hm, parseHm } from '../lib/time'
 import type { Cargo, ProfileId, Stop } from '../lib/types'
-import { Button, Divider, Kbd, Segmented, Tag } from './ui'
+import { Button, Divider, Kbd, Segmented, CargoTag } from './ui'
 
 interface Props {
   stops: Stop[]
@@ -153,7 +153,7 @@ export function StopsEditor(props: Props) {
               <div className={clsx('truncate text-[12px]', reviewCount ? 'text-fg-2' : 'text-fg-3')}>
                 {reviewCount ? (
                   <span className="inline-flex items-center gap-1">
-                    <AlertCircle size={12} className="text-signal" /> {reviewCount} address needs review
+                    <AlertCircle size={12} className="text-warn" /> {reviewCount} address needs review
                   </span>
                 ) : (
                   'All addresses verified with OneMap'
@@ -172,7 +172,7 @@ export function StopsEditor(props: Props) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block cursor-pointer rounded-control px-2.5 py-1.5 shadow-[inset_0_0_0_1px_var(--border-dark)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)] hover:bg-hover">
+    <label className="block cursor-pointer rounded-control px-2.5 py-1.5 shadow-[inset_0_0_0_1px_var(--border-dark)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)] hover:bg-hover">
       <span className="block text-[10.5px] text-fg-3">{label}</span>
       <span className="block h-5 text-[13px] leading-5 font-medium">{children}</span>
     </label>
@@ -196,7 +196,7 @@ function StopRow({
 }) {
   return (
     <li className={clsx('group relative transition-colors', open ? 'bg-hover' : 'hover:bg-hover')}>
-      {open && <span className="absolute inset-y-0 left-0 w-[2px] bg-ink" />}
+      {open && <span className="absolute inset-y-0 left-0 w-[3px] rounded-r-full bg-brand" />}
       <div className="flex cursor-pointer items-start gap-3 px-5 py-2.5" onClick={onToggle}>
         <GripVertical
           size={14}
@@ -205,7 +205,7 @@ function StopRow({
         <span
           className={clsx(
             'num mt-[1px] flex size-[22px] shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold',
-            open ? 'bg-ink text-on-ink' : 'text-fg-2 shadow-[inset_0_0_0_1.5px_var(--border-dark)]',
+            open ? 'bg-brand text-on-brand' : 'bg-brand-soft text-brand-fg',
           )}
         >
           {index}
@@ -213,7 +213,7 @@ function StopRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-medium text-[13.5px]">{stop.name}</span>
-            {stop.review && <AlertCircle size={13} className="shrink-0 text-signal" />}
+            {stop.review && <AlertCircle size={13} className="shrink-0 text-warn" />}
           </div>
           <div className="truncate text-[12px] text-fg-3">{stop.address}</div>
         </div>
@@ -223,7 +223,7 @@ function StopRow({
           </span>
           <span className="flex items-center gap-1.5">
             <span className="num text-[11px] text-fg-3">{stop.service}m</span>
-            <Tag>{stop.cargo}</Tag>
+            <CargoTag cargo={stop.cargo} />
           </span>
         </div>
         <button
@@ -318,7 +318,7 @@ function TimeInput({ value, onChange, className }: { value: number; onChange: (m
 
 function MiniField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block rounded-control bg-panel px-2 py-1 shadow-[inset_0_0_0_1px_var(--border-dark)] focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)]">
+    <label className="block rounded-control bg-panel px-2 py-1 shadow-[inset_0_0_0_1px_var(--border-dark)] focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
       <span className="block text-[10px] text-fg-3">{label}</span>
       <span className="block text-[12.5px]">{children}</span>
     </label>
@@ -345,7 +345,7 @@ function AddressSearch({ onPick, existing }: { onPick: (s: Stop) => void; existi
 
   return (
     <div className="relative">
-      <div className="flex h-9 items-center gap-2 rounded-control bg-subtle px-2.5 transition-shadow focus-within:bg-panel focus-within:shadow-[inset_0_0_0_1.5px_var(--ink)]">
+      <div className="flex h-9 items-center gap-2 rounded-control bg-subtle px-2.5 transition-shadow focus-within:bg-panel focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
         <Search size={14} className="text-fg-3" />
         <input
           ref={inputRef}
@@ -388,7 +388,7 @@ function AddressSearch({ onPick, existing }: { onPick: (s: Stop) => void; existi
                 <span className="block truncate font-medium">{r.name}</span>
                 <span className="block truncate text-[12px] text-fg-3">{r.address}</span>
               </span>
-              <Tag>{r.cargo}</Tag>
+              <CargoTag cargo={r.cargo} />
             </button>
           ))}
         </div>
@@ -424,7 +424,7 @@ function OptimisingSteps({ step, count }: { step: number; count: number }) {
       </ol>
       <div className="mt-2.5 h-[2px] overflow-hidden rounded-full bg-strong">
         <div
-          className="h-full bg-ink transition-[width] duration-300 ease-out"
+          className="h-full bg-brand transition-[width] duration-300 ease-out"
           style={{ width: `${Math.min(100, ((step + 1) / OPTIMISE_STEPS.length) * 100)}%` }}
         />
       </div>

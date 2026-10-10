@@ -4,71 +4,47 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /*
- * Design tokens follow the Manus palette: warm off-white canvas, ink-black
- * actions, hairline borders and transparent warm-grey fills. Every theme only
- * swaps CSS variables; components use the semantic utilities below.
+ * Design tokens. Values come from src/lib/themes.ts and are written onto <html>
+ * before first paint; the defaults below only cover the instant before that.
+ * Components use the semantic utilities (bg-panel, text-fg-2, bg-brand,
+ * text-ok, bg-bad-soft, ...), never raw colours.
  */
-:root,
-[data-theme='paper'] {
-  --bg-main: #f8f8f7;
+:root {
+  --bg-main: #f4f7f7;
   --bg-panel: #ffffff;
-  --bg-subtle: #f3f3f3;
-  --fill-hover: #37352f0a;
-  --fill-strong: #37352f14;
-  --fill-stronger: #37352f24;
-  --text-1: #1a1a1a;
-  --text-2: #4d4d4d;
-  --text-3: #737373;
-  --text-4: #a6a6a6;
-  --border-main: #0000000f;
-  --border-dark: #00000024;
-  --ink: #1a1a19;
+  --bg-subtle: #eef3f3;
+  --fill-hover: rgba(16, 24, 40, 0.04);
+  --fill-strong: rgba(16, 24, 40, 0.07);
+  --fill-stronger: rgba(16, 24, 40, 0.13);
+  --text-1: #101828;
+  --text-2: #475467;
+  --text-3: #667085;
+  --text-4: #98a2b3;
+  --border-main: #e8ebef;
+  --border-dark: #d0d5dd;
+  --ink: #101828;
   --on-ink: #ffffff;
-  --signal-on: #fb494f;
-  --shadow-card: 0 0 0 1px #16191d0d, 0 1px 2px #16191d08, 0 8px 24px #16191d0a;
-  --shadow-float: 0 0 0 1px #16191d14, 0 12px 32px #16191d14;
+  --brand: #0e9384;
+  --brand-hover: #107569;
+  --brand-soft: #e6f5f2;
+  --brand-text: #107569;
+  --on-brand: #ffffff;
+  --ok: #079455;
+  --ok-soft: #ecfdf3;
+  --warn: #dc6803;
+  --warn-soft: #fffaeb;
+  --bad: #d92d20;
+  --bad-soft: #fef3f2;
+  --signal: var(--bad);
+  --rain: #2e90fa;
+  --rain-soft: #eff8ff;
+  --cargo-pharma: #7a5af8;
+  --cargo-frozen: #2e90fa;
+  --cargo-chilled: #06aed4;
+  --shadow-card: 0 0 0 1px rgba(16, 24, 40, 0.05), 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.04);
+  --shadow-float: 0 0 0 1px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.1);
   --r-panel: 14px;
   --r-control: 8px;
-  --panel-border: 1px solid var(--border-main);
-}
-
-[data-theme='editorial'] {
-  --bg-main: #ffffff;
-  --bg-panel: #ffffff;
-  --bg-subtle: #fafafa;
-  --border-main: #00000014;
-  --border-dark: #00000033;
-  --shadow-card: none;
-  --shadow-float: 0 0 0 1px #00000014, 0 10px 30px #0000000d;
-  --r-panel: 2px;
-  --r-control: 2px;
-}
-
-[data-theme='dark'] {
-  --bg-main: #1a1a1a;
-  --bg-panel: #212121;
-  --bg-subtle: #2a2a2a;
-  --fill-hover: #ffffff0a;
-  --fill-strong: #ffffff14;
-  --fill-stronger: #ffffff24;
-  --text-1: #e6e6e6;
-  --text-2: #b3b3b3;
-  --text-3: #8c8c8c;
-  --text-4: #595959;
-  --border-main: #ffffff0f;
-  --border-dark: #ffffff1f;
-  --ink: #f2f2f2;
-  --on-ink: #141414;
-  --signal-on: #eb4d4d;
-  --shadow-card: 0 0 0 1px #ffffff0d;
-  --shadow-float: 0 0 0 1px #ffffff14, 0 16px 40px #00000066;
-}
-
-[data-signal='off'] {
-  --signal: var(--ink);
-}
-[data-signal='on'] {
-  --signal: var(--signal-on);
 }
 
 @theme inline {
@@ -86,7 +62,23 @@
   --color-line-strong: var(--border-dark);
   --color-ink: var(--ink);
   --color-on-ink: var(--on-ink);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-fg: var(--brand-text);
+  --color-on-brand: var(--on-brand);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
   --color-signal: var(--signal);
+  --color-rain: var(--rain);
+  --color-rain-soft: var(--rain-soft);
+  --color-pharma: var(--cargo-pharma);
+  --color-frozen: var(--cargo-frozen);
+  --color-chilled: var(--cargo-chilled);
   --radius-panel: var(--r-panel);
   --radius-control: var(--r-control);
   --shadow-card: var(--shadow-card);
@@ -136,7 +128,7 @@
     font-feature-settings: 'tnum' 1;
   }
   ::selection {
-    background: var(--fill-stronger);
+    background: var(--brand-soft);
   }
   button {
     cursor: pointer;
@@ -168,8 +160,16 @@
       transparent 1px 6px
     );
   }
+  .hatch-rain {
+    background-color: color-mix(in srgb, var(--rain) 7%, transparent);
+    background-image: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--rain) 45%, transparent) 0 1px,
+      transparent 1px 6px
+    );
+  }
   .hatch-signal {
-    background-image: repeating-linear-gradient(135deg, var(--signal) 0 1.5px, transparent 1.5px 5px);
+    background-image: repeating-linear-gradient(135deg, var(--bad) 0 1.5px, transparent 1.5px 5px);
   }
   .scroll-thin {
     scrollbar-width: thin;

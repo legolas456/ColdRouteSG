@@ -1,11 +1,11 @@
 import clsx from 'clsx'
-import { ArrowDown, ArrowUp, Minus, PencilLine, RefreshCw } from 'lucide-react'
+import { ArrowDown, ArrowUp, CloudRain, Minus, PencilLine, RefreshCw, Sparkles } from 'lucide-react'
 import { DEPOT } from '../data/sample'
 import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
 import { duration, hm, signed } from '../lib/time'
 import type { OptimiseResult, Plan, Stop } from '../lib/types'
-import { Button, DotMeter, Segmented, Tag } from './ui'
+import { Button, CargoTag, DotMeter, Segmented } from './ui'
 
 export type View = 'coldroute' | 'baseline' | 'compare'
 
@@ -58,34 +58,45 @@ export function ResultsPanel(props: Props) {
         <Kpi
           label="Late deliveries"
           value={String(shown.lateStops)}
+          valueTone={shown.lateStops > 0 ? 'bad' : other.lateStops > 0 ? 'ok' : undefined}
+          delta={delta(shown.lateStops - other.lateStops, String(shown.lateStops - other.lateStops), 'outcome')}
           sub={`${otherName}: ${other.lateStops}${other.lateMinutes ? ` · ${Math.round(other.lateMinutes)} min late` : ''}`}
-          emphasis={shown.lateStops > 0}
           className="border-r border-b border-line"
         />
         <Kpi
           label="Cold-chain exposure"
           value={`${Math.round(shown.exposure)}`}
           unit="min"
-          sub={`${signed(exposureDelta)}% vs ${otherName.toLowerCase()}`}
+          delta={delta(exposureDelta, `${signed(exposureDelta)}%`, 'outcome')}
+          sub={`${otherName}: ${Math.round(other.exposure)} min`}
           className="border-b border-line"
         />
         <Kpi
           label="Drive time"
           value={`${Math.round(shown.drive)}`}
           unit="min"
-          sub={`${signed(shown.drive - other.drive)} min vs ${otherName.toLowerCase()}`}
+          delta={delta(shown.drive - other.drive, `${signed(shown.drive - other.drive)} min`, 'cost')}
+          sub={`${otherName}: ${Math.round(other.drive)} min`}
           className="border-r border-line"
         />
-        <Kpi label="Distance" value={shown.km.toFixed(1)} unit="km" sub={`${signed(shown.km - other.km, 1)} km`} />
+        <Kpi
+          label="Distance"
+          value={shown.km.toFixed(1)}
+          unit="km"
+          delta={delta(shown.km - other.km, `${signed(shown.km - other.km, 1)} km`, 'cost')}
+          sub={`${otherName}: ${other.km.toFixed(1)} km`}
+        />
       </div>
 
       {view !== 'baseline' ? (
-        <div className="mx-5 mt-4 border-l-2 border-ink pl-3">
-          <div className="eyebrow">Why this route</div>
-          <p className="mt-1 text-[13px] leading-relaxed text-fg-2">{summarise(result, stopList)}</p>
+        <div className="mx-5 mt-4 rounded-[10px] bg-brand-soft px-3.5 py-3">
+          <div className="eyebrow flex items-center gap-1.5 !text-brand-fg">
+            <Sparkles size={12} strokeWidth={2} /> Why this route
+          </div>
+          <p className="mt-1 text-[13px] leading-relaxed text-fg">{summarise(result, stopList)}</p>
         </div>
       ) : (
-        <div className="mx-5 mt-4 border-l-2 border-line-strong pl-3">
+        <div className="mx-5 mt-4 rounded-[10px] bg-subtle px-3.5 py-3">
           <div className="eyebrow">Shortest route</div>
           <p className="mt-1 text-[13px] leading-relaxed text-fg-2">
             Minimises driving only. It ignores time windows, showers and parking, which is what most dispatch tools do today.
@@ -113,17 +124,17 @@ export function ResultsPanel(props: Props) {
                 onClick={() => onSelect(selected ? null : row.id)}
                 className={clsx(
                   'group relative grid w-full grid-cols-[24px_1fr_auto] gap-3 px-5 py-2.5 text-left transition-colors',
-                  selected ? 'bg-hover' : 'hover:bg-hover',
+                  selected ? 'bg-brand-soft/60' : 'hover:bg-hover',
                 )}
               >
-                {selected && <span className="absolute inset-y-0 left-0 w-[2px] bg-ink" />}
+                {selected && <span className="absolute inset-y-0 left-0 w-[3px] rounded-r-full bg-brand" />}
                 {i < shown.rows.length - 1 && (
                   <span className="absolute top-[36px] bottom-[-10px] left-[31.5px] w-px bg-line-strong" />
                 )}
                 <span
                   className={clsx(
                     'num relative z-[1] mt-[1px] flex size-6 items-center justify-center rounded-full text-[11px] font-semibold',
-                    view === 'baseline' ? 'bg-panel text-fg shadow-[inset_0_0_0_1.5px_var(--ink)]' : 'bg-ink text-on-ink',
+                    view === 'baseline' ? 'bg-panel text-fg-2 shadow-[inset_0_0_0_1.5px_var(--text-4)]' : 'bg-brand text-on-brand',
                   )}
                 >
                   {row.seq}
@@ -132,7 +143,7 @@ export function ResultsPanel(props: Props) {
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[13.5px] font-medium">{s.name}</span>
                     {isRisk && (
-                      <span className="num shrink-0 rounded-[4px] bg-ink px-1.5 py-[1px] text-[9.5px] font-semibold tracking-[0.06em] text-on-ink">
+                      <span className="num shrink-0 rounded-full bg-bad-soft px-1.5 py-[1px] text-[9.5px] font-semibold tracking-[0.06em] text-bad">
                         HIGHEST RISK
                       </span>
                     )}
@@ -142,7 +153,7 @@ export function ResultsPanel(props: Props) {
                       {hm(s.windowStart)}–{hm(s.windowEnd)}
                     </span>
                     <span className="text-fg-4">·</span>
-                    <Tag className="h-4 text-[9.5px]">{s.cargo}</Tag>
+                    <CargoTag cargo={s.cargo} className="h-4" />
                     {row.wait > 1 && (
                       <>
                         <span className="text-fg-4">·</span>
@@ -161,11 +172,18 @@ export function ResultsPanel(props: Props) {
                 <span className="flex flex-col items-end">
                   <span className="num text-[14px] font-medium">{hm(row.arrival)}</span>
                   {row.late > 0 ? (
-                    <span className="num mt-0.5 text-[11px] font-medium text-signal">+{Math.round(row.late)} min late</span>
+                    <span className="num mt-0.5 text-[11px] font-medium text-bad">+{Math.round(row.late)} min late</span>
                   ) : row.inRain ? (
-                    <span className="mt-0.5 text-[11px] text-fg-2">in showers</span>
+                    <span className="mt-0.5 flex items-center gap-1 text-[11px] font-medium text-rain">
+                      <CloudRain size={11} strokeWidth={2} /> in showers
+                    </span>
                   ) : (
-                    <span className="num mt-0.5 flex items-center gap-0.5 text-[11px] text-fg-3">
+                    <span
+                      className={clsx(
+                        'num mt-0.5 flex items-center gap-0.5 text-[11px]',
+                        move !== 0 && view !== 'baseline' ? 'text-brand-fg' : 'text-fg-3',
+                      )}
+                    >
                       {move > 0 ? <ArrowUp size={11} /> : move < 0 ? <ArrowDown size={11} /> : <Minus size={11} />}
                       {move !== 0 ? Math.abs(move) : ''}
                       {view === 'compare' && ref && <span className="ml-1 text-fg-4">was #{ref.seq}</span>}
@@ -192,26 +210,59 @@ export function ResultsPanel(props: Props) {
   )
 }
 
+type Tone = 'good' | 'bad' | 'neutral'
+
+/**
+ * Lower is better for every KPI. Outcomes (lateness, exposure) turn red when
+ * worse; costs (drive, distance) stay neutral because they are the trade-off.
+ */
+function delta(diff: number, text: string, kind: 'outcome' | 'cost'): { text: string; tone: Tone } {
+  if (Math.abs(diff) < 0.05) return { text: 'same', tone: 'neutral' }
+  return { text, tone: diff < 0 ? 'good' : kind === 'outcome' ? 'bad' : 'neutral' }
+}
+
 function Kpi({
   label,
   value,
   unit,
   sub,
-  emphasis,
+  delta,
+  valueTone,
   className,
 }: {
   label: string
   value: string
   unit?: string
   sub: string
-  emphasis?: boolean
+  delta?: { text: string; tone: Tone }
+  valueTone?: 'ok' | 'bad'
   className?: string
 }) {
   return (
     <div className={clsx('px-3.5 pt-3 pb-3', className)}>
-      <div className="text-[11.5px] text-fg-3">{label}</div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11.5px] text-fg-3">{label}</span>
+        {delta && (
+          <span
+            className={clsx(
+              'num inline-flex h-[18px] items-center rounded-full px-1.5 text-[10.5px] font-medium',
+              delta.tone === 'good' && 'bg-ok-soft text-ok',
+              delta.tone === 'bad' && 'bg-bad-soft text-bad',
+              delta.tone === 'neutral' && 'bg-subtle text-fg-3',
+            )}
+          >
+            {delta.text}
+          </span>
+        )}
+      </div>
       <div className="mt-1 flex items-baseline gap-1">
-        <span className={clsx('font-serif text-[30px] leading-none tracking-[-0.03em]', emphasis && 'text-signal')}>
+        <span
+          className={clsx(
+            'font-serif text-[30px] leading-none tracking-[-0.03em]',
+            valueTone === 'ok' && 'text-ok',
+            valueTone === 'bad' && 'text-bad',
+          )}
+        >
           {value}
         </span>
         {unit && <span className="text-[12px] text-fg-3">{unit}</span>}

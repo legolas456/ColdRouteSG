@@ -7,13 +7,14 @@ import { RAIN } from '../data/sample'
 import { legGeometry, pathFor } from '../lib/optimizer'
 import { hm } from '../lib/time'
 import type { Depot, OptimiseResult, Stop } from '../lib/types'
+import type { MapPalette } from '../lib/themes'
 import type { View } from './ResultsPanel'
 
 // The ESM build resolves its worker relative to import.meta.url, which breaks
 // once Vite pre-bundles or hashes the library. Point it at the shipped file.
 setWorkerUrl(workerUrl)
 
-export type MapTheme = 'light' | 'dark'
+export type { MapPalette }
 export interface Layers {
   rain: boolean
   parking: boolean
@@ -21,49 +22,10 @@ export interface Layers {
   baseline: boolean
 }
 
-const STYLE: Record<MapTheme, string> = {
+const STYLE: Record<MapPalette['base'], string> = {
   light: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
   dark: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
 }
-
-const PALETTE = {
-  light: {
-    bg: '#f2f2f0',
-    land: '#ededea',
-    water: '#e1e1de',
-    waterLine: '#d9d9d6',
-    building: '#e7e7e4',
-    road: '#ffffff',
-    casing: '#e2e2df',
-    boundary: '#d4d4d1',
-    label: '#9b9b97',
-    waterLabel: '#b0b0ac',
-    halo: '#f2f2f0',
-    ink: '#1a1a19',
-    halo2: '#ffffff',
-    muted: '#a3a3a0',
-    hatch: 'rgba(26,26,25,0.42)',
-    rainFill: 'rgba(26,26,25,0.03)',
-  },
-  dark: {
-    bg: '#1b1b1b',
-    land: '#1f1f1f',
-    water: '#121212',
-    waterLine: '#161616',
-    building: '#252525',
-    road: '#2c2c2c',
-    casing: '#232323',
-    boundary: '#333333',
-    label: '#6d6d6d',
-    waterLabel: '#4a4a4a',
-    halo: '#1b1b1b',
-    ink: '#f2f2f2',
-    halo2: '#1b1b1b',
-    muted: '#5e5e5e',
-    hatch: 'rgba(242,242,242,0.34)',
-    rainFill: 'rgba(242,242,242,0.03)',
-  },
-} as const
 
 const EMPTY_LINE: GeoJSON.Feature<GeoJSON.LineString> = {
   type: 'Feature',
@@ -72,12 +34,11 @@ const EMPTY_LINE: GeoJSON.Feature<GeoJSON.LineString> = {
 }
 
 /**
- * Repaint the Carto vector style into a quiet monochrome basemap. Runs on the
+ * Repaint the Carto vector style into a quiet, lightly tinted basemap. Runs on the
  * style JSON before MapLibre sees it, so there is no flash of the original
  * colours and no paint transitions on load.
  */
-function monochromeSpec(style: StyleSpecification, theme: MapTheme): StyleSpecification {
-  const c = PALETTE[theme]
+function tintedSpec(style: StyleSpecification, c: MapPalette): StyleSpecification {
   const layers = style.layers.map((layer) => {
     const id = layer.id
     const paint: Record<string, unknown> = { ...('paint' in layer ? layer.paint : {}) }
@@ -85,6 +46,7 @@ function monochromeSpec(style: StyleSpecification, theme: MapTheme): StyleSpecif
     if (layer.type === 'background') paint['background-color'] = c.bg
     else if (layer.type === 'fill') {
       if (/water/.test(id)) paint['fill-color'] = c.water
+      else if (/park|wood|grass|forest|nature|cemetery|golf|pitch/.test(id)) paint['fill-color'] = c.park
       else if (/building/.test(id)) {
         paint['fill-color'] = c.building
         paint['fill-outline-color'] = c.casing
@@ -108,14 +70,14 @@ function monochromeSpec(style: StyleSpecification, theme: MapTheme): StyleSpecif
   return { ...style, transition: { duration: 0, delay: 0 }, layers }
 }
 
-const blankStyle = (theme: MapTheme): StyleSpecification => ({
+const blankStyle = (c: MapPalette): StyleSpecification => ({
   version: 8,
   sources: {},
-  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': PALETTE[theme].bg } }],
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': c.bg } }],
 })
 
-function applyBasemap(map: MapLibre, theme: MapTheme) {
-  map.setStyle(STYLE[theme], { diff: false, transformStyle: (_prev, next) => monochromeSpec(next, theme) })
+function applyBasemap(map: MapLibre, c: MapPalette) {
+  map.setStyle(STYLE[c.base], { diff: false, transformStyle: (_prev, next) => tintedSpec(next, c) })
 }
 
 function hatchImage(color: string) {
@@ -148,8 +110,7 @@ function rainPolygon(): GeoJSON.Feature<GeoJSON.Polygon> {
   return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } }
 }
 
-function addOverlays(map: MapLibre, theme: MapTheme) {
-  const c = PALETTE[theme]
+function addOverlays(map: MapLibre, c: MapPalette) {
   // Carto puts a few water labels before the road layers; anchor overlays above
   // the last road/building layer so white road fills never cover the route.
   const styleLayers = map.getStyle().layers ?? []
@@ -159,16 +120,17 @@ function addOverlays(map: MapLibre, theme: MapTheme) {
   })
   const before = styleLayers.slice(lastGeometry + 1).find((l) => l.type === 'symbol')?.id
   if (map.hasImage('hatch')) map.removeImage('hatch')
-  map.addImage('hatch', hatchImage(c.hatch), { pixelRatio: 2 })
+  map.addImage('hatch', hatchImage(c.rainHatch), { pixelRatio: 2 })
 
   map.addSource('rain', { type: 'geojson', data: rainPolygon() })
+  map.addLayer({ id: 'rain-tint', type: 'fill', source: 'rain', paint: { 'fill-color': c.rain, 'fill-opacity': c.base === 'dark' ? 0.1 : 0.07 } }, before)
   map.addLayer({ id: 'rain-fill', type: 'fill', source: 'rain', paint: { 'fill-pattern': 'hatch', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, 1, 14, 0.45] } }, before)
   map.addLayer(
     {
       id: 'rain-line',
       type: 'line',
       source: 'rain',
-      paint: { 'line-color': c.ink, 'line-opacity': 0.35, 'line-width': 1, 'line-dasharray': [3, 3] },
+      paint: { 'line-color': c.rain, 'line-opacity': 0.6, 'line-width': 1.2, 'line-dasharray': [3, 3] },
     },
     before,
   )
@@ -183,7 +145,7 @@ function addOverlays(map: MapLibre, theme: MapTheme) {
       id: 'walk',
       type: 'line',
       source: 'walk',
-      paint: { 'line-color': c.ink, 'line-width': 1.2, 'line-dasharray': [1, 2], 'line-opacity': 0.7 },
+      paint: { 'line-color': c.walk, 'line-width': 1.2, 'line-dasharray': [1, 2], 'line-opacity': 0.7 },
     },
     before,
   )
@@ -193,7 +155,7 @@ function addOverlays(map: MapLibre, theme: MapTheme) {
       type: 'line',
       source: 'route-secondary',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': c.muted, 'line-width': 2.2, 'line-dasharray': [2, 2] },
+      paint: { 'line-color': c.baseline, 'line-width': 2.2, 'line-dasharray': [2, 2] },
     },
     before,
   )
@@ -203,7 +165,7 @@ function addOverlays(map: MapLibre, theme: MapTheme) {
       type: 'line',
       source: 'route-primary',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-gradient': reveal(c.halo2, 1), 'line-width': 7.5 },
+      paint: { 'line-gradient': reveal(c.routeCasing, 1), 'line-width': 7.5 },
     },
     before,
   )
@@ -213,7 +175,7 @@ function addOverlays(map: MapLibre, theme: MapTheme) {
       type: 'line',
       source: 'route-primary',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-gradient': reveal(c.ink, 1), 'line-width': 3.2 },
+      paint: { 'line-gradient': reveal(c.route, 1), 'line-width': 3.6 },
     },
     before,
   )
@@ -223,7 +185,7 @@ function addOverlays(map: MapLibre, theme: MapTheme) {
       type: 'line',
       source: 'traffic',
       layout: { 'line-cap': 'round' },
-      paint: { 'line-color': c.ink, 'line-width': 7, 'line-opacity': 0.22 },
+      paint: { 'line-color': c.traffic, 'line-width': 7, 'line-opacity': 0.32 },
     },
     before,
   )
@@ -248,7 +210,7 @@ function markerEl(html: string, onClick?: () => void) {
 }
 
 interface Props {
-  theme: MapTheme
+  palette: MapPalette
   depot: Depot
   stops: Stop[]
   result: OptimiseResult | null
@@ -265,12 +227,12 @@ interface Props {
 }
 
 export function MapView(props: Props) {
-  const { theme, depot, stops, result, view, phase, selectedId, onSelect, layers, setLayers } = props
+  const { palette, depot, stops, result, view, phase, selectedId, onSelect, layers, setLayers } = props
   const insetLeft = props.insetLeft ?? 0
   const insetBottom = props.insetBottom ?? 0
   const ref = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibre | null>(null)
-  const themeRef = useRef(theme)
+  const themeRef = useRef(palette)
   const markersRef = useRef<Marker[]>([])
   const animRef = useRef(0)
   const revealTimer = useRef(0)
@@ -343,10 +305,10 @@ export function MapView(props: Props) {
 
   // theme swap
   useEffect(() => {
-    if (themeRef.current === theme) return
-    themeRef.current = theme
-    if (mapRef.current) applyBasemap(mapRef.current, theme)
-  }, [theme])
+    if (themeRef.current === palette) return
+    themeRef.current = palette
+    if (mapRef.current) applyBasemap(mapRef.current, palette)
+  }, [palette])
 
   const primaryPlan = result ? (view === 'baseline' ? result.baseline : result.recommended) : null
   const secondaryPlan = result
@@ -362,6 +324,7 @@ export function MapView(props: Props) {
     const map = mapRef.current
     if (!map || !styleVersion || !map.getSource('route-primary')) return
     const vis = (id: string, on: boolean) => map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
+    vis('rain-tint', layers.rain)
     vis('rain-fill', layers.rain)
     vis('rain-line', layers.rain)
     vis('walk', layers.parking)
@@ -410,10 +373,13 @@ export function MapView(props: Props) {
       return
     }
     primary.setData({ ...EMPTY_LINE, geometry: { type: 'LineString', coordinates: coords } })
-    const c = PALETTE[themeRef.current]
+    const c = themeRef.current
+    // the shortest route is "not ours": draw it in neutral, ColdRoute in brand
+    const lineColor = view === 'baseline' ? c.walk : c.route
+    map.setPaintProperty('route-secondary', 'line-color', view === 'baseline' ? c.route : c.baseline)
     const paint = (p: number) => {
-      map.setPaintProperty('route-primary', 'line-gradient', reveal(c.ink, p))
-      map.setPaintProperty('route-casing', 'line-gradient', reveal(c.halo2, p))
+      map.setPaintProperty('route-primary', 'line-gradient', reveal(lineColor, p))
+      map.setPaintProperty('route-casing', 'line-gradient', reveal(c.routeCasing, p))
     }
     const t0 = performance.now()
     const total = 900
@@ -429,7 +395,7 @@ export function MapView(props: Props) {
       cancelAnimationFrame(animRef.current)
       paint(1)
     }, total + 200)
-  }, [styleVersion, primaryPlan, secondaryPlan, layers, depot, stopById, stops])
+  }, [styleVersion, primaryPlan, secondaryPlan, layers, depot, stopById, stops, view])
 
   // markers
   useEffect(() => {
@@ -453,7 +419,7 @@ export function MapView(props: Props) {
       add(
         markerEl(
           `<div class="flex items-center gap-1.5 rounded-full bg-panel px-2.5 py-1 text-[11px] font-medium text-fg shadow-card whitespace-nowrap">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/><path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2"/></svg>
+            <svg class="text-rain" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/><path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2"/></svg>
             ${RAIN.label} · <span class="num">${hm(RAIN.start)}–${hm(RAIN.end)}</span></div>`,
         ),
         // south-east rim of the shower cell, label hanging off it
@@ -473,7 +439,7 @@ export function MapView(props: Props) {
         const risky = s.parking.risk >= 0.7
         add(
           markerEl(
-            `<div class="relative flex size-[18px] items-center justify-center rounded-[5px] bg-panel num text-[9.5px] font-bold text-fg shadow-[inset_0_0_0_1.5px_var(--ink)]">P
+            `<div class="relative flex size-[18px] items-center justify-center rounded-[5px] bg-panel num text-[9.5px] font-bold text-fg-2 shadow-[inset_0_0_0_1.5px_var(--text-3)]">P
               ${risky ? `<div class="absolute left-[24px] top-1/2 -translate-y-1/2 whitespace-nowrap rounded-[5px] bg-panel px-1.5 py-0.5 text-[10.5px] text-fg-2 shadow-card"><span class="num">${s.parking.distanceKm} km</span> walk · <span class="num">${s.parking.freePct}%</span> free</div>` : ''}
             </div>`,
           ),
@@ -505,17 +471,21 @@ export function MapView(props: Props) {
       const late = !!row && row.late > 0
       const solid = phase === 'optimised' && view !== 'baseline'
       const size = selected ? 32 : 26
-      const ring = selected ? 'shadow-[0_0_0_3px_var(--bg-panel),0_0_0_4.5px_var(--ink)]' : 'shadow-[0_0_0_3px_var(--bg-panel)]'
-      const body = solid ? 'bg-ink text-on-ink' : 'bg-panel text-fg shadow-[inset_0_0_0_1.75px_var(--ink)]'
+      const ring = selected ? 'shadow-[0_0_0_3px_var(--bg-panel),0_0_0_5px_var(--brand)]' : 'shadow-[0_0_0_3px_var(--bg-panel),0_1px_3px_3px_rgba(16,24,40,0.12)]'
+      const body = solid
+        ? 'bg-brand text-on-brand'
+        : view === 'baseline' && phase === 'optimised'
+          ? 'bg-panel text-fg-2 shadow-[inset_0_0_0_1.75px_var(--text-3)]'
+          : 'bg-panel text-brand-fg shadow-[inset_0_0_0_1.75px_var(--brand)]'
       const offset = offsets[s.id] ?? [0, 0]
       const labelSide = offset[0] < -2 ? `right:${size + 7}px` : `left:${size + 7}px`
       add(
         markerEl(
           `<div class="relative transition-transform duration-150 hover:scale-110" style="width:${size}px;height:${size}px">
-            ${risk ? '<span class="absolute inset-0 rounded-full border-2 border-signal animate-pulse-ring"></span>' : ''}
+            ${risk ? '<span class="absolute inset-0 rounded-full border-2 border-bad animate-pulse-ring"></span>' : ''}
             <span class="absolute inset-0 rounded-full ${ring}"></span>
             <span class="num absolute inset-0 flex items-center justify-center rounded-full ${body} text-[11.5px] font-semibold">${seq}</span>
-            ${late ? '<span class="absolute -right-0.5 -top-0.5 size-[10px] rounded-full bg-signal shadow-[0_0_0_2px_var(--bg-panel)]"></span>' : ''}
+            ${late ? '<span class="absolute -right-0.5 -top-0.5 size-[10px] rounded-full bg-bad shadow-[0_0_0_2px_var(--bg-panel)]"></span>' : ''}
             <div class="absolute top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] ${selected ? 'font-semibold text-fg' : 'font-medium text-fg-2'} [text-shadow:0_0_3px_var(--bg-main),0_0_3px_var(--bg-main),0_0_3px_var(--bg-main)]" style="${labelSide}">${s.short}${row && phase === 'optimised' ? ` <span class="num font-normal text-fg-3">${hm(row.arrival)}</span>` : ''}</div>
           </div>`,
           () => onSelectRef.current(selectedId === s.id ? null : s.id),
@@ -548,11 +518,11 @@ export function MapView(props: Props) {
     } else fit()
   }, [selectedId, padding, stops.length])
 
-  const toggles: Array<{ key: keyof Layers; label: string; show: boolean }> = [
-    { key: 'rain', label: 'Showers', show: true },
-    { key: 'parking', label: 'Carparks', show: true },
-    { key: 'traffic', label: 'Traffic', show: phase === 'optimised' },
-    { key: 'baseline', label: 'Shortest route', show: phase === 'optimised' && view === 'coldroute' },
+  const toggles: Array<{ key: keyof Layers; label: string; show: boolean; dot: string }> = [
+    { key: 'rain', label: 'Showers', show: true, dot: 'bg-rain' },
+    { key: 'parking', label: 'Carparks', show: true, dot: 'bg-fg-2' },
+    { key: 'traffic', label: 'Traffic', show: phase === 'optimised', dot: 'bg-bad' },
+    { key: 'baseline', label: 'Shortest route', show: phase === 'optimised' && view === 'coldroute', dot: 'bg-fg-4' },
   ]
 
   return (
@@ -569,10 +539,10 @@ export function MapView(props: Props) {
               onClick={() => setLayers({ ...layers, [t.key]: !layers[t.key] })}
               className={clsx(
                 'flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium shadow-card transition-colors',
-                layers[t.key] ? 'bg-ink text-on-ink' : 'bg-panel text-fg-2 hover:text-fg',
+                layers[t.key] ? 'bg-panel text-fg shadow-[0_0_0_1.5px_var(--brand),0_1px_2px_rgba(16,24,40,0.08)]' : 'bg-panel/90 text-fg-3 hover:text-fg',
               )}
             >
-              <span className={clsx('size-1.5 rounded-full', layers[t.key] ? 'bg-on-ink' : 'bg-fg-4')} />
+              <span className={clsx('size-2 rounded-full transition-opacity', t.dot, !layers[t.key] && 'opacity-35')} />
               {t.label}
             </button>
           ))}
@@ -584,7 +554,7 @@ export function MapView(props: Props) {
           style={{ left: 16 + insetLeft, bottom: 16 + insetBottom }}
         >
           <span className="flex items-center gap-1.5">
-            <span className="h-[3px] w-5 rounded-full bg-ink" />
+            <span className={clsx('h-[3px] w-5 rounded-full', view === 'baseline' ? 'bg-fg-2' : 'bg-brand')} />
             {view === 'baseline' ? 'Shortest route' : 'ColdRoute'}
           </span>
           {secondaryPlan && (
@@ -594,12 +564,12 @@ export function MapView(props: Props) {
             </span>
           )}
           <span className="flex items-center gap-1.5">
-            <span className="hatch size-3 rounded-[3px] shadow-[inset_0_0_0_1px_var(--border-dark)]" />
+            <span className="hatch-rain size-3 rounded-[3px]" />
             Showers
           </span>
           {view !== 'baseline' && (
             <span className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full border-2 border-signal" />
+              <span className="size-2.5 rounded-full border-2 border-bad" />
               Highest risk
             </span>
           )}

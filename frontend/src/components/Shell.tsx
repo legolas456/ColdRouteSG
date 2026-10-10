@@ -6,16 +6,16 @@ import { Button, StatusPill } from './ui'
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 28 28" className={clsx('size-7', className)} aria-hidden>
-      <rect width="28" height="28" rx="8" className="fill-ink" />
+      <rect width="28" height="28" rx="8" className="fill-brand" />
       <path
         d="M8 19.5c0-3 2.4-4.6 5-4.6h2.2c2.4 0 4.8-1.4 4.8-4.4"
         fill="none"
         strokeWidth="1.8"
         strokeLinecap="round"
-        className="stroke-on-ink"
+        className="stroke-on-brand"
       />
-      <circle cx="8" cy="19.5" r="2" className="fill-on-ink" />
-      <circle cx="20" cy="9" r="2.6" fill="none" strokeWidth="1.6" className="stroke-on-ink" />
+      <circle cx="8" cy="19.5" r="2" className="fill-on-brand" />
+      <circle cx="20" cy="9" r="2.6" fill="none" strokeWidth="1.6" className="stroke-on-brand" />
     </svg>
   )
 }
@@ -37,7 +37,7 @@ export function NavRail() {
           title={label}
           className={clsx(
             'group relative flex size-10 items-center justify-center rounded-[10px] transition-colors',
-            active ? 'bg-strong text-fg' : 'text-fg-3 hover:bg-hover hover:text-fg',
+            active ? 'bg-brand-soft text-brand-fg' : 'text-fg-3 hover:bg-hover hover:text-fg',
           )}
         >
           <Icon size={18} strokeWidth={1.6} />
@@ -50,7 +50,7 @@ export function NavRail() {
         <button title="Settings" className="flex size-10 items-center justify-center rounded-[10px] text-fg-3 hover:bg-hover hover:text-fg">
           <Settings size={18} strokeWidth={1.6} />
         </button>
-        <div className="flex size-8 items-center justify-center rounded-full bg-strong text-[11px] font-semibold text-fg-2">FL</div>
+        <div className="flex size-8 items-center justify-center rounded-full bg-brand-soft text-[11px] font-semibold text-brand-fg">FL</div>
       </div>
     </nav>
   )
@@ -81,8 +81,8 @@ export function TopBar({
       <div className="flex-1" />
       <StatusPill tone="live">
         <span className="relative flex size-1.5">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-fg-3 opacity-60" />
-          <span className="relative inline-flex size-1.5 rounded-full bg-fg-2" />
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-60" />
+          <span className="relative inline-flex size-1.5 rounded-full bg-ok" />
         </span>
         NEA · LTA · HDB <span className="num">{updatedAt}</span>
       </StatusPill>
