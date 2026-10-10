@@ -11,6 +11,7 @@ Project knowledge for the ColdRoute SG group project (CS5224 Cloud Computing, Gr
 | [product-design.md](product-design.md) | Product definition and UX: the dispatcher flow, key screens, explanations, and the wider ideas we may still build |
 | [brand.md](brand.md) | Name, logo, colours, fonts and tone, for anything visual (slides, posters, images, videos) |
 | [roadmap.md](roadmap.md) | Status and to-dos, in priority order |
+| [deployment.md](deployment.md) | Where the live demo runs, where the AWS keys are (not in the repo), how to deploy, and the CI to-do |
 
 ## Where other knowledge lives
 
@@ -19,7 +20,7 @@ Project knowledge for the ColdRoute SG group project (CS5224 Cloud Computing, Gr
 | Backend, public data endpoints, optimisation logic | [`../README.md`](../README.md) and `backend/` |
 | Frontend features, layouts, screenshots | [`../frontend/README.md`](../frontend/README.md) and `frontend/docs/screenshots/` |
 | UI rules (tokens, buttons, switches, copy) | [`../frontend/AGENTS.md`](../frontend/AGENTS.md) |
-| Live demo | https://production.d3afn54umnn6ms.amplifyapp.com/ (AWS Amplify) |
+| Live demo | https://main.daledp6z7ncmz.amplifyapp.com/ (AWS Amplify, deployed by hand with `make deploy`, see [deployment.md](deployment.md)) |
 | Singapore data sources | data.gov.sg (NEA weather, HDB carparks, traffic cameras), LTA DataMall, OneMap, OSRM. Check their official docs before quoting numbers. |
 
 If two sources disagree, the code on `main` wins. Then fix the doc.

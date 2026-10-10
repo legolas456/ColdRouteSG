@@ -8,13 +8,16 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [x] Python + FastAPI local MVP with public data.gov.sg feeds and OSRM (`backend/`).
 - [x] New dispatcher console (PR #1): workspace, three views, KPIs, explanations, timeline, Singapore map, share and account mocks, phone layout, light and dark.
 - [x] Project docs (this folder).
+- [x] New console deployed by hand to Amplify: https://main.daledp6z7ncmz.amplifyapp.com/ (`make deploy`, see [deployment.md](deployment.md)).
 
 ## Next, in priority order
 
 ### 1. Deploy what we have
 
-- [ ] Check the Amplify app's branch and build settings so the live demo builds the new console from `main` (`frontend/`, Node 22).
-- [ ] Add the live demo link and a short "real vs mocked" note to the root README.
+- [x] Find out how the old demo was deployed: by hand, no CI and no keys in the repo. Details in [deployment.md](deployment.md).
+- [x] One-off manual deploy of the new console from a local machine (`make deploy`).
+- [ ] **CI: get GitHub permissions from the repo owner (legolas456) first.** We're `write` collaborators and can't connect the Amplify GitHub App or change Actions settings, so CI is blocked until then. Options are in [deployment.md](deployment.md#todo-ci-blocked-on-the-repo-owner).
+- [x] Add the live demo link and a short "real vs mocked" note to the root README.
 
 ### 2. Connect the frontend and the backend
 
