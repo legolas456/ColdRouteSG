@@ -5,7 +5,7 @@ import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
 import { duration, hm, signed } from '../lib/time'
 import type { OptimiseResult, Plan, Stop, StopResult } from '../lib/types'
-import { Button, CargoTag, Tabs } from './ui'
+import { Button, CargoTag, Segmented } from './ui'
 
 export type View = 'coldroute' | 'baseline' | 'compare'
 
@@ -68,19 +68,31 @@ export function ResultsPanel(props: Props) {
           </div>
         )}
       </div>
-      <Tabs<View>
-        label="Route view"
-        className="sticky top-0 z-10 mt-2 bg-panel px-5"
-        value={view}
-        onChange={setView}
-        options={[
-          { value: 'coldroute', label: 'ColdRoute', title: 'The recommended, risk-aware plan' },
-          { value: 'baseline', label: 'Shortest route', title: 'Minimises driving only' },
-          { value: 'compare', label: 'Compare', title: 'Both plans on one map' },
-        ]}
-      />
+      {/* same switch as the draft profile picker; stays reachable while the panel scrolls */}
+      <div className="sticky top-0 z-10 bg-panel px-5 pt-3 pb-2">
+        <Segmented<View>
+          label="Route view"
+          className="w-full"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'coldroute', label: 'ColdRoute', title: 'The recommended, risk-aware plan' },
+            {
+              value: 'baseline',
+              // "Shortest" alone on a narrow panel, like the KPI captions
+              label: (
+                <>
+                  Shortest<span className="@max-sm:hidden"> route</span>
+                </>
+              ),
+              title: 'Shortest route: minimises driving only',
+            },
+            { value: 'compare', label: 'Compare', title: 'Both plans on one map' },
+          ]}
+        />
+      </div>
 
-      <div className="mx-5 mt-4 grid grid-cols-2 overflow-hidden rounded-panel shadow-[inset_0_0_0_1px_var(--border-main)]">
+      <div className="mx-5 mt-2 grid grid-cols-2 overflow-hidden rounded-panel shadow-[inset_0_0_0_1px_var(--border-main)]">
         <Kpi
           label="Late deliveries"
           value={String(shown.lateStops)}

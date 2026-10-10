@@ -1,6 +1,6 @@
 # ColdRoute SG — Local MVP
 
-ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation in Singapore** using public weather, parking and traffic-camera data. The frontend is **React + TypeScript + Vite + Tailwind CSS + MapLibre**, a single-screen dispatcher console. See [`frontend/README.md`](frontend/README.md). The backend is **Python + FastAPI**.
+ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation in Singapore** using public weather, parking and traffic-camera data. The frontend is **React + TypeScript + Vite + Tailwind CSS + MapLibre**, a single-screen dispatcher console. See [`frontend/README.md`](frontend/README.md); UI conventions are in [`frontend/AGENTS.md`](frontend/AGENTS.md). The backend is **Python + FastAPI**.
 
 This version intentionally has **no AWS integration** and does **not require any API key or registration** to run.
 

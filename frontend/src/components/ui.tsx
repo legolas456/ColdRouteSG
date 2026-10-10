@@ -75,7 +75,7 @@ export function Segmented<T extends string>({
   label,
 }: {
   value: T
-  options: Array<{ value: T; label: ReactNode }>
+  options: Array<{ value: T; label: ReactNode; title?: string }>
   onChange: (v: T) => void
   size?: 'sm' | 'md'
   className?: string
@@ -94,6 +94,7 @@ export function Segmented<T extends string>({
             key={o.value}
             role="radio"
             aria-checked={on}
+            title={o.title}
             onClick={() => onChange(o.value)}
             className={clsx(
               'min-w-0 flex-1 truncate whitespace-nowrap rounded-[calc(var(--r-control)-3px)] font-medium transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-offset-[-1px]',
@@ -101,51 +102,6 @@ export function Segmented<T extends string>({
               on
                 ? 'bg-panel text-brand-fg shadow-[0_0_0_1.5px_var(--brand),0_1px_2px_rgba(16,24,40,0.08)]'
                 : 'text-fg-2 hover:bg-panel/70 hover:text-fg',
-            )}
-          >
-            {o.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-/**
- * Switch between views of the same thing. Underlined tabs on a hairline, sized
- * to their labels, so they never squeeze or wrap; they scroll if space runs out.
- */
-export function Tabs<T extends string>({
-  value,
-  options,
-  onChange,
-  className,
-  label,
-}: {
-  value: T
-  options: Array<{ value: T; label: ReactNode; title?: string }>
-  onChange: (v: T) => void
-  className?: string
-  label?: string
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label={label}
-      className={clsx('no-scrollbar flex gap-3 overflow-x-auto shadow-[inset_0_-1px_0_var(--border-main)]', className)}
-    >
-      {options.map((o) => {
-        const on = value === o.value
-        return (
-          <button
-            key={o.value}
-            role="tab"
-            aria-selected={on}
-            title={o.title}
-            onClick={() => onChange(o.value)}
-            className={clsx(
-              '-mx-1 flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-[6px] border-b-2 px-1 text-[13px] font-medium transition-colors focus-visible:outline-offset-[-2px]',
-              on ? 'border-brand text-fg' : 'border-transparent text-fg-3 hover:border-line-strong hover:text-fg',
             )}
           >
             {o.label}

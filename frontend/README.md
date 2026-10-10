@@ -32,7 +32,7 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 | --- | --- |
 | Input panel | Departure time, depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. **Optimise route** sits right under the run title. |
 | Optimising | A short, staged progress list for the five data sources takes the place of the Optimise button, then the result appears. `⌘↵` runs it from anywhere. |
-| Results panel | **Re-optimise** and **Edit stops** sit under the title. Then four KPIs, each compared with the shortest route, a plain-language "Why this route" summary, and the stop order. Each stop lists only what needs attention, in words: "Unloads in rain", "1.1 km walk", "Heavy traffic", "2 h 57 min on board", "12 min spare". Red means high risk. The whole panel scrolls as one, with the view tabs pinned to the top. |
+| Results panel | **Re-optimise** and **Edit stops** sit under the title. Then four KPIs, each compared with the shortest route, a plain-language "Why this route" summary, and the stop order. Each stop lists only what needs attention, in words: "Unloads in rain", "1.1 km walk", "Heavy traffic", "2 h 57 min on board", "12 min spare". Red means high risk. The whole panel scrolls as one, with the view switch pinned to the top. |
 | Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, two hatched rain cells that drift slowly (light rain in the west, heavy rain over the City), and heavy-traffic stretches marked on the route. Optional layers show carparks with walking links and the shortest route as a ghost. The highest-risk stop pulses. |
 | Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, and every risk factor compared with the shortest route. |
 | Timeline | Delivery windows, unloading blocks, waits, lateness and the heavy-rain period on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
@@ -50,6 +50,16 @@ Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views
 | Phone (< 768 px) | The map fills the screen and the panel moves into a bottom sheet with three heights (peek, half, full). Drag or flick the grabber, or tap it to step up. After optimising, the sheet has **Plan** and **Timeline** tabs. Tapping a stop shows its card in the sheet, raised to half height. The top bar keeps the logo, the status, a light/dark button and the main action. |
 
 Both layouts render the same components. `App.tsx` picks the arrangement with `useMediaQuery`, and smaller differences use Tailwind's `max-md:` variants.
+
+## Conventions
+
+The full rules are in [`AGENTS.md`](AGENTS.md); read it before changing the UI. AI coding agents pick it up automatically. In short:
+
+- **Tokens only.** Colours, radii and shadows come from `index.css` and `lib/themes.ts`, and every colour means something (orange = action, green = better, amber = medium risk, rose = late or high risk, blue = rain).
+- **One solid primary per screen.** Run actions sit in the top bar, plan actions at the top of the panel, and the account at the bottom.
+- **One switch style.** Any choice between 2 and 4 options uses `Segmented`.
+- **Same type scale everywhere.** Serif for titles and big numbers, `num` for times and distances, sentence-case copy in plain words.
+- **Check before a PR.** Light and dark, panel widths 340 and 600, a 390 px phone, and `npm run build`.
 
 ## Button hierarchy
 
