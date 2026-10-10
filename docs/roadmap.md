@@ -1,0 +1,69 @@
+# Roadmap and to-dos
+
+Update this file in the same PR as the work. Tick items off; don't delete them.
+
+## Done
+
+- [x] Preliminary report submitted (28 Sep 2026). See [preliminary-proposal.md](preliminary-proposal.md).
+- [x] Python + FastAPI local MVP with public data.gov.sg feeds and OSRM (`backend/`).
+- [x] New dispatcher console (PR #1): workspace, three views, KPIs, explanations, timeline, Singapore map, share and account mocks, phone layout, light and dark.
+- [x] Project docs (this folder).
+
+## Next, in priority order
+
+### 1. Deploy what we have
+
+- [ ] Check the Amplify app's branch and build settings so the live demo builds the new console from `main` (`frontend/`, Node 22).
+- [ ] Add the live demo link and a short "real vs mocked" note to the root README.
+
+### 2. Connect the frontend and the backend
+
+- [ ] Call the backend optimise endpoint from the frontend, keeping the shapes in `frontend/src/lib/types.ts`.
+- [ ] Keep the current in-browser data as the fallback ("Recorded" mode) so the demo never breaks.
+- [ ] Show data mode and snapshot time in the top bar.
+
+### 3. Real data
+
+- [ ] NEA 2-hour forecast → rain risk per stop and time slot.
+- [ ] HDB carpark availability → parking risk.
+- [ ] LTA DataMall traffic speed bands (needs a free AccountKey) to replace the traffic-camera proxy.
+- [ ] OneMap search for addresses.
+
+### 4. Optimiser
+
+- [ ] Today: exhaustive search up to 8 stops, 2-opt from the input order above that. Seed 2-opt with earliest-deadline or nearest-neighbour (as in the proposal) and check results at 10 and 15 stops.
+- [ ] Unit tests on fixed scenarios: rain, parking crunch, tight pharma window.
+- [ ] Explanations generated from cost differences, checked against the position change.
+
+### 5. AWS (the cloud part of the course)
+
+- [ ] API Gateway + Lambda for the backend (`backend/lambda_handler.py` is a start).
+- [ ] DynamoDB for runs, versions and results.
+- [ ] S3 for recorded condition snapshots and experiment exports.
+- [ ] EventBridge to refresh conditions on a schedule.
+- [ ] Cognito sign-in to replace the mock account.
+- [ ] CloudWatch metrics: latency, errors, cost per optimisation.
+- [ ] If AWS Educate blocks a service, use the alternative listed in the proposal and note it.
+
+### 6. Evaluation
+
+- [ ] Scenario experiments: ColdRoute vs shortest route on late deliveries, lateness, exposure, drive time.
+- [ ] Performance: optimisation time for 5, 10 and 15 stops; API p50/p95; error rate.
+- [ ] Cost per optimisation and a monthly projection.
+- [ ] Usability study with 8–12 users: tasks T1–T5 and SUS.
+
+### 7. Final deliverables
+
+- [ ] Final report.
+- [ ] Slides.
+- [ ] Demo video (follow the script in [product-design.md](product-design.md#demo)).
+
+## Later, if there's time
+
+What-if panel, runs list, system page, driver app, tracking page, live playback. See [product-design.md](product-design.md#ideas-we-may-still-build).
+
+## Open questions
+
+- Which AWS account type do we deploy to, and which services does it allow?
+- Final deadline and demo format (live or recorded)?
+- Who owns each section above?
