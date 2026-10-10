@@ -1,0 +1,214 @@
+@import 'tailwindcss';
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Design tokens. Values come from src/lib/themes.ts and are written onto <html>
+ * before first paint; the defaults below only cover the instant before that.
+ * Components use the semantic utilities (bg-panel, text-fg-2, bg-brand,
+ * text-ok, bg-bad-soft, ...), never raw colours.
+ */
+:root {
+  --bg-main: #f8f7f5;
+  --bg-panel: #ffffff;
+  --bg-subtle: #f3f1ee;
+  --fill-hover: rgba(55, 53, 47, 0.04);
+  --fill-strong: rgba(55, 53, 47, 0.08);
+  --fill-stronger: rgba(55, 53, 47, 0.14);
+  --text-1: #1c1917;
+  --text-2: #57534e;
+  --text-3: #78716c;
+  --text-4: #a8a29e;
+  --border-main: #ece9e4;
+  --border-dark: #d6d3cf;
+  --ink: #1c1917;
+  --on-ink: #ffffff;
+  --brand: #d3460a;
+  --brand-hover: #bd3f09;
+  --brand-soft: #fef1e8;
+  --brand-text: #c2410c;
+  --on-brand: #ffffff;
+  --ok: #079455;
+  --ok-soft: #ecfdf3;
+  --warn: #ca8504;
+  --warn-soft: #fefbe8;
+  --bad: #e31b54;
+  --bad-soft: #fff1f3;
+  --rain: #2e90fa;
+  --rain-soft: #eff8ff;
+  --cargo-pharma: #7a5af8;
+  --cargo-frozen: #2e90fa;
+  --cargo-chilled: #06aed4;
+  --r-panel: 14px;
+  --r-control: 8px;
+  --signal: var(--bad);
+  --shadow-card: 0 0 0 1px rgba(28,25,23,0.05), 0 1px 2px rgba(28,25,23,0.04), 0 8px 24px rgba(28,25,23,0.04);
+  --shadow-float: 0 0 0 1px rgba(28,25,23,0.06), 0 12px 32px rgba(28,25,23,0.10);
+}
+
+@theme inline {
+  --color-canvas: var(--bg-main);
+  --color-panel: var(--bg-panel);
+  --color-subtle: var(--bg-subtle);
+  --color-hover: var(--fill-hover);
+  --color-strong: var(--fill-strong);
+  --color-stronger: var(--fill-stronger);
+  --color-fg: var(--text-1);
+  --color-fg-2: var(--text-2);
+  --color-fg-3: var(--text-3);
+  --color-fg-4: var(--text-4);
+  --color-line: var(--border-main);
+  --color-line-strong: var(--border-dark);
+  --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-fg: var(--brand-text);
+  --color-on-brand: var(--on-brand);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-signal: var(--signal);
+  --color-rain: var(--rain);
+  --color-rain-soft: var(--rain-soft);
+  --color-pharma: var(--cargo-pharma);
+  --color-frozen: var(--cargo-frozen);
+  --color-chilled: var(--cargo-chilled);
+  --radius-panel: var(--r-panel);
+  --radius-control: var(--r-control);
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+}
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Display', 'Segoe UI', Helvetica, Arial,
+    sans-serif;
+  --font-serif: 'Libre Baskerville', Georgia, Cambria, 'Times New Roman', serif;
+  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+  --animate-rise: rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pulse-ring: pulse-ring 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  /* phones: follow the visible viewport as the browser bars show and hide */
+  #root {
+    height: 100dvh;
+  }
+  body {
+    @apply bg-canvas text-fg font-sans antialiased;
+    font-size: 13px;
+    line-height: 1.45;
+    font-feature-settings: 'tnum' 1;
+  }
+  ::selection {
+    background: var(--brand-soft);
+  }
+  button {
+    cursor: pointer;
+  }
+  /* One focus style for the whole app: only for keyboard focus, never on click */
+  :where(button, a, select, summary, [tabindex]):focus {
+    outline: none;
+  }
+  :where(button, a, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--brand) 70%, transparent);
+    outline-offset: 2px;
+  }
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+    letter-spacing: -0.01em;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .hatch {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--fill-stronger) 0 1px,
+      transparent 1px 6px
+    );
+  }
+  .hatch-rain {
+    background-color: color-mix(in srgb, var(--rain) 14%, transparent);
+    background-image: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--rain) 60%, transparent) 0 1px,
+      transparent 1px 6px
+    );
+  }
+  .hatch-signal {
+    background-image: repeating-linear-gradient(135deg, var(--bad) 0 1.5px, transparent 1.5px 5px);
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--fill-stronger) transparent;
+  }
+}
+
+/* MapLibre chrome, restyled to match */
+.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--bg-panel) 80%, transparent) !important;
+  color: var(--text-3) !important;
+  font-size: 10px !important;
+  border-radius: 6px !important;
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--text-3) !important;
+}
+.maplibregl-ctrl-attrib-button {
+  filter: grayscale(1);
+}
+[data-theme='dark'] .maplibregl-ctrl-attrib-button {
+  filter: invert(1) grayscale(1);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

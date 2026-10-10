@@ -1,125 +1,448 @@
-import { Button, ConfigProvider, Result, Spin, theme } from 'antd'
-import type { ThemeConfig } from 'antd'
-import { Component, lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import type { ErrorInfo, ReactNode } from 'react'
+import clsx from 'clsx'
+import { Check, Copy, Eye, Loader2, Send } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AccountBar, AccountButton, SignInDialog, type User } from './components/Account'
+import { BottomSheet, type Snap } from './components/BottomSheet'
+import { MapView, type Layers } from './components/MapView'
+import { PANEL, PanelHandle } from './components/PanelHandle'
+import { ResultsPanel, type View } from './components/ResultsPanel'
+import { SharePopover } from './components/SharePopover'
+import { TopBar, type ThemeMode } from './components/Shell'
+import { StopCard } from './components/StopCard'
+import { OPTIMISE_STEPS, StopsEditor } from './components/StopsEditor'
+import { Timeline } from './components/Timeline'
+import { Button, Segmented, StatusPill } from './components/ui'
+import { DEPARTURE, DEPOT, PROFILES, SAMPLE_STOPS } from './data/sample'
+import { optimise } from './lib/optimizer'
+import { isTyping, PHONE_QUERY, useMediaQuery, usePersistentState } from './lib/hooks'
+import { applyTheme, THEME_BY_ID, type ThemeId } from './lib/themes'
+import type { OptimiseResult, ProfileId, Stop } from './lib/types'
 
-export type ThemeMode = 'light' | 'dark'
+type Phase = 'draft' | 'optimising' | 'optimised'
 
-const Dashboard = lazy(() =>
-  import('./components/Dashboard').then((module) => ({ default: module.Dashboard })),
-)
+// ---- URL contract -------------------------------------------------------
+// ?share=<token>[&view=compare][&stop=<id>]  a teammate's read-only link
+// ?state=results                             open straight on the result (demos, screenshots)
+// ?theme=light|dark                          force a theme for this visit only
+const SHARE_TOKEN = 'mr1010-7k2f'
+const params = new URLSearchParams(location.search)
+const sharedOnLoad = params.has('share')
+const VIEWS: View[] = ['coldroute', 'baseline', 'compare']
+const VIEW_LABEL: Record<View, string> = { coldroute: 'ColdRoute', baseline: 'Shortest route', compare: 'Compare' }
+const urlView = VIEWS.find((v) => v === params.get('view')) ?? 'coldroute'
+const urlStop = SAMPLE_STOPS.some((s) => s.id === params.get('stop')) ? params.get('stop') : null
+const urlTheme = ((t) => (t === 'dark' || t === 'night' ? 'dark' : t === 'light' ? 'light' : null))(params.get('theme')) as ThemeId | null
+const openOnResult = sharedOnLoad || params.get('state') === 'results'
 
-type BoundaryProps = { children: ReactNode }
-type BoundaryState = { hasError: boolean; message: string }
-
-class AppErrorBoundary extends Component<BoundaryProps, BoundaryState> {
-  state: BoundaryState = { hasError: false, message: '' }
-
-  static getDerivedStateFromError(error: Error): BoundaryState {
-    return {
-      hasError: true,
-      message: error?.message || 'Unexpected frontend error',
-    }
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('ColdRoute frontend error:', error, info)
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <Result
-          status="error"
-          title="ColdRoute could not load"
-          subTitle={this.state.message}
-          extra={(
-            <Button type="primary" onClick={() => window.location.reload()}>
-              Reload page
-            </Button>
-          )}
-        />
-      )
-    }
-    return this.props.children
-  }
+// keep the address bar clean: drop one-off and legacy params, keep a share link intact
+{
+  const url = new URL(location.href)
+  for (const k of ['theme', 'style', 'layout', 'state']) url.searchParams.delete(k)
+  if (!sharedOnLoad) for (const k of ['view', 'stop']) url.searchParams.delete(k)
+  history.replaceState(null, '', url)
 }
 
 export default function App() {
-  const [themeMode, setThemeMode] = useState<ThemeMode>('light')
+  // appearance: follows the OS until the user picks Light or Dark
+  const [themeMode, setThemeMode] = usePersistentState<ThemeMode>('coldroute.theme', 'system')
+  const [forcedTheme, setForcedTheme] = useState<ThemeId | null>(urlTheme)
+  const systemDark = useMediaQuery('(prefers-color-scheme: dark)')
+  const themeId: ThemeId = forcedTheme ?? (themeMode === 'system' ? (systemDark ? 'dark' : 'light') : themeMode)
+  const theme = THEME_BY_ID[themeId]
+  const pickTheme = (m: ThemeMode) => {
+    setForcedTheme(null)
+    setThemeMode(m)
+  }
 
-  useEffect(() => {
-    let nextTheme: ThemeMode = 'light'
-    try {
-      const saved = window.localStorage.getItem('coldroute-theme')
-      if (saved === 'light' || saved === 'dark') {
-        nextTheme = saved
-      } else if (
-        typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-color-scheme: dark)').matches
-      ) {
-        nextTheme = 'dark'
+  const [readOnly, setReadOnly] = useState(sharedOnLoad)
+  // mock account: signed out on first visit, remembered after that
+  const [user, setUser] = usePersistentState<User | null>('coldroute.user', null)
+  const [signIn, setSignIn] = useState<{ reason?: string; then?: () => void } | null>(null)
+  const [phase, setPhase] = useState<Phase>('draft')
+  const [stops, setStops] = useState<Stop[]>(SAMPLE_STOPS)
+  const [departure, setDeparture] = useState(DEPARTURE)
+  const [profile, setProfile] = useState<ProfileId>('pharma')
+  const [result, setResult] = useState<OptimiseResult | null>(null)
+  const [view, setView] = useState<View>(urlView)
+  const [selectedId, setSelectedId] = useState<string | null>(urlStop)
+  const [layers, setLayers] = useState<Layers>({ rain: true, parking: false, traffic: true, baseline: false })
+  const [step, setStep] = useState(0)
+  const [toast, setToast] = useState<string | null>(null)
+  const [shareOpen, setShareOpen] = useState(false)
+  const timers = useRef<number[]>([])
+
+  // desktop: resizable, collapsible panel (remembered across reloads)
+  const isPhone = useMediaQuery(PHONE_QUERY)
+  const [panelW, setPanelW] = usePersistentState('coldroute.panel.width', PANEL.default)
+  const [collapsed, setCollapsed] = usePersistentState('coldroute.panel.hidden', false)
+  const [resizing, setResizing] = useState(false)
+  // phone: bottom sheet
+  const [sheet, setSheet] = useState<Snap>('half')
+  const [sheetH, setSheetH] = useState(0)
+  const [sheetTab, setSheetTab] = useState<'plan' | 'timeline'>('plan')
+
+  const stopById = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s])), [stops])
+  const names = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s.short])), [stops])
+
+  // before paint, so there is no flash of the other theme
+  useLayoutEffect(() => {
+    applyTheme(theme)
+  }, [theme])
+
+  const runOptimise = useCallback(
+    (instant = false) => {
+      timers.current.forEach(clearTimeout)
+      const r = optimise(DEPOT, stops, departure, PROFILES[profile].weights)
+      if (instant) {
+        setResult(r)
+        setPhase('optimised')
+        return
       }
-    } catch {
-      nextTheme = 'light'
-    }
-    setThemeMode(nextTheme)
+      setSelectedId(null)
+      setPhase('optimising')
+      setStep(0)
+      OPTIMISE_STEPS.forEach((_, i) => {
+        timers.current.push(window.setTimeout(() => setStep(i + 1), 340 * (i + 1)))
+      })
+      timers.current.push(
+        window.setTimeout(() => {
+          setResult(r)
+          setView('coldroute')
+          setPhase('optimised')
+        }, 340 * OPTIMISE_STEPS.length + 220),
+      )
+    },
+    [stops, departure, profile],
+  )
+
+  // a share link (or ?state=results) opens on the optimised plan
+  useEffect(() => {
+    if (openOnResult) runOptimise(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem('coldroute-theme', themeMode)
-    } catch {
-      // Local storage can be unavailable in some browser modes.
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && phase === 'draft') {
+        e.preventDefault()
+        runOptimise()
+      }
+      if (e.key === 'Escape') setSelectedId(null)
+      if (e.key === '[' && !e.metaKey && !e.ctrlKey && !isTyping()) {
+        e.preventDefault()
+        setCollapsed((c) => !c)
+      }
+      if (e.key === '/' && phase === 'draft' && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>('input[placeholder^="Add a stop"]')?.focus()
+      }
     }
-    document.documentElement.dataset.theme = themeMode
-  }, [themeMode])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [phase, runOptimise, setCollapsed])
 
-  const themeConfig = useMemo<ThemeConfig>(() => {
-    const isDark = themeMode === 'dark'
-    return {
-      algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-      token: {
-        colorPrimary: isDark ? '#2dd4bf' : '#0f766e',
-        colorInfo: isDark ? '#38bdf8' : '#0284c7',
-        colorSuccess: isDark ? '#4ade80' : '#16a34a',
-        colorWarning: isDark ? '#fbbf24' : '#d97706',
-        colorError: isDark ? '#fb7185' : '#dc2626',
-        colorBgBase: isDark ? '#07111b' : '#f3f6f8',
-        colorBgContainer: isDark ? '#0d1a26' : '#ffffff',
-        colorBgElevated: isDark ? '#112231' : '#ffffff',
-        colorBorder: isDark ? '#274052' : '#dbe4ea',
-        colorBorderSecondary: isDark ? '#1b3040' : '#e6edf2',
-        colorText: isDark ? '#e8f1f7' : '#0f172a',
-        colorTextSecondary: isDark ? '#91a8b8' : '#64748b',
-        borderRadius: 12,
-        borderRadiusLG: 16,
-        controlHeight: 38,
-        fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
-        boxShadowSecondary: isDark
-          ? '0 18px 50px rgba(0, 0, 0, 0.34)'
-          : '0 14px 38px rgba(15, 23, 42, 0.08)',
-      },
-    }
-  }, [themeMode])
+  // phone: picking a stop on the map raises the sheet so its card is readable
+  useEffect(() => {
+    if (isPhone && selectedId) setSheet((s) => (s === 'peek' ? 'half' : s))
+  }, [isPhone, selectedId])
+  useEffect(() => {
+    if (phase !== 'optimised') setSheetTab('plan')
+  }, [phase])
+
+  // a viewer's link keeps following what they look at, so reload restores it
+  useEffect(() => {
+    if (!readOnly) return
+    const url = new URL(location.href)
+    if (view === 'coldroute') url.searchParams.delete('view')
+    else url.searchParams.set('view', view)
+    if (selectedId) url.searchParams.set('stop', selectedId)
+    else url.searchParams.delete('stop')
+    history.replaceState(null, '', url)
+  }, [readOnly, view, selectedId])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = window.setTimeout(() => setToast(null), 3200)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  const buildLink = useCallback(
+    (withView: boolean) => {
+      const url = new URL(location.origin + location.pathname)
+      url.searchParams.set('share', SHARE_TOKEN)
+      if (withView && view !== 'coldroute') url.searchParams.set('view', view)
+      if (withView && selectedId) url.searchParams.set('stop', selectedId)
+      return url.toString()
+    },
+    [view, selectedId],
+  )
+
+  const share = () => {
+    if (!readOnly) return setShareOpen((o) => !o)
+    // viewers can pass the link on, but not change who has access
+    const ok = () => setToast('Link copied · it opens this view for anyone with access')
+    navigator.clipboard?.writeText(location.href).then(ok, ok)
+  }
+
+  const makeCopy = () => {
+    setReadOnly(false)
+    const url = new URL(location.href)
+    for (const k of ['share', 'view', 'stop']) url.searchParams.delete(k)
+    history.replaceState(null, '', url)
+    setToast('Saved to your runs as “Morning run (copy)” · you can edit it now')
+  }
+
+  const selectedStop = selectedId ? stopById[selectedId] : null
+  const viewLabel = phase === 'optimised' ? `${VIEW_LABEL[view]}${selectedStop ? ` · ${selectedStop.short}` : ''}` : undefined
+
+  const status = readOnly ? (
+    <StatusPill>
+      <Eye size={11} strokeWidth={2.2} /> View only
+    </StatusPill>
+  ) : phase === 'draft' ? (
+    <StatusPill>Draft</StatusPill>
+  ) : phase === 'optimising' ? (
+    <StatusPill>
+      <Loader2 size={11} className="animate-spin" /> Optimising
+    </StatusPill>
+  ) : (
+    <StatusPill tone="ok">
+      <Check size={11} strokeWidth={2.5} /> Optimised
+    </StatusPill>
+  )
+
+  const primary = readOnly ? (
+    <Button variant="primary" icon={<Copy size={13} strokeWidth={2} />} onClick={makeCopy}>
+      Make a copy
+    </Button>
+  ) : phase === 'optimised' ? (
+    <Button
+      variant="primary"
+      icon={<Send size={13} strokeWidth={2} />}
+      onClick={() => {
+        const send = () => setToast(`Sent to Ahmad R. · ${stops.length} stops · first ETA ${result ? fmt(result.recommended.rows[0].arrival) : ''}`)
+        if (user) send()
+        else setSignIn({ reason: 'Sign in to send this run to the driver.', then: send })
+      }}
+    >
+      Dispatch<span className="max-md:hidden"> to driver</span>
+    </Button>
+  ) : (
+    <span title="Optimise the route first" className="inline-flex">
+      <Button variant="primary" icon={<Send size={13} strokeWidth={2} />} disabled>
+        Dispatch<span className="max-md:hidden"> to driver</span>
+      </Button>
+    </span>
+  )
+
+  const left =
+    phase === 'optimised' && result ? (
+      <ResultsPanel
+        result={result}
+        stops={stopById}
+        stopList={stops}
+        view={view}
+        setView={setView}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onEdit={
+          readOnly
+            ? undefined
+            : () => {
+                setSelectedId(null)
+                setPhase('draft')
+              }
+        }
+        onReoptimise={readOnly ? undefined : () => runOptimise()}
+        profileLabel={PROFILES[profile].label}
+        departure={departure}
+      />
+    ) : (
+      <StopsEditor
+        stops={stops}
+        setStops={setStops}
+        departure={departure}
+        setDeparture={setDeparture}
+        profile={profile}
+        setProfile={setProfile}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onOptimise={() => runOptimise()}
+        busy={phase === 'optimising'}
+        step={step}
+      />
+    )
+
+  const card =
+    phase === 'optimised' && result && selectedStop ? (
+      <StopCard
+        stop={selectedStop}
+        result={result}
+        names={names}
+        departure={departure}
+        onClose={() => setSelectedId(null)}
+        onEdit={readOnly ? undefined : () => setPhase('draft')}
+        inline={isPhone}
+      />
+    ) : null
+
+  const timeline =
+    phase === 'optimised' && result ? (
+      <Timeline result={result} stops={stopById} view={view} departure={departure} selectedId={selectedId} onSelect={setSelectedId} />
+    ) : null
+
+  const map = (insetBottom: number) => (
+    <MapView
+      palette={theme.map}
+      depot={DEPOT}
+      stops={stops}
+      result={phase === 'optimised' ? result : null}
+      view={view}
+      phase={phase}
+      selectedId={selectedId}
+      onSelect={setSelectedId}
+      layers={layers}
+      setLayers={setLayers}
+      insetLeft={0}
+      insetBottom={insetBottom}
+      cardOpen={!!card && !isPhone}
+      compact={isPhone}
+    >
+      {!isPhone && card}
+    </MapView>
+  )
+
+  const account = {
+    user,
+    onSignIn: () => setSignIn({}),
+    onSignOut: () => {
+      setUser(null)
+      setToast('Signed out')
+    },
+  }
+
+  const topBar = (
+    <TopBar
+      status={status}
+      primary={primary}
+      updatedAt="09:05"
+      onShare={share}
+      sharePopover={
+        shareOpen && <SharePopover viewLabel={viewLabel} buildLink={buildLink} onClose={() => setShareOpen(false)} notify={setToast} />
+      }
+      theme={{ mode: forcedTheme ?? themeMode, resolved: themeId, onChange: pickTheme }}
+      panel={isPhone ? undefined : { collapsed, onToggle: () => setCollapsed((c) => !c) }}
+      account={(isPhone || collapsed) && <AccountButton {...account} />}
+    />
+  )
+
+  const sharedBanner = readOnly && (
+    <div className="flex shrink-0 items-center gap-2 border-b border-line bg-brand-soft px-4 py-2 text-[12.5px] text-fg-2 max-md:px-3">
+      <span className="num flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-on-brand">FL</span>
+      <span className="min-w-0 truncate">
+        <span className="font-medium text-fg">Fiona Lim</span> shared this run with you
+        <span className="max-md:hidden"> · read-only snapshot, data from 09:05</span>
+      </span>
+    </div>
+  )
+
+  const signInDialog = signIn && (
+    <SignInDialog
+      reason={signIn.reason}
+      onClose={() => setSignIn(null)}
+      onSignedIn={(u) => {
+        setUser(u)
+        setSignIn(null)
+        if (signIn.then) signIn.then()
+        else setToast(`Signed in as ${u.name}`)
+      }}
+    />
+  )
+
+  const toastEl = toast && (
+    <div
+      role="status"
+      className="animate-rise fixed bottom-6 left-1/2 z-[60] flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-on-ink shadow-float max-md:top-16 max-md:bottom-auto"
+    >
+      <Check size={13} strokeWidth={2.5} className="shrink-0" /> <span className="truncate">{toast}</span>
+    </div>
+  )
+
+  // Phone: full-bleed map with the panel in a bottom sheet
+  if (isPhone) {
+    const showTimeline = sheetTab === 'timeline' && !!timeline && !card
+    return (
+      <div className="flex h-full flex-col bg-canvas text-fg">
+        {topBar}
+        {sharedBanner}
+        <main className="relative min-h-0 flex-1 overflow-hidden">
+          <div className="absolute inset-0">{map(sheetH)}</div>
+          <BottomSheet
+            snap={sheet}
+            setSnap={setSheet}
+            onHeight={setSheetH}
+            scrollAll={!showTimeline}
+            contentKey={card ? `stop-${selectedId}` : showTimeline ? 'timeline' : phase}
+            header={
+              timeline && !card ? (
+                <div className="px-4 pb-2">
+                  <Segmented
+                    label="Panel"
+                    size="sm"
+                    className="w-full"
+                    value={sheetTab}
+                    onChange={setSheetTab}
+                    options={[
+                      { value: 'plan', label: 'Plan' },
+                      { value: 'timeline', label: 'Timeline' },
+                    ]}
+                  />
+                </div>
+              ) : null
+            }
+          >
+            {card ?? (showTimeline ? timeline : left)}
+          </BottomSheet>
+        </main>
+        {signInDialog}
+        {toastEl}
+      </div>
+    )
+  }
 
   return (
-    <AppErrorBoundary>
-      <ConfigProvider theme={themeConfig}>
-        <Suspense
-          fallback={(
-            <div className="app-loading-state">
-              <Spin size="large" />
-              <span>Loading ColdRoute SG…</span>
-            </div>
+    <div className="flex h-full flex-col bg-canvas text-fg">
+      {topBar}
+      {sharedBanner}
+      <main className="flex min-h-0 flex-1">
+        <aside
+          inert={collapsed}
+          aria-label="Run panel"
+          style={{ width: collapsed ? 0 : panelW }}
+          className={clsx(
+            'relative flex shrink-0 flex-col bg-panel',
+            collapsed ? 'overflow-hidden' : 'border-r border-line',
+            !resizing && 'transition-[width] duration-200 ease-out',
           )}
         >
-          <Dashboard
-            themeMode={themeMode}
-            onThemeModeChange={setThemeMode}
-          />
-        </Suspense>
-      </ConfigProvider>
-    </AppErrorBoundary>
+          {/* fixed inner width: the content slides out instead of re-wrapping */}
+          <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ width: panelW }}>
+            <div className="flex min-h-0 flex-1 flex-col">{left}</div>
+            <AccountBar {...account} />
+          </div>
+          {!collapsed && (
+            <PanelHandle width={panelW} setWidth={setPanelW} onCollapse={() => setCollapsed(true)} onDragChange={setResizing} />
+          )}
+        </aside>
+        <section className="flex min-w-0 flex-1 flex-col">
+          <div className="relative min-h-0 flex-1">{map(0)}</div>
+          {timeline && <div className="h-[236px] shrink-0 border-t border-line bg-panel">{timeline}</div>}
+        </section>
+      </main>
+      {signInDialog}
+      {toastEl}
+    </div>
   )
 }
+
+const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`
