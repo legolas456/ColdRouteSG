@@ -5,13 +5,13 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 
 ## Screenshots
 
-The optimised results screen in each brand theme:
-
-| Arctic Teal (default) | Glacier Blue | Indigo |
-| --- | --- | --- |
-| ![Arctic Teal](docs/screenshots/themes/1-arctic-teal.png) | ![Glacier Blue](docs/screenshots/themes/2-glacier-blue.png) | ![Indigo](docs/screenshots/themes/3-indigo.png) |
-| **Safety Orange** | **Night Shift** | **Mono (reference)** |
-| ![Safety Orange](docs/screenshots/themes/4-safety-orange.png) | ![Night Shift](docs/screenshots/themes/5-night-shift.png) | ![Mono](docs/screenshots/themes/6-mono.png) |
+| Draft: input | Optimised: results |
+| --- | --- |
+| ![Input](docs/screenshots/01-input.png) | ![Results](docs/screenshots/02-results.png) |
+| **Compare view and stop card** | **Map-first layout** |
+| ![Compare](docs/screenshots/03-compare-stop-card.png) | ![Map-first](docs/screenshots/04-map-first.png) |
+| **Dark mode** | |
+| ![Dark](docs/screenshots/05-dark.png) | |
 
 ## Run it
 
@@ -22,7 +22,7 @@ npm run build      # type-check + production bundle in dist/
 npm run preview    # serve dist/ on http://localhost:4173
 ```
 
-No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), repainted with the active theme's land, water and park colours at load time.
+No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), repainted with the theme's land, water and park colours at load time.
 
 ## What the demo shows
 
@@ -39,33 +39,23 @@ Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views
 
 ## Design system
 
-Every theme has one **brand colour**. It is used for primary actions, the route, stop numbers and selection. A small set of **semantic colours** only appears where it means something:
+The brand colour is **Safety Orange** on warm paper, the high-vis orange used across logistics. Other colours only appear where they carry meaning:
 
-| Role | Used for |
-| --- | --- |
-| Brand | Primary buttons, ColdRoute line and markers, unloading blocks, selected rows |
-| Green (`ok`) | Improvements vs the shortest route, on-time, live data |
-| Amber (`warn`) | Medium risk, addresses that need review |
-| Red (`bad`) | Late, highest-risk stop, high risk |
-| Blue (`rain`) | Shower cell on the map and in the timeline |
-| Cargo dots | PHARMA (violet), FROZEN (blue), CHILLED (cyan) |
+| Role | Light | Used for |
+| --- | --- | --- |
+| Brand | `#d4470a` | Primary buttons, stop numbers, unloading blocks, selection. Deep enough for AA contrast with white text. |
+| Route | `#ec5d13` | The ColdRoute line on the map. Brighter than the brand colour so it reads on map tiles. |
+| Green (`ok`) | `#079455` | Improvements vs the shortest route, on time, live data |
+| Amber (`warn`) | `#ca8504` | Medium risk, addresses that need review. Yellow-amber, so it is not confused with the brand orange. |
+| Rose (`bad`) | `#e31b54` | Late, highest-risk stop, slow traffic. Rose rather than red, for the same reason. |
+| Blue (`rain`) | `#2e90fa` | Shower cells on the map and in the timeline |
+| Cargo dots | violet, blue, cyan | PHARMA, FROZEN, CHILLED |
 
-Use **Style** in the top bar to switch brand colour and layout, or set them in the URL:
+Dark mode (**Night Shift**) uses warm charcoal with a brighter orange (`#ff7a33`) and dark text on orange buttons.
 
-| `?theme=` | Brand colour |
-| --- | --- |
-| *(none)* | **Arctic Teal** (recommended). Teal reads as both cold and clinical, and stands apart from generic SaaS blue. |
-| `glacier` | Glacier Blue: trustworthy enterprise blue |
-| `indigo` | Indigo: modern product feel |
-| `orange` | Safety Orange: logistics high-vis orange on warm paper |
-| `night` | Night Shift: dark navy control room with teal accents |
-| `mono` | The earlier black-and-white direction, kept for reference |
+Use **View** in the top bar to switch appearance and layout, or set them in the URL: `?theme=dark` and `?layout=float` (map-first with floating panels). The same menu can jump straight to the input or results state for demos.
 
-`?layout=float` switches to the map-first layout with floating panels.
-
-All themes live in `src/lib/themes.ts`: UI tokens and the matching map palette in one place. `applyTheme()` writes the tokens to `<html>` as CSS variables before first paint. Components only use semantic utilities (`bg-panel`, `text-fg-2`, `bg-brand`, `text-ok`, `bg-bad-soft`, …), so adding a theme is one object.
-
-Screenshots of each theme are in `docs/screenshots/themes/`.
+Both themes live in `src/lib/themes.ts`, with the UI tokens and the matching map palette in one place. `applyTheme()` writes the tokens to `<html>` as CSS variables before first paint. Components only use semantic utilities (`bg-panel`, `text-fg-2`, `bg-brand`, `text-ok`, `bg-bad-soft`, …). The other palettes explored earlier (teal, glacier blue, indigo, mono) are in commit `94abb12`.
 
 ## Data and algorithm
 
@@ -87,7 +77,7 @@ src/
 │  ├─ MapView.tsx          MapLibre map, overlays, markers, layer chips
 │  ├─ StopCard.tsx         stop detail card on the map
 │  ├─ Timeline.tsx         time-axis view
-│  ├─ StyleMenu.tsx        brand colour and layout switcher
+│  ├─ StyleMenu.tsx        View menu: appearance, layout, demo states
 │  └─ ui.tsx               buttons, segmented control, tags, meters
 ├─ lib/                    optimizer, explanations, time helpers, types
 └─ data/                   sample run, OSRM snapshot

@@ -18,12 +18,8 @@ type Phase = 'draft' | 'optimising' | 'optimised'
 const params = new URLSearchParams(location.search)
 const initialTheme = (): ThemeId => {
   const t = params.get('theme')
-  if (t && t in THEME_BY_ID) return t as ThemeId
-  // links from the first mock-up used ?style=
-  const legacy = params.get('style')
-  if (legacy === 'dark') return 'night'
-  if (legacy === 'paper' || legacy === 'editorial') return 'mono'
-  return 'teal'
+  // ?theme=night and ?style=dark come from earlier shared links
+  return t === 'dark' || t === 'night' || params.get('style') === 'dark' ? 'dark' : 'light'
 }
 const initialLayout = (): Layout => (params.get('layout') === 'float' || params.get('style') === 'mapfirst' ? 'float' : 'split')
 
@@ -53,7 +49,7 @@ export default function App() {
   useEffect(() => {
     const url = new URL(location.href)
     url.searchParams.delete('style')
-    if (themeId === 'teal') url.searchParams.delete('theme')
+    if (themeId === 'light') url.searchParams.delete('theme')
     else url.searchParams.set('theme', themeId)
     if (layout === 'split') url.searchParams.delete('layout')
     else url.searchParams.set('layout', layout)
