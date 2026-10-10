@@ -8,10 +8,12 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 | Draft: input | Optimised: results |
 | --- | --- |
 | ![Input](docs/screenshots/01-input.png) | ![Results](docs/screenshots/02-results.png) |
-| **Compare view and stop card** | **Map-first layout** |
-| ![Compare](docs/screenshots/03-compare-stop-card.png) | ![Map-first](docs/screenshots/04-map-first.png) |
-| **Dark mode** | **Phone: results and stop card** |
-| ![Dark](docs/screenshots/05-dark.png) | <img src="docs/screenshots/06-phone-results.png" width="49%" alt="Phone results"> <img src="docs/screenshots/07-phone-stop-card.png" width="49%" alt="Phone stop card"> |
+| **Compare view and stop card** | **Share dialog** |
+| ![Compare](docs/screenshots/03-compare-stop-card.png) | ![Share](docs/screenshots/04-share-dialog.png) |
+| **Opened from a share link (view only)** | **Dark mode** |
+| ![Shared view](docs/screenshots/08-shared-view.png) | ![Dark](docs/screenshots/05-dark.png) |
+| **Phone: results and stop card** | |
+| <img src="docs/screenshots/06-phone-results.png" width="49%" alt="Phone results"> <img src="docs/screenshots/07-phone-stop-card.png" width="49%" alt="Phone stop card"> | |
 
 ## Run it
 
@@ -28,12 +30,14 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 
 | Area | What it does |
 | --- | --- |
-| Input panel | Departure time, depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. |
+| Input panel | Departure time, depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. |
 | Optimising | A short, staged progress list for the five data sources, then the result. `⌘↵` runs it. |
 | Results panel | Four KPIs, each compared with the shortest route. Also a plain-language "Why this route" summary and the stop order with W/P/T/C/L risk meters and how far each stop moved. |
 | Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, a hatched shower cell and carparks with walking links. Optional layers show slow road segments and the shortest route as a ghost. The highest-risk stop pulses. |
 | Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, and every risk factor compared with the shortest route. |
 | Timeline | Delivery windows, unloading blocks, waits, lateness and the shower period on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
+| Share | **Share** opens a dialog with an invite field that suggests names from a mocked workspace directory and accepts any email, plus people with access (owner, Ops team, driver) with Can edit / Can view / Remove. General access can be Restricted, the ColdRoute SG workspace or anyone with the link. You can also pick a link expiry, choose whether the link opens on your current view (e.g. Compare · MBFC), and copy the link. |
+| Shared view | Opening a `?share=` link shows a read-only snapshot with a "shared with you" banner and a **View only** status. Edit, re-optimise and dispatch are hidden. **Make a copy** turns it into your own editable run. |
 
 Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views redraws the map, list and timeline.
 
@@ -41,8 +45,8 @@ Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views
 
 | Screen | Layout |
 | --- | --- |
-| Desktop (≥ 768 px) | Panel on the left, map and timeline on the right. Drag the panel edge to resize it (340–600 px); double-click the edge to reset. Press the chevron, press `[`, or drag the edge past the minimum to hide the panel; the pill over the map brings it back. Width and visibility are saved in `localStorage`. The map re-frames the run whenever its size changes, unless you have panned or zoomed it yourself. |
-| Phone (< 768 px) | The map fills the screen and the panel moves into a bottom sheet with three heights (peek, half, full). Drag or flick the grabber, or tap it to step up. After optimising, the sheet has **Plan** and **Timeline** tabs. Tapping a stop shows its card in the sheet, raised to half height. The top bar keeps the logo, the status, **View** and the main action. |
+| Desktop (≥ 768 px) | Panel on the left, map and timeline on the right. The panel toggle sits next to the logo, in the same place whether the panel is open or hidden, so one click hides it and the next brings it back. `[` does the same. Drag the panel edge to resize it (340–600 px), double-click the edge to reset, or drag it past the minimum to hide. Width and visibility are saved in `localStorage`. The map re-frames the run whenever its size changes, unless you have panned or zoomed it yourself. |
+| Phone (< 768 px) | The map fills the screen and the panel moves into a bottom sheet with three heights (peek, half, full). Drag or flick the grabber, or tap it to step up. After optimising, the sheet has **Plan** and **Timeline** tabs. Tapping a stop shows its card in the sheet, raised to half height. The top bar keeps the logo, the status, a light/dark button and the main action. |
 
 Both layouts render the same components. `App.tsx` picks the arrangement with `useMediaQuery`, and smaller differences use Tailwind's `max-md:` variants.
 
@@ -62,7 +66,7 @@ The brand colour is **Safety Orange** on warm paper, the high-vis orange used ac
 
 Dark mode (**Night Shift**) uses warm charcoal with a brighter orange (`#ff7a33`) and dark text on orange buttons.
 
-Use **View** in the top bar to switch appearance and layout, or set them in the URL: `?theme=dark` and `?layout=float` (map-first with floating panels). The same menu can jump straight to the input or results state for demos.
+Appearance follows the operating system by default. The **System / Light / Dark** switch in the top bar overrides it, and the choice is saved. On phones it is a single light/dark button. For demos and screenshots, `?theme=dark` forces a theme for one visit and `?state=results` opens straight on the optimised plan.
 
 Both themes live in `src/lib/themes.ts`, with the UI tokens and the matching map palette in one place. `applyTheme()` writes the tokens to `<html>` as CSS variables before first paint. Components only use semantic utilities (`bg-panel`, `text-fg-2`, `bg-brand`, `text-ok`, `bg-bad-soft`, …). The other palettes explored earlier (teal, glacier blue, indigo, mono) are in commit `94abb12`.
 
@@ -78,18 +82,18 @@ Both themes live in `src/lib/themes.ts`, with the UI tokens and the matching map
 
 ```text
 src/
-├─ App.tsx                 state machine (draft → optimising → optimised), layouts, shortcuts
+├─ App.tsx                 state machine (draft → optimising → optimised), layout, theme, sharing, shortcuts
 ├─ index.css               design tokens and themes
 ├─ components/
-│  ├─ Shell.tsx            top bar and logo
-│  ├─ PanelHandle.tsx      resize / hide handle for the desktop panel
+│  ├─ Shell.tsx            top bar, logo, panel toggle, theme switch
+│  ├─ PanelHandle.tsx      resize handle for the desktop panel
 │  ├─ BottomSheet.tsx      phone bottom sheet
 │  ├─ StopsEditor.tsx      input panel and optimising progress
 │  ├─ ResultsPanel.tsx     KPIs, explanation, stop order
 │  ├─ MapView.tsx          MapLibre map, overlays, markers, layer chips
 │  ├─ StopCard.tsx         stop detail card (on the map, or in the phone sheet)
 │  ├─ Timeline.tsx         time-axis view
-│  ├─ StyleMenu.tsx        View menu: appearance, layout, demo states
+│  ├─ ShareDialog.tsx      share dialog (mocked people, access and link)
 │  └─ ui.tsx               buttons, segmented control, tags, meters
 ├─ lib/                    optimizer, explanations, themes, hooks, time helpers, types
 └─ data/                   sample run, OSRM snapshot, Singapore mask

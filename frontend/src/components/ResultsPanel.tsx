@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ArrowDown, ArrowUp, CloudRain, Minus, PencilLine, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowDown, ArrowUp, CloudRain, Eye, Minus, PencilLine, RefreshCw, Sparkles } from 'lucide-react'
 import { DEPOT } from '../data/sample'
 import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
@@ -17,8 +17,9 @@ interface Props {
   setView: (v: View) => void
   selectedId: string | null
   onSelect: (id: string | null) => void
-  onEdit: () => void
-  onReoptimise: () => void
+  /** Both are omitted in a shared, view-only run. */
+  onEdit?: () => void
+  onReoptimise?: () => void
   profileLabel: string
   departure: number
 }
@@ -197,14 +198,22 @@ export function ResultsPanel(props: Props) {
       </ol>
 
       <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-panel px-5 py-3">
-        <Button variant="ghost" size="sm" icon={<PencilLine size={13} strokeWidth={1.8} />} onClick={onEdit}>
-          Edit stops
-        </Button>
+        {onEdit ? (
+          <Button variant="ghost" size="sm" icon={<PencilLine size={13} strokeWidth={1.8} />} onClick={onEdit}>
+            Edit stops
+          </Button>
+        ) : (
+          <span className="flex items-center gap-1.5 text-[12px] text-fg-2">
+            <Eye size={13} strokeWidth={1.8} /> View only
+          </span>
+        )}
         <div className="flex-1" />
         <span className="text-[11.5px] text-fg-3">Data from 09:05</span>
-        <Button size="sm" icon={<RefreshCw size={13} strokeWidth={1.8} />} onClick={onReoptimise}>
-          Re-optimise
-        </Button>
+        {onReoptimise && (
+          <Button size="sm" icon={<RefreshCw size={13} strokeWidth={1.8} />} onClick={onReoptimise}>
+            Re-optimise
+          </Button>
+        )}
       </div>
     </div>
   )

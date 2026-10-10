@@ -1,5 +1,4 @@
 import clsx from 'clsx'
-import { ChevronLeft, PanelLeftOpen } from 'lucide-react'
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 
 export const PANEL = { min: 340, max: 600, default: 420 }
@@ -17,8 +16,9 @@ interface HandleProps {
 
 /**
  * Sits on the panel's right edge. Drag to resize, double-click to reset,
- * drag past the minimum or press the chevron to collapse. Keyboard: focus
- * it, then ←/→ to resize and Enter to collapse.
+ * drag past the minimum to hide. Showing/hiding by click lives in the top
+ * bar (PanelToggle), so it never moves. Keyboard: focus it, then ←/→ to
+ * resize and Enter to hide.
  */
 export function PanelHandle({ width, setWidth, onCollapse, onDragChange }: HandleProps) {
   const [dragging, setDragging] = useState(false)
@@ -70,7 +70,7 @@ export function PanelHandle({ width, setWidth, onCollapse, onDragChange }: Handl
       aria-valuemax={PANEL.max}
       aria-valuenow={Math.round(width)}
       tabIndex={0}
-      title="Drag to resize · double-click to reset · [ to hide"
+      title="Drag to resize · double-click to reset"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -85,33 +85,6 @@ export function PanelHandle({ width, setWidth, onCollapse, onDragChange }: Handl
           willCollapse ? 'bg-fg-4' : dragging ? 'bg-brand' : 'bg-transparent group-hover:bg-brand/50 group-focus-visible:bg-brand',
         )}
       />
-      <button
-        type="button"
-        aria-label="Hide panel"
-        title="Hide panel  ["
-        onClick={onCollapse}
-        className={clsx(
-          'absolute top-1/2 left-1/2 flex size-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-panel text-fg-3 shadow-[0_0_0_1px_var(--border-dark),0_1px_3px_rgba(28,25,23,0.12)] transition-[color,opacity] hover:text-fg',
-          dragging && 'opacity-0',
-        )}
-      >
-        <ChevronLeft size={14} strokeWidth={2} />
-      </button>
     </div>
-  )
-}
-
-/** Shown over the map while the panel is hidden. */
-export function PanelExpand({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title="Show panel  ["
-      className="animate-rise absolute top-4 left-4 z-20 flex h-8 items-center gap-1.5 rounded-full bg-panel pr-3 pl-2.5 text-[12px] font-medium text-fg shadow-float hover:bg-subtle"
-    >
-      <PanelLeftOpen size={14} strokeWidth={1.8} className="text-brand-fg" />
-      {label}
-    </button>
   )
 }

@@ -3,7 +3,6 @@ import {
   AlertCircle,
   Check,
   ChevronDown,
-  GripVertical,
   Loader2,
   MapPin,
   Search,
@@ -96,6 +95,9 @@ export function StopsEditor(props: Props) {
           <h2 className="text-[13px] font-semibold">Stops</h2>
           <span className="num text-[12px] text-fg-3">{stops.length}</span>
         </div>
+        <span className="text-[11.5px] text-fg-3" title="Add stops in any order. ColdRoute decides the delivery sequence when you optimise.">
+          Any order · the optimiser sets the sequence
+        </span>
       </div>
 
       <div className="px-5 pb-2">
@@ -188,10 +190,6 @@ function StopRow({
     <li className={clsx('group relative transition-colors', open ? 'bg-hover' : 'hover:bg-hover')}>
       {open && <span className="absolute inset-y-0 left-0 w-[3px] rounded-r-full bg-brand" />}
       <div className="flex cursor-pointer items-start gap-3 px-5 py-2.5" onClick={onToggle}>
-        <GripVertical
-          size={14}
-          className="absolute top-[14px] left-1 text-fg-4 opacity-0 transition-opacity group-hover:opacity-100"
-        />
         <span
           className={clsx(
             'num mt-[1px] flex size-[22px] shrink-0 items-center justify-center rounded-full text-[10.5px] font-semibold',

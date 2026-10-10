@@ -78,7 +78,7 @@ coldroute-sg/
    └─ src/
       ├─ App.tsx
       ├─ index.css
-      ├─ components/       Shell, StopsEditor, ResultsPanel, MapView, StopCard, Timeline, StyleMenu, ui
+      ├─ components/       Shell, StopsEditor, ResultsPanel, MapView, StopCard, Timeline, ShareDialog, ui
       ├─ lib/              optimizer, explain, time, types
       └─ data/             sample run, OSRM snapshot
 ```
