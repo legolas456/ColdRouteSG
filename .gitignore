@@ -13,6 +13,15 @@ dist/
 .env
 *.local
 
+# Secrets: never commit AWS keys. They live in ~/.aws (see docs/deployment.md).
+*accessKeys*.csv
+*credentials*.csv
+.aws/
+
+# Agent and scratch folders
+.manus/
+.work/
+
 # Editors/OS
 .vscode/
 .idea/

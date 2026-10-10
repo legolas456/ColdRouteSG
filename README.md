@@ -4,7 +4,24 @@ ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation i
 
 Project background, the preliminary proposal, product design, brand and to-dos are in [`docs/`](docs/README.md).
 
-This version intentionally has **no AWS integration** and does **not require any API key or registration** to run.
+**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify, deployed by hand with `make deploy`; see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. Live feeds, address search and accounts are mocked, and the optimiser runs in the browser.
+
+The app does **not require any API key or registration** to run locally.
+
+## Quick start
+
+From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`):
+
+| Command | What it does |
+| --- | --- |
+| `make setup` | Creates `backend/.venv`, installs backend and frontend dependencies, creates local env files |
+| `make dev` | Backend on http://localhost:8000 and frontend on http://localhost:5173 together |
+| `make frontend` / `make backend` | Just one of them (the console works without the backend) |
+| `make test` | Backend `pytest` plus the frontend type check |
+| `make build` / `make preview` | Production build into `frontend/dist`, and serve it on http://localhost:4173 |
+| `make deploy` | Build and upload the frontend to Amplify. Needs the `coldroute` AWS profile, see [`docs/deployment.md`](docs/deployment.md) |
+
+`make help` lists them all. Local env files (`backend/.env`, `.env.deploy.local`) are created from the `*.example` files and ignored by git. AWS keys never go in the repo. On Windows without `make`, use the manual steps below or `run_local.bat`.
 
 ## What is included
 
@@ -53,6 +70,9 @@ No credentials are supplied by the project.
 ```text
 coldroute-sg/
 ├─ README.md
+├─ Makefile               setup, dev, test, build, deploy
+├─ .env.deploy.example    deploy settings (copy to .env.deploy.local)
+├─ scripts/deploy-frontend.sh
 ├─ run_local.bat
 ├─ run_local.sh
 ├─ backend/
@@ -292,23 +312,20 @@ ALLOW_MOCK_FALLBACK=false
 
 # Testing
 
-From `backend/`:
+From the repo root, `make test`. Or from `backend/`:
 
 ```bash
 pytest
 ```
 
-# No AWS yet
+# AWS status
 
-There is intentionally no:
+The frontend is on **Amplify Hosting** as a manual deployment (no CI yet, see [`docs/deployment.md`](docs/deployment.md)). An earlier API Gateway + Lambda copy of the backend (`backend/lambda_handler.py`) runs in a teammate's account, but the new console doesn't call it. There is no:
 
-- API Gateway
-- Lambda
 - DynamoDB
 - Cognito
 - S3
 - EventBridge
-- Amplify
 
 A later cloud version can map the local components as follows:
 
