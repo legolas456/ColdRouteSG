@@ -213,26 +213,36 @@ export function DeliveryForm({
                 />
               </div>
 
-              <Flex gap={8} wrap>
-                <InputNumber
-                  min={0}
-                  max={180}
-                  style={{ flex: 1, minWidth: 140 }}
-                  addonBefore="Service"
-                  addonAfter="min"
-                  value={stop.service_minutes}
-                  onChange={(value) => updateStop(index, { service_minutes: Number(value ?? 10) })}
-                />
-                <TimePicker
-                  style={{ flex: 1, minWidth: 140 }}
-                  placeholder="Window end"
-                  value={stop.window_end ? dayjs(stop.window_end, 'HH:mm') : null}
-                  format="HH:mm"
-                  minuteStep={5}
-                  onChange={(value) => updateStop(index, { window_end: value ? value.format('HH:mm') : null })}
-                  allowClear
-                />
-              </Flex>
+              <div className="delivery-stop-timing-grid">
+                <div className="delivery-stop-timing-field service-minutes-field">
+                  <Text strong>Service time</Text>
+                  <InputNumber
+                    className="service-minutes-input"
+                    style={{ width: '100%' }}
+                    addonAfter="min"
+                    value={stop.service_minutes === 0 ? undefined : stop.service_minutes}
+                    placeholder="0 if blank"
+                    controls={false}
+                    precision={0}
+                    min={0}
+                    max={180}
+                    onChange={(value) => updateStop(index, { service_minutes: Math.min(180, Math.max(0, Number(value ?? 0))) })}
+                  />
+                </div>
+                <div className="delivery-stop-timing-field">
+                  <Text strong>Delivery window end</Text>
+                  <TimePicker
+                    className="delivery-window-input"
+                    style={{ width: '100%' }}
+                    placeholder="Optional"
+                    value={stop.window_end ? dayjs(stop.window_end, 'HH:mm') : null}
+                    format="HH:mm"
+                    minuteStep={5}
+                    onChange={(value) => updateStop(index, { window_end: value ? value.format('HH:mm') : null })}
+                    allowClear
+                  />
+                </div>
+              </div>
 
               <Flex align="center" gap={10} wrap>
                 <Text strong>Cold-chain priority</Text>
@@ -250,7 +260,7 @@ export function DeliveryForm({
             </Space>
           </Card>
         ))}
-        <Button block dashed icon={<PlusOutlined />} onClick={addStop} disabled={stops.length >= 15}>Add delivery stop</Button>
+        <Button block type="dashed" icon={<PlusOutlined />} onClick={addStop} disabled={stops.length >= 15}>Add delivery stop</Button>
       </Space>
 
       <Divider />

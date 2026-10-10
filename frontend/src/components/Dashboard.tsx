@@ -5,6 +5,7 @@ import {
   CloudServerOutlined,
   DashboardOutlined,
   EnvironmentOutlined,
+  InfoCircleOutlined,
   MoonOutlined,
   SunOutlined,
 } from '@ant-design/icons'
@@ -73,6 +74,17 @@ function formatSingaporeClock(date: Date) {
   }).format(date)
 }
 
+function LiveSingaporeClock() {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  return <strong>{formatSingaporeClock(now)} SGT</strong>
+}
+
 function copyStops(stops: DeliveryStop[]) {
   return stops.map((stop) => ({ ...stop }))
 }
@@ -82,7 +94,7 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
   const [plannerPage, setPlannerPage] = useState<PlannerPage>('setup')
   const [depot, setDepot] = useState<Coordinate>({ ...sampleDepot })
   const [depotName, setDepotName] = useState('Jurong Cold Storage Depot')
-  const [departureTime, setDepartureTime] = useState('08:30')
+  const [departureTime, setDepartureTime] = useState(() => currentSingaporeHHMM())
   const [stops, setStops] = useState<DeliveryStop[]>(copyStops(defaultStops))
   const [result, setResult] = useState<RouteResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -90,20 +102,16 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
   const [updatingStopId, setUpdatingStopId] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [mapOpen, setMapOpen] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
   const [recalibrationNote, setRecalibrationNote] = useState<string | null>(null)
   const [routeComplete, setRouteComplete] = useState(false)
-  const [now, setNow] = useState(() => new Date())
   const [msg, contextHolder] = message.useMessage()
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
 
   const loadSample = () => {
     setDepot({ ...sampleDepot })
     setDepotName('Jurong Cold Storage Depot')
-    setDepartureTime('08:30')
+    setDepartureTime(currentSingaporeHHMM())
     setStops(copyStops(sampleStops))
     setResult(null)
     setRouteComplete(false)
@@ -254,14 +262,7 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
           </div>
         </Space>
 
-        <Flex gap={10} align="center" wrap className="hero-nav-actions">
-          <div className="current-time-pill nav-current-time">
-            <ClockCircleOutlined />
-            <div>
-              <span className="current-time-label">Current time</span>
-              <strong>{formatSingaporeClock(now)} SGT</strong>
-            </div>
-          </div>
+        <Flex gap={10} align="center" wrap className="hero-actions">
           <Segmented
             value={view}
             onChange={(value) => setView(value as 'planner' | 'feeds')}
@@ -270,6 +271,13 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
               { label: 'Live public feeds', value: 'feeds', icon: <ApiOutlined /> },
             ]}
           />
+          <Button
+            className="info-button"
+            icon={<InfoCircleOutlined />}
+            onClick={() => setInfoOpen(true)}
+          >
+            Info
+          </Button>
           <Switch
             aria-label="Toggle dark mode"
             checked={themeMode === 'dark'}
@@ -324,6 +332,13 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
                   <Text type="secondary">Starting from {depotName} · route reference time {departureTime}</Text>
                 </div>
                 <Flex gap={10} align="center" wrap className="route-toolbar-actions">
+                  <div className="current-time-pill">
+                    <ClockCircleOutlined />
+                    <div>
+                      <span className="current-time-label">Current time</span>
+                      <LiveSingaporeClock />
+                    </div>
+                  </div>
                   <Button onClick={goBackToInputs}>← Back to Input Locations</Button>
                 </Flex>
               </Flex>
@@ -381,6 +396,49 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
           )}
         </>
       )}
+
+      <Modal
+        open={infoOpen}
+        onCancel={() => setInfoOpen(false)}
+        footer={null}
+        title={(
+          <Space size={8}>
+            <InfoCircleOutlined />
+            <span>How to use ColdRoute SG</span>
+          </Space>
+        )}
+        width={620}
+        centered
+        className="app-info-modal"
+      >
+        <Text type="secondary">
+          ColdRoute SG helps plan cold-chain deliveries using route travel time, weather, parking availability, delivery priority and delivery windows.
+        </Text>
+        <Steps
+          direction="vertical"
+          size="small"
+          current={-1}
+          className="app-info-steps"
+          items={[
+            {
+              title: 'Enter locations',
+              description: 'Set the depot, add delivery stops and choose a cold-chain priority for each stop.',
+            },
+            {
+              title: 'Set delivery details',
+              description: 'Choose the departure time, service minutes and an optional delivery-window end time.',
+            },
+            {
+              title: 'Optimise the route',
+              description: 'ColdRoute recommends a delivery sequence and shows estimated timing, weather and nearby parking information.',
+            },
+            {
+              title: 'Update while delivering',
+              description: 'Edit a stop or mark the current location to automatically recalculate the remaining route using the current Singapore time.',
+            },
+          ]}
+        />
+      </Modal>
 
       <Modal
         open={mapOpen}

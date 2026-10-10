@@ -286,11 +286,15 @@ export function RouteSummary({
                   <div className="inline-editor-field">
                     <Text strong>Service time</Text>
                     <InputNumber
+                      className="service-minutes-input"
+                      addonAfter="min"
+                      value={draftStop.service_minutes === 0 ? undefined : draftStop.service_minutes}
+                      placeholder="0 if blank"
+                      controls={false}
+                      precision={0}
                       min={0}
                       max={180}
-                      addonAfter="min"
-                      value={draftStop.service_minutes}
-                      onChange={(value) => setDraftStop({ ...draftStop, service_minutes: Number(value ?? 10) })}
+                      onChange={(value) => setDraftStop({ ...draftStop, service_minutes: Math.min(180, Math.max(0, Number(value ?? 0))) })}
                       style={{ width: '100%' }}
                     />
                   </div>

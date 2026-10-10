@@ -1063,3 +1063,97 @@ button, input { font: inherit; }
     animation: none;
   }
 }
+
+/* Delivery input readability + app information */
+.hero-actions {
+  justify-content: flex-end;
+}
+
+.delivery-stop-timing-grid {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.25fr) minmax(170px, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.delivery-stop-timing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.service-minutes-input,
+.service-minutes-field .ant-input-number-group-wrapper,
+.inline-editor-field .ant-input-number-group-wrapper {
+  width: 100% !important;
+}
+
+.service-minutes-input input {
+  min-width: 72px;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-info-modal .ant-modal-body {
+  padding-top: 6px;
+}
+
+.app-info-steps {
+  margin: 22px 0 8px;
+}
+
+.app-info-steps .ant-steps-item-description {
+  max-width: none !important;
+  padding-bottom: 8px;
+}
+
+/* Keep every Info modal step fully legible instead of muting future steps. */
+.app-info-steps .ant-steps-item-title,
+.app-info-steps .ant-steps-item-description {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+.app-info-steps .ant-steps-item-wait .ant-steps-item-icon {
+  border-color: var(--accent) !important;
+  background: var(--surface) !important;
+}
+
+.app-info-steps .ant-steps-item-wait .ant-steps-icon {
+  color: var(--accent) !important;
+}
+
+@media (max-width: 767px) {
+  .hero-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+    gap: 10px !important;
+  }
+
+  .hero-actions .ant-segmented {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+  }
+
+  .hero-actions .info-button {
+    width: 100%;
+  }
+
+  .delivery-stop-timing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .service-minutes-input,
+  .service-minutes-field .ant-input-number-group-wrapper,
+  .inline-editor-field .ant-input-number-group-wrapper {
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  .service-minutes-input input {
+    min-width: 96px;
+  }
+}
+
