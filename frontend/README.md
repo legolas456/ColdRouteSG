@@ -30,14 +30,15 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 
 | Area | What it does |
 | --- | --- |
-| Input panel | Departure time, depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. |
-| Optimising | A short, staged progress list for the five data sources, then the result. `⌘↵` runs it. |
-| Results panel | Four KPIs, each compared with the shortest route. Also a plain-language "Why this route" summary and the stop order with W/P/T/C/L risk meters and how far each stop moved. |
-| Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, a hatched shower cell and carparks with walking links. Optional layers show slow road segments and the shortest route as a ghost. The highest-risk stop pulses. |
+| Input panel | Departure time, depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. **Optimise route** sits right under the run title. |
+| Optimising | A short, staged progress list for the five data sources takes the place of the Optimise button, then the result appears. `⌘↵` runs it from anywhere. |
+| Results panel | **Re-optimise** and **Edit stops** sit under the title. Then four KPIs, each compared with the shortest route, a plain-language "Why this route" summary, and the stop order. Each stop lists only what needs attention, in words: "Unloads in rain", "1.1 km walk", "Heavy traffic", "2 h 57 min on board", "12 min spare". Red means high risk. The whole panel scrolls as one, with the view tabs pinned to the top. |
+| Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, two hatched rain cells that drift slowly (light rain in the west, heavy rain over the City), and heavy-traffic stretches marked on the route. Optional layers show carparks with walking links and the shortest route as a ghost. The highest-risk stop pulses. |
 | Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, and every risk factor compared with the shortest route. |
-| Timeline | Delivery windows, unloading blocks, waits, lateness and the shower period on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
+| Timeline | Delivery windows, unloading blocks, waits, lateness and the heavy-rain period on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
 | Share | **Share** opens a small popover under the button. It has three parts: who can open the link (anyone at ColdRoute SG, or anyone with the link; both can view only), an option to open the link on your current view (e.g. Compare · MBFC), and **Copy link**. |
 | Shared view | Opening a `?share=` link shows a read-only snapshot with a "shared with you" banner and a **View only** status. Edit, re-optimise and dispatch are hidden. **Make a copy** turns it into your own editable run. |
+| Account (mock) | The bottom of the panel shows who is signed in (Fiona Lim, Admin). Click it for the account menu and **Sign out**. Signed out, it offers **Sign in**, which opens a demo account picker. **Dispatch to driver** asks you to sign in first, then sends. On phones, and when the panel is hidden, the avatar moves to the top bar. Nothing leaves the browser: the user is kept in `localStorage`. |
 
 Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views redraws the map, list and timeline.
 
@@ -50,6 +51,18 @@ Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views
 
 Both layouts render the same components. `App.tsx` picks the arrangement with `useMediaQuery`, and smaller differences use Tailwind's `max-md:` variants.
 
+## Button hierarchy
+
+One solid primary button per screen, so the next step is always obvious.
+
+| State | Solid primary | Supporting actions |
+| --- | --- | --- |
+| Draft | **Optimise route**, under the run title | **Dispatch to driver** is shown in the top bar but stays disabled until there is a plan |
+| Optimised | **Dispatch to driver**, top right | **Re-optimise** is a tonal (tinted) primary for the panel; **Edit stops** is a compact secondary; **Share** is secondary |
+| Shared view | **Make a copy** | Nothing else can change the run |
+
+Actions live at the top: the top bar for the run, the top of the panel for the plan. The bottom of the panel is for the account.
+
 ## Design system
 
 The brand colour is **Safety Orange** on warm paper, the high-vis orange used across logistics. Other colours only appear where they carry meaning:
@@ -61,7 +74,7 @@ The brand colour is **Safety Orange** on warm paper, the high-vis orange used ac
 | Green (`ok`) | `#079455` | Improvements vs the shortest route, on time, live data |
 | Amber (`warn`) | `#ca8504` | Medium risk, addresses that need review. Yellow-amber, so it is not confused with the brand orange. |
 | Rose (`bad`) | `#e31b54` | Late, highest-risk stop, slow traffic. Rose rather than red, for the same reason. |
-| Blue (`rain`) | `#2e90fa` | Shower cells on the map and in the timeline |
+| Blue (`rain`) | `#2e90fa` | Rain cells on the map and in the timeline |
 | Cargo dots | violet, blue, cyan | PHARMA, FROZEN, CHILLED |
 
 Dark mode (**Night Shift**) uses warm charcoal with a brighter orange (`#ff7a33`) and dark text on orange buttons.
@@ -82,19 +95,20 @@ Both themes live in `src/lib/themes.ts`, with the UI tokens and the matching map
 
 ```text
 src/
-├─ App.tsx                 state machine (draft → optimising → optimised), layout, theme, sharing, shortcuts
+├─ App.tsx                 state machine (draft → optimising → optimised), layout, theme, sharing, account, shortcuts
 ├─ index.css               design tokens and themes
 ├─ components/
 │  ├─ Shell.tsx            top bar, logo, panel toggle, theme switch
 │  ├─ PanelHandle.tsx      resize handle for the desktop panel
 │  ├─ BottomSheet.tsx      phone bottom sheet
 │  ├─ StopsEditor.tsx      input panel and optimising progress
-│  ├─ ResultsPanel.tsx     KPIs, explanation, stop order
+│  ├─ ResultsPanel.tsx     plan actions, KPIs, explanation, stop order with watch-outs
 │  ├─ MapView.tsx          MapLibre map, overlays, markers, layer chips
 │  ├─ StopCard.tsx         stop detail card (on the map, or in the phone sheet)
 │  ├─ Timeline.tsx         time-axis view
 │  ├─ SharePopover.tsx     share popover: link access, current view, copy
-│  └─ ui.tsx               buttons, segmented control, tags, meters
+│  ├─ Account.tsx          mock sign-in, panel account bar, top-bar avatar
+│  └─ ui.tsx               buttons, tabs, segmented control, tags
 ├─ lib/                    optimizer, explanations, themes, hooks, time helpers, types
 └─ data/                   sample run, OSRM snapshot, Singapore mask
 ```

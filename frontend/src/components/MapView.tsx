@@ -1,13 +1,13 @@
 import clsx from 'clsx'
-import { LocateFixed, Minus, Plus } from 'lucide-react'
+import { Check, LocateFixed, Minus, Plus } from 'lucide-react'
 import { GeoJSONSource, LngLatBounds, Map as MapLibre, Marker, setWorkerUrl, type ExpressionSpecification, type LayerSpecification, type StyleSpecification } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { RAIN } from '../data/sample'
+import { RAIN_CELLS } from '../data/sample'
 import sgMask from '../data/sg-mask.json'
 import { legGeometry, pathFor } from '../lib/optimizer'
 import { hm } from '../lib/time'
-import type { Depot, OptimiseResult, Stop } from '../lib/types'
+import type { Depot, OptimiseResult, RainCell, Stop } from '../lib/types'
 import type { MapPalette } from '../lib/themes'
 import type { View } from './ResultsPanel'
 
@@ -103,35 +103,47 @@ function applyBasemap(map: MapLibre, c: MapPalette) {
   map.setStyle(STYLE[c.base], { diff: false, transformStyle: (_prev, next) => tintedSpec(next, c) })
 }
 
-function hatchImage(color: string) {
-  const size = 16
+/** Tile size of the rain hatch in CSS px. */
+const HATCH = 12
+
+/** One tile of diagonal rain. `phase` (0 to HATCH) slides the lines down the slope. */
+function hatchImage(color: string, phase = 0) {
+  const size = HATCH
   const ratio = 2
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = size * ratio
   const ctx = canvas.getContext('2d')!
   ctx.scale(ratio, ratio)
   ctx.strokeStyle = color
-  ctx.lineWidth = 1.5
+  ctx.lineWidth = 1.4
   ctx.beginPath()
-  for (const o of [-size, 0, size]) {
-    ctx.moveTo(o, size)
-    ctx.lineTo(o + size, 0)
+  for (const o of [-2 * size, -size, 0, size]) {
+    ctx.moveTo(o + phase, size)
+    ctx.lineTo(o + phase + size, 0)
   }
   ctx.stroke()
   const data = ctx.getImageData(0, 0, size * ratio, size * ratio)
   return { width: data.width, height: data.height, data: new Uint8Array(data.data.buffer) }
 }
 
-function rainPolygon(): GeoJSON.Feature<GeoJSON.Polygon> {
-  const [lng, lat] = RAIN.center
+function rainPolygon(cell: RainCell, i: number): GeoJSON.Feature<GeoJSON.Polygon> {
+  const [lng, lat] = cell.center
   const ring: [number, number][] = []
-  for (let i = 0; i <= 72; i++) {
-    const t = (i / 72) * Math.PI * 2
-    const r = RAIN.radiusKm * (1 + 0.1 * Math.sin(3 * t + 0.6) + 0.06 * Math.cos(5 * t))
+  for (let k = 0; k <= 72; k++) {
+    const t = (k / 72) * Math.PI * 2
+    const r = cell.radiusKm * (1 + 0.1 * Math.sin(3 * t + 0.6 + i * 1.7) + 0.06 * Math.cos(5 * t + i))
     ring.push([lng + (r / (111.32 * Math.cos((lat * Math.PI) / 180))) * Math.cos(t), lat + (r / 110.574) * Math.sin(t)])
   }
-  return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } }
+  return { type: 'Feature', properties: { heavy: i === 0 }, geometry: { type: 'Polygon', coordinates: [ring] } }
 }
+
+/** The first cell is the heavy one that drives the plan; the rest are lighter. */
+const rainCells = (): GeoJSON.FeatureCollection<GeoJSON.Polygon> => ({
+  type: 'FeatureCollection',
+  features: RAIN_CELLS.map(rainPolygon),
+})
+
+const HEAVY = ['==', ['get', 'heavy'], true] as ExpressionSpecification
 
 function addOverlays(map: MapLibre, c: MapPalette) {
   // Carto puts a few water labels before the road layers; anchor overlays above
@@ -145,15 +157,40 @@ function addOverlays(map: MapLibre, c: MapPalette) {
   if (map.hasImage('hatch')) map.removeImage('hatch')
   map.addImage('hatch', hatchImage(c.rainHatch), { pixelRatio: 2 })
 
-  map.addSource('rain', { type: 'geojson', data: rainPolygon() })
-  map.addLayer({ id: 'rain-tint', type: 'fill', source: 'rain', paint: { 'fill-color': c.rain, 'fill-opacity': c.base === 'dark' ? 0.1 : 0.07 } }, before)
-  map.addLayer({ id: 'rain-fill', type: 'fill', source: 'rain', paint: { 'fill-pattern': 'hatch', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, 1, 14, 0.45] } }, before)
+  map.addSource('rain', { type: 'geojson', data: rainCells() })
+  const dark = c.base === 'dark'
+  map.addLayer(
+    {
+      id: 'rain-tint',
+      type: 'fill',
+      source: 'rain',
+      paint: { 'fill-color': c.rain, 'fill-opacity': ['case', HEAVY, dark ? 0.2 : 0.15, dark ? 0.13 : 0.09] as ExpressionSpecification },
+    },
+    before,
+  )
+  map.addLayer(
+    {
+      id: 'rain-fill',
+      type: 'fill',
+      source: 'rain',
+      paint: { 'fill-pattern': 'hatch', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 11.5, 0.95, 14, 0.4] },
+    },
+    before,
+  )
+  map.addLayer(
+    { id: 'rain-glow', type: 'line', source: 'rain', paint: { 'line-color': c.rain, 'line-opacity': 0.2, 'line-width': 7, 'line-blur': 5 } },
+    before,
+  )
   map.addLayer(
     {
       id: 'rain-line',
       type: 'line',
       source: 'rain',
-      paint: { 'line-color': c.rain, 'line-opacity': 0.6, 'line-width': 1.2, 'line-dasharray': [3, 3] },
+      paint: {
+        'line-color': c.rain,
+        'line-opacity': ['case', HEAVY, 0.9, 0.7] as ExpressionSpecification,
+        'line-width': ['case', HEAVY, 1.8, 1.3] as ExpressionSpecification,
+      },
     },
     before,
   )
@@ -202,13 +239,24 @@ function addOverlays(map: MapLibre, c: MapPalette) {
     },
     before,
   )
+  // Jams sit on the route itself, like a ride-hailing app: a red stretch of the line
+  map.addLayer(
+    {
+      id: 'traffic-casing',
+      type: 'line',
+      source: 'traffic',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': c.routeCasing, 'line-width': 8.5 },
+    },
+    before,
+  )
   map.addLayer(
     {
       id: 'traffic',
       type: 'line',
       source: 'traffic',
-      layout: { 'line-cap': 'round' },
-      paint: { 'line-color': c.traffic, 'line-width': 7, 'line-opacity': 0.32 },
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': c.traffic, 'line-width': 4.8 },
     },
     before,
   )
@@ -228,6 +276,18 @@ function addOverlays(map: MapLibre, c: MapPalette) {
     source: 'outside-sg',
     paint: { 'line-color': c.boundary, 'line-width': 1, 'line-dasharray': [4, 3] },
   })
+}
+
+const kmBetween = ([x1, y1]: [number, number], [x2, y2]: [number, number]) =>
+  Math.hypot((x2 - x1) * Math.cos((y1 * Math.PI) / 180), y2 - y1) * 111.2
+
+/** The part of a line between two fractions of its length (by distance, not by vertex). */
+function sliceByDistance(line: [number, number][], from: number, to: number) {
+  const d = [0]
+  for (let i = 1; i < line.length; i++) d.push(d[i - 1] + kmBetween(line[i - 1], line[i]))
+  const total = d[d.length - 1]
+  const coords = line.filter((_, i) => d[i] >= from * total && d[i] <= to * total)
+  return { coords, mid: coords[Math.floor(coords.length / 2)] ?? line[0], km: total * (to - from) }
 }
 
 /** Gradient that paints the first `p` of a line and leaves the rest transparent. */
@@ -338,6 +398,9 @@ export function MapView(props: Props) {
       if (firstStyle) {
         firstStyle = false
         fitRef.current(0)
+        // keep credits one click away behind the (i) button, so they never cover labels
+        // (MapLibre opens them again while the first tiles load, so wait for idle)
+        map.once('idle', () => map.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'))
       }
       setStyleVersion((v) => v + 1)
     })
@@ -386,16 +449,34 @@ export function MapView(props: Props) {
       : null
     : null
 
+  // Heavy traffic on the shown plan: the slow stretch of each approach into a
+  // congested stop (LTA speed bands in production)
+  const jams = useMemo(() => {
+    const out: Array<{ id: string; coords: [number, number][]; mid: [number, number]; km: number }> = []
+    if (!primaryPlan) return out
+    let prev: { id: string; lng: number; lat: number } = depot
+    for (const id of primaryPlan.order) {
+      const s = stopById[id]
+      if (s.trafficRisk >= 0.5) {
+        // 12% of the approach at risk 0.5, up to 18% at 0.6, ending just before the stop
+        const span = 0.12 + (s.trafficRisk - 0.5) * 0.6
+        const seg = sliceByDistance(legGeometry(prev, s), 0.88 - span, 0.88)
+        if (seg.coords.length > 1) out.push({ id, ...seg })
+      }
+      prev = s
+    }
+    return out
+  }, [primaryPlan, depot, stopById])
+
   // lines + overlay visibility
   useEffect(() => {
     const map = mapRef.current
     if (!map || !styleVersion || !map.getSource('route-primary')) return
     const vis = (id: string, on: boolean) => map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
-    vis('rain-tint', layers.rain)
-    vis('rain-fill', layers.rain)
-    vis('rain-line', layers.rain)
+    for (const id of ['rain-tint', 'rain-fill', 'rain-glow', 'rain-line']) vis(id, layers.rain)
     vis('walk', layers.parking)
     vis('traffic', layers.traffic && !!primaryPlan)
+    vis('traffic-casing', layers.traffic && !!primaryPlan)
 
     const primary = map.getSource('route-primary') as GeoJSONSource
     const secondary = map.getSource('route-secondary') as GeoJSONSource
@@ -416,22 +497,14 @@ export function MapView(props: Props) {
         })),
     })
 
-    // slow segments: the final third of each approach into a congested stop
-    const slow: GeoJSON.Feature<GeoJSON.LineString>[] = []
-    if (primaryPlan) {
-      let prev: { id: string; lng: number; lat: number } = depot
-      for (const id of primaryPlan.order) {
-        const s = stopById[id]
-        if (s.trafficRisk >= 0.5) {
-          const leg = legGeometry(prev, s)
-          const a = Math.floor(leg.length * 0.45)
-          const b = Math.floor(leg.length * 0.85)
-          if (b - a > 1) slow.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: leg.slice(a, b) } })
-        }
-        prev = s
-      }
-    }
-    ;(map.getSource('traffic') as GeoJSONSource).setData({ type: 'FeatureCollection', features: slow })
+    // jams appear once the route has been drawn through them
+    const traffic = map.getSource('traffic') as GeoJSONSource
+    const showJams = () =>
+      traffic.setData({
+        type: 'FeatureCollection',
+        features: jams.map((j) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: j.coords } })),
+      })
+    traffic.setData({ type: 'FeatureCollection', features: [] })
 
     cancelAnimationFrame(animRef.current)
     clearTimeout(revealTimer.current)
@@ -461,8 +534,25 @@ export function MapView(props: Props) {
     revealTimer.current = window.setTimeout(() => {
       cancelAnimationFrame(animRef.current)
       paint(1)
+      showJams()
     }, total + 200)
-  }, [styleVersion, primaryPlan, secondaryPlan, layers, depot, stopById, stops, view])
+  }, [styleVersion, primaryPlan, secondaryPlan, layers, depot, stopById, stops, view, jams])
+
+  // Rain drifts slowly down the hatch: 8 frames on a loop, about 8 fps. Quiet
+  // enough to read as weather, not as an alert. Off for reduced motion.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !styleVersion || !layers.rain) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const frames = Array.from({ length: 8 }, (_, i) => hatchImage(palette.rainHatch, (i * HATCH) / 8))
+    let i = 0
+    const timer = window.setInterval(() => {
+      if (!map.hasImage('hatch')) return
+      i = (i + 1) % frames.length
+      map.updateImage('hatch', frames[i])
+    }, 125)
+    return () => clearInterval(timer)
+  }, [styleVersion, layers.rain, palette])
 
   // markers
   useEffect(() => {
@@ -475,29 +565,58 @@ export function MapView(props: Props) {
       lngLat: [number, number],
       z = 1,
       offset: [number, number] = [0, 0],
-      anchor: 'center' | 'top-left' = 'center',
+      anchor: 'center' | 'top-left' | 'bottom' = 'center',
     ) => {
       el.style.zIndex = String(z)
       markersRef.current.push(new Marker({ element: el, anchor, offset }).setLngLat(lngLat).addTo(map))
     }
 
-    // rain label
+    // rain labels, attached to each cell's rim
     if (layers.rain) {
-      add(
-        markerEl(
-          `<div class="flex items-center gap-1.5 rounded-full bg-panel px-2.5 py-1 text-[11px] font-medium text-fg shadow-card whitespace-nowrap">
-            <svg class="text-rain" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/><path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2"/></svg>
-            ${RAIN.label} · <span class="num">${hm(RAIN.start)}–${hm(RAIN.end)}</span></div>`,
-        ),
-        // south-east rim of the shower cell, label hanging off it
-        [
-          RAIN.center[0] + (RAIN.radiusKm * 0.72) / (111.32 * Math.cos((RAIN.center[1] * Math.PI) / 180)),
-          RAIN.center[1] - (RAIN.radiusKm * 0.72) / 110.574,
-        ],
-        2,
-        [4, 4],
-        'top-left',
-      )
+      RAIN_CELLS.forEach((cell, i) => {
+        const heavy = i === 0
+        const kx = 1 / (111.32 * Math.cos((cell.center[1] * Math.PI) / 180))
+        const ky = 1 / 110.574
+        add(
+          markerEl(
+            `<div class="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-panel ${heavy ? 'px-2.5 py-1 text-[11px]' : 'px-2 py-[3px] text-[10.5px]'} text-fg shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--rain)_65%,transparent),0_2px_6px_rgba(16,24,40,0.12)]">
+              <svg class="text-rain" width="${heavy ? 13 : 11}" height="${heavy ? 13 : 11}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/><path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2"/></svg>
+              <span class="font-semibold">${cell.label}</span>${compact ? '' : `<span class="num text-fg-2">${hm(cell.start)}–${hm(cell.end)}</span>`}</div>`,
+          ),
+          heavy
+            ? // south-east rim, the label hangs off it over the sea
+              [cell.center[0] + cell.radiusKm * 0.72 * kx, cell.center[1] - cell.radiusKm * 0.72 * ky]
+            : // north rim, the label sits on top of it
+              [cell.center[0], cell.center[1] + cell.radiusKm * 0.95 * ky],
+          2,
+          heavy ? [4, 4] : [0, -4],
+          heavy ? 'top-left' : 'bottom',
+        )
+      })
+    }
+
+    // heavy-traffic tags: only on jams long enough to matter, never on top of a
+    // stop, and one per area so they never stack
+    // (phones: the red stretches alone, tags would crowd the small map)
+    if (layers.traffic && phase === 'optimised' && !compact) {
+      const tagged: [number, number][] = []
+      const places: [number, number][] = [[depot.lng, depot.lat], ...stops.map((s): [number, number] => [s.lng, s.lat])]
+      for (const j of jams) {
+        if (j.km < 1) continue
+        if (places.some((p) => kmBetween(p, j.mid) < 1.5)) continue
+        if (tagged.some((t) => kmBetween(t, j.mid) < 2.5)) continue
+        tagged.push(j.mid)
+        add(
+          markerEl(
+            `<div class="flex items-center gap-1 whitespace-nowrap rounded-full bg-bad px-1.5 py-[2px] text-[10.5px] font-semibold text-white shadow-[0_0_0_2px_var(--bg-panel),0_2px_6px_rgba(16,24,40,0.18)]">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-3l2-6h12l2 6v3z"/><path d="M6 16v3M18 16v3M4 13h16"/></svg>
+              Heavy traffic</div>`,
+          ),
+          j.mid,
+          4,
+          [0, -16],
+        )
+      }
     }
 
     // carparks
@@ -562,7 +681,7 @@ export function MapView(props: Props) {
         offset,
       )
     })
-  }, [styleVersion, stops, primaryPlan, selectedId, layers, phase, view, result, depot, offsets])
+  }, [styleVersion, stops, primaryPlan, selectedId, layers, phase, view, result, depot, offsets, jams, compact])
 
   // camera
   const fit = (duration = 700) => {
@@ -597,7 +716,7 @@ export function MapView(props: Props) {
   }, [selectedId, padding, stops.length])
 
   const toggles: Array<{ key: keyof Layers; label: string; show: boolean; dot: string }> = [
-    { key: 'rain', label: 'Showers', show: true, dot: 'bg-rain' },
+    { key: 'rain', label: 'Rain', show: true, dot: 'bg-rain' },
     { key: 'parking', label: 'Carparks', show: true, dot: 'bg-fg-2' },
     { key: 'traffic', label: 'Traffic', show: phase === 'optimised', dot: 'bg-bad' },
     { key: 'baseline', label: 'Shortest route', show: phase === 'optimised' && view === 'coldroute', dot: 'bg-fg-4' },
@@ -617,13 +736,24 @@ export function MapView(props: Props) {
           .map((t) => (
             <button
               key={t.key}
+              aria-pressed={layers[t.key]}
+              title={`${layers[t.key] ? 'Hide' : 'Show'} ${t.label.toLowerCase()}`}
               onClick={() => setLayers({ ...layers, [t.key]: !layers[t.key] })}
               className={clsx(
-                'flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium shadow-card transition-colors',
-                layers[t.key] ? 'bg-panel text-fg shadow-[0_0_0_1.5px_var(--brand),0_1px_2px_rgba(16,24,40,0.08)]' : 'bg-panel/90 text-fg-3 hover:text-fg',
+                'flex h-8 shrink-0 items-center gap-1.5 rounded-full pr-3 pl-2 text-[12px] font-medium transition-[color,box-shadow,background-color]',
+                layers[t.key]
+                  ? 'bg-panel text-fg shadow-[0_0_0_1.5px_var(--brand),0_1px_3px_rgba(16,24,40,0.10)]'
+                  : 'bg-panel text-fg-3 shadow-[0_0_0_1px_var(--border-dark),0_1px_3px_rgba(16,24,40,0.08)] hover:text-fg hover:shadow-[0_0_0_1px_var(--text-4),0_1px_3px_rgba(16,24,40,0.08)]',
               )}
             >
-              <span className={clsx('size-2 rounded-full transition-opacity', t.dot, !layers[t.key] && 'opacity-35')} />
+              <span
+                className={clsx(
+                  'flex size-4 shrink-0 items-center justify-center rounded-full transition-colors',
+                  layers[t.key] ? t.dot : 'shadow-[inset_0_0_0_1.5px_var(--text-4)]',
+                )}
+              >
+                {layers[t.key] && <Check size={10} strokeWidth={3.2} className="text-panel" />}
+              </span>
               {t.label}
             </button>
           ))}
@@ -644,10 +774,18 @@ export function MapView(props: Props) {
               {view === 'baseline' ? 'ColdRoute' : 'Shortest route'}
             </span>
           )}
-          <span className="flex items-center gap-1.5">
-            <span className="hatch-rain size-3 rounded-[3px]" />
-            Showers
-          </span>
+          {layers.rain && (
+            <span className="flex items-center gap-1.5">
+              <span className="hatch-rain size-3 rounded-[3px] shadow-[inset_0_0_0_1px_var(--rain)]" />
+              Rain
+            </span>
+          )}
+          {layers.traffic && jams.length > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-[4px] w-5 rounded-full bg-bad" />
+              Heavy traffic
+            </span>
+          )}
           {view !== 'baseline' && (
             <span className="flex items-center gap-1.5">
               <span className="size-2.5 rounded-full border-2 border-bad" />

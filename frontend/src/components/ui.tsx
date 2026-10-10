@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'tonal'
   size?: 'sm' | 'md'
   icon?: ReactNode
   kbd?: string
@@ -17,6 +17,9 @@ export function Button({ variant = 'secondary', size = 'md', icon, kbd, classNam
         variant === 'primary' && 'bg-brand text-on-brand shadow-[0_1px_2px_rgba(16,24,40,0.08),inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-brand-hover',
         variant === 'secondary' && 'bg-panel text-fg shadow-[inset_0_0_0_1px_var(--border-dark)] hover:bg-subtle',
         variant === 'ghost' && 'text-fg-2 hover:bg-hover hover:text-fg',
+        // the panel's main action when the screen already has a solid primary
+        variant === 'tonal' &&
+          'bg-brand-soft text-brand-fg shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_26%,transparent)] hover:bg-[color-mix(in_srgb,var(--brand)_15%,transparent)]',
         className,
       )}
       {...rest}
@@ -58,36 +61,97 @@ export function IconButton({
   )
 }
 
+/**
+ * Pick one of a few options (a radio group). The chosen option is a white key
+ * with a brand ring; the others sit in a visible track and light up on hover.
+ * Labels never wrap: they truncate, so the control keeps one height.
+ */
 export function Segmented<T extends string>({
   value,
   options,
   onChange,
   size = 'md',
   className,
+  label,
 }: {
   value: T
   options: Array<{ value: T; label: ReactNode }>
   onChange: (v: T) => void
   size?: 'sm' | 'md'
   className?: string
+  label?: string
 }) {
   return (
-    <div className={clsx('inline-flex rounded-control bg-hover p-0.5', className)} role="tablist">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          role="tab"
-          aria-selected={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={clsx(
-            'flex-1 rounded-[calc(var(--r-control)-2px)] font-medium transition-all duration-150',
-            size === 'sm' ? 'h-6 px-2.5 text-[12px]' : 'h-7 px-3 text-[12.5px]',
-            value === o.value ? 'bg-panel text-fg shadow-[0_0_0_1px_var(--border-main),0_1px_2px_#0000000d]' : 'text-fg-3 hover:text-fg',
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={clsx('inline-flex gap-0.5 rounded-control bg-hover p-[3px] shadow-[inset_0_0_0_1px_var(--border-main)]', className)}
+    >
+      {options.map((o) => {
+        const on = value === o.value
+        return (
+          <button
+            key={o.value}
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(o.value)}
+            className={clsx(
+              'min-w-0 flex-1 truncate whitespace-nowrap rounded-[calc(var(--r-control)-3px)] font-medium transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-offset-[-1px]',
+              size === 'sm' ? 'h-7 px-2 text-[12px]' : 'h-8 px-3 text-[13px]',
+              on
+                ? 'bg-panel text-brand-fg shadow-[0_0_0_1.5px_var(--brand),0_1px_2px_rgba(16,24,40,0.08)]'
+                : 'text-fg-2 hover:bg-panel/70 hover:text-fg',
+            )}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Switch between views of the same thing. Underlined tabs on a hairline, sized
+ * to their labels, so they never squeeze or wrap; they scroll if space runs out.
+ */
+export function Tabs<T extends string>({
+  value,
+  options,
+  onChange,
+  className,
+  label,
+}: {
+  value: T
+  options: Array<{ value: T; label: ReactNode; title?: string }>
+  onChange: (v: T) => void
+  className?: string
+  label?: string
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className={clsx('no-scrollbar flex gap-3 overflow-x-auto shadow-[inset_0_-1px_0_var(--border-main)]', className)}
+    >
+      {options.map((o) => {
+        const on = value === o.value
+        return (
+          <button
+            key={o.value}
+            role="tab"
+            aria-selected={on}
+            title={o.title}
+            onClick={() => onChange(o.value)}
+            className={clsx(
+              '-mx-1 flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-[6px] border-b-2 px-1 text-[13px] font-medium transition-colors focus-visible:outline-offset-[-2px]',
+              on ? 'border-brand text-fg' : 'border-transparent text-fg-3 hover:border-line-strong hover:text-fg',
+            )}
+          >
+            {o.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -123,26 +187,6 @@ export function StatusPill({ children, tone = 'default' }: { children: ReactNode
 }
 
 /** Three-step meter: grey for low, amber for medium, red for high. Colour only appears when it needs attention. */
-export function DotMeter({ value, label }: { value: number; label: string }) {
-  const level = value >= 0.66 ? 3 : value >= 0.33 ? 2 : 1
-  return (
-    <span className="inline-flex items-center gap-1" title={`${label}: ${['low', 'medium', 'high'][level - 1]}`}>
-      <span className="num text-[10px] text-fg-3">{label}</span>
-      <span className="inline-flex gap-[2px]">
-        {[1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className={clsx(
-              'h-[8px] w-[3px] rounded-[1px]',
-              i <= level ? (level === 3 ? 'bg-bad' : level === 2 ? 'bg-warn' : 'bg-fg-4') : 'bg-stronger',
-            )}
-          />
-        ))}
-      </span>
-    </span>
-  )
-}
-
 const CARGO_DOT: Record<string, string> = { PHARMA: 'bg-pharma', FROZEN: 'bg-frozen', CHILLED: 'bg-chilled' }
 
 /** Cargo class: neutral pill with a coloured dot, so three classes read apart without shouting. */

@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { Check, Copy, Eye, Loader2, Send } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { AccountBar, AccountButton, SignInDialog, type User } from './components/Account'
 import { BottomSheet, type Snap } from './components/BottomSheet'
 import { MapView, type Layers } from './components/MapView'
 import { PANEL, PanelHandle } from './components/PanelHandle'
@@ -54,6 +55,9 @@ export default function App() {
   }
 
   const [readOnly, setReadOnly] = useState(sharedOnLoad)
+  // mock account: signed out on first visit, remembered after that
+  const [user, setUser] = usePersistentState<User | null>('coldroute.user', null)
+  const [signIn, setSignIn] = useState<{ reason?: string; then?: () => void } | null>(null)
   const [phase, setPhase] = useState<Phase>('draft')
   const [stops, setStops] = useState<Stop[]>(SAMPLE_STOPS)
   const [departure, setDeparture] = useState(DEPARTURE)
@@ -61,7 +65,7 @@ export default function App() {
   const [result, setResult] = useState<OptimiseResult | null>(null)
   const [view, setView] = useState<View>(urlView)
   const [selectedId, setSelectedId] = useState<string | null>(urlStop)
-  const [layers, setLayers] = useState<Layers>({ rain: true, parking: false, traffic: false, baseline: false })
+  const [layers, setLayers] = useState<Layers>({ rain: true, parking: false, traffic: true, baseline: false })
   const [step, setStep] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
@@ -215,14 +219,20 @@ export default function App() {
     <Button
       variant="primary"
       icon={<Send size={13} strokeWidth={2} />}
-      onClick={() => setToast(`Sent to Ahmad R. · ${stops.length} stops · first ETA ${result ? fmt(result.recommended.rows[0].arrival) : ''}`)}
+      onClick={() => {
+        const send = () => setToast(`Sent to Ahmad R. · ${stops.length} stops · first ETA ${result ? fmt(result.recommended.rows[0].arrival) : ''}`)
+        if (user) send()
+        else setSignIn({ reason: 'Sign in to send this run to the driver.', then: send })
+      }}
     >
       Dispatch<span className="max-md:hidden"> to driver</span>
     </Button>
   ) : (
-    <Button variant="primary" kbd="⌘↵" disabled={phase === 'optimising' || stops.length < 2} onClick={() => runOptimise()}>
-      {phase === 'optimising' ? 'Optimising…' : <>Optimise<span className="max-md:hidden"> route</span></>}
-    </Button>
+    <span title="Optimise the route first" className="inline-flex">
+      <Button variant="primary" icon={<Send size={13} strokeWidth={2} />} disabled>
+        Dispatch<span className="max-md:hidden"> to driver</span>
+      </Button>
+    </span>
   )
 
   const left =
@@ -302,6 +312,15 @@ export default function App() {
     </MapView>
   )
 
+  const account = {
+    user,
+    onSignIn: () => setSignIn({}),
+    onSignOut: () => {
+      setUser(null)
+      setToast('Signed out')
+    },
+  }
+
   const topBar = (
     <TopBar
       status={status}
@@ -313,6 +332,7 @@ export default function App() {
       }
       theme={{ mode: forcedTheme ?? themeMode, resolved: themeId, onChange: pickTheme }}
       panel={isPhone ? undefined : { collapsed, onToggle: () => setCollapsed((c) => !c) }}
+      account={(isPhone || collapsed) && <AccountButton {...account} />}
     />
   )
 
@@ -324,6 +344,19 @@ export default function App() {
         <span className="max-md:hidden"> · read-only snapshot, data from 09:05</span>
       </span>
     </div>
+  )
+
+  const signInDialog = signIn && (
+    <SignInDialog
+      reason={signIn.reason}
+      onClose={() => setSignIn(null)}
+      onSignedIn={(u) => {
+        setUser(u)
+        setSignIn(null)
+        if (signIn.then) signIn.then()
+        else setToast(`Signed in as ${u.name}`)
+      }}
+    />
   )
 
   const toastEl = toast && (
@@ -354,6 +387,7 @@ export default function App() {
               timeline && !card ? (
                 <div className="px-4 pb-2">
                   <Segmented
+                    label="Panel"
                     size="sm"
                     className="w-full"
                     value={sheetTab}
@@ -370,6 +404,7 @@ export default function App() {
             {card ?? (showTimeline ? timeline : left)}
           </BottomSheet>
         </main>
+        {signInDialog}
         {toastEl}
       </div>
     )
@@ -392,7 +427,8 @@ export default function App() {
         >
           {/* fixed inner width: the content slides out instead of re-wrapping */}
           <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ width: panelW }}>
-            {left}
+            <div className="flex min-h-0 flex-1 flex-col">{left}</div>
+            <AccountBar {...account} />
           </div>
           {!collapsed && (
             <PanelHandle width={panelW} setWidth={setPanelW} onCollapse={() => setCollapsed(true)} onDragChange={setResizing} />
@@ -403,6 +439,7 @@ export default function App() {
           {timeline && <div className="h-[236px] shrink-0 border-t border-line bg-panel">{timeline}</div>}
         </section>
       </main>
+      {signInDialog}
       {toastEl}
     </div>
   )

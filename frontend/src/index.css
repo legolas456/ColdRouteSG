@@ -137,6 +137,14 @@
   button {
     cursor: pointer;
   }
+  /* One focus style for the whole app: only for keyboard focus, never on click */
+  :where(button, a, select, summary, [tabindex]):focus {
+    outline: none;
+  }
+  :where(button, a, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--brand) 70%, transparent);
+    outline-offset: 2px;
+  }
   input,
   select {
     font: inherit;
@@ -165,10 +173,10 @@
     );
   }
   .hatch-rain {
-    background-color: color-mix(in srgb, var(--rain) 7%, transparent);
+    background-color: color-mix(in srgb, var(--rain) 14%, transparent);
     background-image: repeating-linear-gradient(
       135deg,
-      color-mix(in srgb, var(--rain) 45%, transparent) 0 1px,
+      color-mix(in srgb, var(--rain) 60%, transparent) 0 1px,
       transparent 1px 6px
     );
   }

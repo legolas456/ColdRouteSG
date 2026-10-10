@@ -10,7 +10,7 @@
  *   ok        improvements and "on time"
  *   warn      medium risk (yellow-amber, kept clear of the brand orange)
  *   bad       late, highest risk (rose, kept clear of the brand orange)
- *   rain      shower cells and weather (blue, the complement of orange)
+ *   rain      rain cells and weather (blue, the complement of orange)
  *   cargo-*   small dots that tell PHARMA / FROZEN / CHILLED apart
  *
  * The five alternative palettes explored earlier (teal, glacier, indigo,
@@ -109,7 +109,7 @@ const LIGHT: Theme = {
     baseline: '#a8a29e',
     walk: '#57534e',
     rain: '#2e90fa',
-    rainHatch: 'rgba(46,144,250,0.55)',
+    rainHatch: 'rgba(46,144,250,0.72)',
     traffic: '#e31b54',
   },
 }
@@ -173,7 +173,7 @@ const DARK: Theme = {
     baseline: '#6f6961',
     walk: '#b8b2aa',
     rain: '#53b1fd',
-    rainHatch: 'rgba(83,177,253,0.5)',
+    rainHatch: 'rgba(83,177,253,0.62)',
     traffic: '#f63d68',
   },
 }

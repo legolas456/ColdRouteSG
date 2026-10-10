@@ -94,7 +94,7 @@ export const SAMPLE_STOPS: Stop[] = [
     service: 10,
     cargo: 'CHILLED',
     area: 'City',
-    forecast: 'Showers 10:30–11:15',
+    forecast: 'Heavy rain 10:30–11:15',
     parking: park('Marina Square MSCP', 103.8583, 1.2913, 1.1, 12),
     trafficRisk: 0.6,
   },
@@ -110,7 +110,7 @@ export const SAMPLE_STOPS: Stop[] = [
     service: 6,
     cargo: 'PHARMA',
     area: 'City',
-    forecast: 'Showers 10:30–11:15',
+    forecast: 'Heavy rain 10:30–11:15',
     parking: park('Guoco Tower B2', 103.8462, 1.2769, 0.4, 22),
     trafficRisk: 0.5,
   },
@@ -133,14 +133,27 @@ export const SAMPLE_STOPS: Stop[] = [
   },
 ]
 
+/** NEA 2-hour nowcast. The City cell is the one that changes the plan. */
 export const RAIN: RainCell = {
   area: 'City',
-  label: 'Showers',
+  label: 'Heavy rain',
   start: 630,
   end: 675,
   center: [103.8515, 1.2862],
   radiusKm: 2.4,
 }
+
+/** A smaller, lighter cell. No stop or road of the run is inside it, so it never changes the plan. */
+export const RAIN_LIGHT: RainCell = {
+  area: 'Choa Chu Kang',
+  label: 'Light rain',
+  start: 615,
+  end: 660,
+  center: [103.7449, 1.384],
+  radiusKm: 1.3,
+}
+
+export const RAIN_CELLS: RainCell[] = [RAIN, RAIN_LIGHT]
 
 export const DEPARTURE = 540
 

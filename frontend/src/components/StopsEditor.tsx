@@ -24,9 +24,9 @@ interface Props {
   setProfile: (p: ProfileId) => void
   selectedId: string | null
   onSelect: (id: string | null) => void
-  onOptimise: () => void
   busy: boolean
   step: number
+  onOptimise: () => void
 }
 
 export const OPTIMISE_STEPS = [
@@ -38,8 +38,7 @@ export const OPTIMISE_STEPS = [
 ]
 
 export function StopsEditor(props: Props) {
-  const { stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step } =
-    props
+  const { stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step } = props
   const reviewCount = stops.filter((s) => s.review).length
 
   const estimate = useMemo(() => {
@@ -64,6 +63,22 @@ export function StopsEditor(props: Props) {
         <div className="eyebrow">Draft · not dispatched</div>
         <h1 className="mt-1.5 font-serif text-[26px] leading-[1.15] tracking-[-0.02em]">Morning run</h1>
         <p className="mt-1 text-fg-3">Friday, 10 October · Van SGX 4821K · Ahmad R.</p>
+        {busy ? (
+          <div className="mt-3 rounded-[10px] bg-subtle px-3.5 py-3">
+            <OptimisingSteps step={step} count={stops.length} />
+          </div>
+        ) : (
+          <Button
+            variant="primary"
+            kbd="⌘↵"
+            className="mt-3 w-full"
+            onClick={onOptimise}
+            disabled={stops.length < 2}
+            title={stops.length < 2 ? 'Add at least two stops' : 'Find the best delivery order'}
+          >
+            Optimise route
+          </Button>
+        )}
       </div>
 
       <div className="mt-4 grid grid-cols-[104px_1fr] gap-2 px-5">
@@ -80,6 +95,7 @@ export function StopsEditor(props: Props) {
 
       <div className="mt-3 px-5">
         <Segmented
+          label="Optimisation profile"
           className="w-full"
           value={profile}
           onChange={setProfile}
@@ -90,14 +106,23 @@ export function StopsEditor(props: Props) {
 
       <Divider className="mt-4" />
 
-      <div className="flex items-center justify-between px-5 pt-3.5 pb-2">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-[13px] font-semibold">Stops</h2>
-          <span className="num text-[12px] text-fg-3">{stops.length}</span>
+      <div className="px-5 pt-3.5 pb-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h2 className="text-[13px] font-semibold">Stops</h2>
+            <span className="num truncate text-[12px] text-fg-3">
+              {stops.length} · about {duration(estimate)}
+            </span>
+          </div>
+          {reviewCount > 0 ? (
+            <span className="flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-fg-2">
+              <AlertCircle size={12} className="text-warn" /> {reviewCount} to check
+            </span>
+          ) : (
+            <span className="shrink-0 text-[11.5px] text-fg-3">Verified with OneMap</span>
+          )}
         </div>
-        <span className="text-[11.5px] text-fg-3" title="Add stops in any order. ColdRoute decides the delivery sequence when you optimise.">
-          Any order · the optimiser sets the sequence
-        </span>
+        <p className="mt-0.5 text-[11.5px] text-fg-3">Add them in any order. ColdRoute sets the delivery sequence.</p>
       </div>
 
       <div className="px-5 pb-2">
@@ -133,31 +158,6 @@ export function StopsEditor(props: Props) {
         </ul>
       </div>
 
-      <div className="sticky bottom-0 z-10 border-t border-line bg-panel px-5 py-3.5">
-        {busy ? (
-          <OptimisingSteps step={step} count={stops.length} />
-        ) : (
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="text-[12.5px] font-medium">
-                {stops.length} stops · ~{duration(estimate)}
-              </div>
-              <div className={clsx('truncate text-[12px]', reviewCount ? 'text-fg-2' : 'text-fg-3')}>
-                {reviewCount ? (
-                  <span className="inline-flex items-center gap-1">
-                    <AlertCircle size={12} className="text-warn" /> {reviewCount} address needs review
-                  </span>
-                ) : (
-                  'All addresses verified with OneMap'
-                )}
-              </div>
-            </div>
-            <Button variant="primary" kbd="⌘↵" onClick={onOptimise} disabled={stops.length < 2}>
-              Optimise route
-            </Button>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
@@ -205,14 +205,11 @@ function StopRow({
           </div>
           <div className="truncate text-[12px] text-fg-3">{stop.address}</div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex shrink-0 flex-col items-end gap-1" title={`${stop.service} min to unload`}>
           <span className="num text-[12px] text-fg">
             {hm(stop.windowStart)}–{hm(stop.windowEnd)}
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="num text-[11px] text-fg-3">{stop.service}m</span>
-            <CargoTag cargo={stop.cargo} />
-          </span>
+          <CargoTag cargo={stop.cargo} />
         </div>
         <button
           aria-label="Remove stop"
@@ -263,24 +260,42 @@ function StopRow({
               className="num w-full bg-transparent outline-none"
             />
           </MiniField>
-          <div className="col-span-3">
-            <Segmented<Cargo>
-              size="sm"
-              className="w-full"
-              value={stop.cargo}
-              onChange={(cargo) => onChange({ cargo })}
-              options={[
-                { value: 'PHARMA', label: 'Pharma 2–8°C' },
-                { value: 'FROZEN', label: 'Frozen −18°C' },
-                { value: 'CHILLED', label: 'Chilled 0–4°C' },
-              ]}
-            />
+          <div role="radiogroup" aria-label="Cargo" className="col-span-3 grid grid-cols-3 gap-1.5">
+            {CARGO_CHOICES.map((c) => {
+              const on = stop.cargo === c.value
+              return (
+                <button
+                  key={c.value}
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => onChange({ cargo: c.value })}
+                  className={clsx(
+                    'flex min-w-0 flex-col items-start rounded-control bg-panel px-2 py-1.5 text-left transition-shadow focus-visible:outline-offset-[-1px]',
+                    on
+                      ? 'shadow-[inset_0_0_0_1.5px_var(--brand)]'
+                      : 'shadow-[inset_0_0_0_1px_var(--border-dark)] hover:shadow-[inset_0_0_0_1px_var(--text-4)]',
+                  )}
+                >
+                  <span className={clsx('flex max-w-full items-center gap-1.5 text-[12px] font-medium', on ? 'text-brand-fg' : 'text-fg')}>
+                    <span className={clsx('size-[7px] shrink-0 rounded-full', c.dot)} />
+                    <span className="truncate">{c.label}</span>
+                  </span>
+                  <span className="num max-w-full truncate text-[10.5px] text-fg-3">{c.temp}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
     </li>
   )
 }
+
+const CARGO_CHOICES: Array<{ value: Cargo; label: string; temp: string; dot: string }> = [
+  { value: 'PHARMA', label: 'Pharma', temp: '2 to 8 °C', dot: 'bg-pharma' },
+  { value: 'FROZEN', label: 'Frozen', temp: '−18 °C', dot: 'bg-frozen' },
+  { value: 'CHILLED', label: 'Chilled', temp: '0 to 4 °C', dot: 'bg-chilled' },
+]
 
 /** 24-hour HH:MM field; commits on blur or Enter, reverts on invalid input. */
 function TimeInput({ value, onChange, className }: { value: number; onChange: (m: number) => void; className?: string }) {
@@ -351,7 +366,7 @@ function AddressSearch({ onPick, existing }: { onPick: (s: Stop) => void; existi
             if (e.key === 'Enter' && results[active]) pick(results[active])
             if (e.key === 'Escape') inputRef.current?.blur()
           }}
-          placeholder="Add a stop — address, postal code or customer"
+          placeholder="Add a stop by address or postal code"
           className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-4"
         />
         <Kbd>/</Kbd>

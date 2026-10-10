@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Monitor, Moon, PanelLeftClose, PanelLeftOpen, Share2, Sun } from 'lucide-react'
+import { Moon, PanelLeftClose, PanelLeftOpen, Share2, Sun } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { ThemeId } from '../lib/themes'
 import { Button, StatusPill } from './ui'
@@ -23,30 +23,36 @@ export function LogoMark({ className }: { className?: string }) {
   )
 }
 
-const MODES: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
-  { value: 'system', label: 'System', icon: Monitor },
+const MODES: { value: ThemeId; label: string; icon: typeof Sun }[] = [
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
 ]
 
-/** Desktop: System / Light / Dark. Phone: one button that flips light and dark. */
+/**
+ * Light / Dark. Until the user picks one, the app follows the system setting and
+ * the matching option shows as selected. Phone: one button that flips the two.
+ */
 export function ThemeToggle({ mode, resolved, onChange }: { mode: ThemeMode; resolved: ThemeId; onChange: (m: ThemeMode) => void }) {
   return (
     <>
-      <div role="radiogroup" aria-label="Appearance" className="flex shrink-0 items-center gap-0.5 rounded-full bg-hover p-0.5 max-md:hidden">
+      <div
+        role="radiogroup"
+        aria-label="Appearance"
+        className="flex shrink-0 items-center gap-0.5 rounded-full bg-hover p-[3px] shadow-[inset_0_0_0_1px_var(--border-main)] max-md:hidden"
+      >
         {MODES.map(({ value, label, icon: Icon }) => {
-          const on = mode === value
+          const on = resolved === value
           return (
             <button
               key={value}
               role="radio"
               aria-checked={on}
               aria-label={label}
-              title={value === 'system' ? `Match system (${resolved} now)` : label}
+              title={mode === 'system' && on ? `${label} (matches your system)` : label}
               onClick={() => onChange(value)}
               className={clsx(
-                'flex size-7 items-center justify-center rounded-full transition-[color,background-color,box-shadow]',
-                on ? 'bg-panel text-fg shadow-[0_1px_2px_rgba(28,25,23,0.10),inset_0_0_0_1px_var(--border-main)]' : 'text-fg-3 hover:text-fg',
+                'flex size-7 items-center justify-center rounded-full transition-[color,background-color,box-shadow] focus-visible:outline-offset-[-1px]',
+                on ? 'bg-panel text-fg shadow-[0_1px_2px_rgba(28,25,23,0.12),0_0_0_1px_var(--border-dark)]' : 'text-fg-3 hover:bg-panel/70 hover:text-fg',
               )}
             >
               <Icon size={14} strokeWidth={1.8} />
@@ -65,18 +71,27 @@ export function ThemeToggle({ mode, resolved, onChange }: { mode: ThemeMode; res
   )
 }
 
-/** Always in the same spot, so one click hides the panel and the next brings it back. */
+/**
+ * Always in the same spot, so one click hides the panel and the next brings it
+ * back. Icon plus a verb, so it reads as a control at a glance. "Hide plan" and
+ * "Show plan" are the same length, so nothing next to it shifts when it flips.
+ */
 function PanelToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const Icon = collapsed ? PanelLeftOpen : PanelLeftClose
   return (
     <button
-      aria-label={collapsed ? 'Show panel' : 'Hide panel'}
       aria-expanded={!collapsed}
-      title={`${collapsed ? 'Show' : 'Hide'} panel  [`}
+      title={`${collapsed ? 'Show' : 'Hide'} the plan panel  [`}
       onClick={onToggle}
-      className="flex size-8 shrink-0 items-center justify-center rounded-control text-fg-3 transition-colors hover:bg-hover hover:text-fg max-md:hidden"
+      className={clsx(
+        'flex h-8 shrink-0 items-center gap-1.5 rounded-control pr-3 pl-2.5 text-[12.5px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] max-md:hidden',
+        collapsed
+          ? 'bg-brand-soft text-brand-fg shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_45%,transparent)] hover:shadow-[inset_0_0_0_1.5px_var(--brand)]'
+          : 'bg-panel text-fg-2 shadow-[inset_0_0_0_1px_var(--border-dark),0_1px_2px_rgba(16,24,40,0.05)] hover:bg-subtle hover:text-fg',
+      )}
     >
-      <Icon size={17} strokeWidth={1.7} />
+      <Icon size={16} strokeWidth={1.8} />
+      {collapsed ? 'Show plan' : 'Hide plan'}
     </button>
   )
 }
@@ -89,6 +104,7 @@ export function TopBar({
   panel,
   onShare,
   sharePopover,
+  account,
 }: {
   status: ReactNode
   primary: ReactNode
@@ -98,16 +114,16 @@ export function TopBar({
   onShare?: () => void
   /** rendered under the Share button while open */
   sharePopover?: ReactNode
+  /** avatar on the far right, when the panel (which normally holds it) is not on screen */
+  account?: ReactNode
 }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-canvas px-4 max-md:gap-2 max-md:px-3">
-      <LogoMark className="shrink-0" />
+      <span title="ColdRoute SG" className="shrink-0">
+        <LogoMark />
+      </span>
       {panel && <PanelToggle {...panel} />}
-      <div className="flex items-baseline gap-2 max-md:hidden">
-        <span className="font-serif text-[17px] tracking-[-0.01em] text-fg">coldroute</span>
-        <span className="num text-[10px] text-fg-4">SG</span>
-      </div>
-      <span className="text-fg-4 max-md:hidden">/</span>
+      <span className="h-5 w-px shrink-0 bg-line-strong max-md:hidden" />
       <span className="text-fg-3 max-lg:hidden">Runs</span>
       <span className="text-fg-4 max-lg:hidden">/</span>
       <span className="min-w-0 truncate font-medium text-fg">
@@ -127,13 +143,14 @@ export function TopBar({
       <ThemeToggle {...theme} />
       {onShare && (
         <div className="relative max-md:hidden">
-          <Button variant="ghost" aria-expanded={!!sharePopover} icon={<Share2 size={14} strokeWidth={1.8} />} onClick={onShare}>
+          <Button aria-expanded={!!sharePopover} icon={<Share2 size={14} strokeWidth={1.8} />} onClick={onShare}>
             Share
           </Button>
           {sharePopover}
         </div>
       )}
       <span className="shrink-0">{primary}</span>
+      {account}
     </header>
   )
 }

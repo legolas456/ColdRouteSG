@@ -32,7 +32,7 @@ export function explainStop(stop: Stop, result: OptimiseResult, names: Record<st
     return `Moved ${dir} ${from}. The shortest route arrives at ${hm(base.start)}, ${Math.round(base.late)} min after the window closes.`
   }
   if (base.inRain && !rec.inRain) {
-    return `Moved ${dir} ${from} so unloading starts after the ${RAIN.area} showers clear at ${hm(RAIN.end)}. Window ${windowLabel(stop.windowStart, stop.windowEnd)} still met.`
+    return `Moved ${dir} ${from} so unloading starts after the rain over the ${RAIN.area} clears at ${hm(RAIN.end)}. Window ${windowLabel(stop.windowStart, stop.windowEnd)} still met.`
   }
   if (stop.parking.risk > 0.7) {
     return `Nearest carpark is ${stop.parking.distanceKm} km away with ${stop.parking.freePct}% free, so unloading takes longer. Scheduled with ${Math.round(rec.slack)} min of slack.`
@@ -49,7 +49,7 @@ export function summarise(result: OptimiseResult, stops: Stop[]) {
   const parts: string[] = []
   const pharma = stops.filter((s) => s.cargo === 'PHARMA')
   if (pharma.every((s) => r.byId[s.id]?.late === 0)) parts.push('Every pharma stop lands inside its window')
-  if (b.rainStops > r.rainStops) parts.push(`no unloading during the ${RAIN.area} showers`)
+  if (b.rainStops > r.rainStops) parts.push(`no unloading in the ${RAIN.area} rain`)
   const extra = Math.round(r.drive - b.drive)
   if (b.lateMinutes > r.lateMinutes && extra > 0) {
     parts.push(`${extra} extra minutes of driving remove ${Math.round(b.lateMinutes - r.lateMinutes)} minutes of lateness`)
