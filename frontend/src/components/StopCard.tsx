@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Lock, PencilLine, X } from 'lucide-react'
+import { PencilLine, X } from 'lucide-react'
 import { RAIN } from '../data/sample'
 import { explainStop } from '../lib/explain'
 import { duration, hm } from '../lib/time'
@@ -12,9 +12,13 @@ interface Props {
   names: Record<string, string>
   departure: number
   onClose: () => void
+  /** Back to the draft with this stop open for editing. */
+  onEdit?: () => void
+  /** Render in flow (phone bottom sheet) instead of floating over the map. */
+  inline?: boolean
 }
 
-export function StopCard({ stop, result, names, departure, onClose }: Props) {
+export function StopCard({ stop, result, names, departure, onClose, onEdit, inline }: Props) {
   const rec = result.recommended.byId[stop.id]
   const base = result.baseline.byId[stop.id]
   if (!rec || !base) return null
@@ -59,7 +63,7 @@ export function StopCard({ stop, result, names, departure, onClose }: Props) {
   ]
 
   return (
-    <div className="animate-rise absolute top-16 right-4 z-20 w-[360px] overflow-hidden rounded-panel bg-panel shadow-float">
+    <div className={inline ? 'w-full bg-panel' : 'animate-rise absolute top-16 right-4 z-20 w-[360px] overflow-hidden rounded-panel bg-panel shadow-float'}>
       <div className="px-4 pt-3.5 pb-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
@@ -142,10 +146,7 @@ export function StopCard({ stop, result, names, departure, onClose }: Props) {
       </div>
 
       <div className="flex items-center gap-2 border-t border-line px-4 py-2.5">
-        <Button size="sm" icon={<Lock size={12} strokeWidth={2} />}>
-          Lock position
-        </Button>
-        <Button size="sm" variant="ghost" icon={<PencilLine size={12} strokeWidth={2} />}>
+        <Button size="sm" icon={<PencilLine size={12} strokeWidth={2} />} onClick={onEdit}>
           Edit stop
         </Button>
         <div className="flex-1" />

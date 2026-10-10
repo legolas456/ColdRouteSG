@@ -10,8 +10,8 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 | ![Input](docs/screenshots/01-input.png) | ![Results](docs/screenshots/02-results.png) |
 | **Compare view and stop card** | **Map-first layout** |
 | ![Compare](docs/screenshots/03-compare-stop-card.png) | ![Map-first](docs/screenshots/04-map-first.png) |
-| **Dark mode** | |
-| ![Dark](docs/screenshots/05-dark.png) | |
+| **Dark mode** | **Phone: results and stop card** |
+| ![Dark](docs/screenshots/05-dark.png) | <img src="docs/screenshots/06-phone-results.png" width="49%" alt="Phone results"> <img src="docs/screenshots/07-phone-stop-card.png" width="49%" alt="Phone stop card"> |
 
 ## Run it
 
@@ -31,11 +31,20 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 | Input panel | Departure time, depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. |
 | Optimising | A short, staged progress list for the five data sources, then the result. `⌘↵` runs it. |
 | Results panel | Four KPIs, each compared with the shortest route. Also a plain-language "Why this route" summary and the stop order with W/P/T/C/L risk meters and how far each stop moved. |
-| Map | Numbered stops, a route drawn on real roads, a hatched shower cell and carparks with walking links. Optional layers show slow road segments and the shortest route as a ghost. The highest-risk stop pulses. |
+| Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, a hatched shower cell and carparks with walking links. Optional layers show slow road segments and the shortest route as a ghost. The highest-risk stop pulses. |
 | Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, and every risk factor compared with the shortest route. |
 | Timeline | Delivery windows, unloading blocks, waits, lateness and the shower period on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
 
 Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views redraws the map, list and timeline.
+
+## Layouts
+
+| Screen | Layout |
+| --- | --- |
+| Desktop (≥ 768 px) | Panel on the left, map and timeline on the right. Drag the panel edge to resize it (340–600 px); double-click the edge to reset. Press the chevron, press `[`, or drag the edge past the minimum to hide the panel; the pill over the map brings it back. Width and visibility are saved in `localStorage`. The map re-frames the run whenever its size changes, unless you have panned or zoomed it yourself. |
+| Phone (< 768 px) | The map fills the screen and the panel moves into a bottom sheet with three heights (peek, half, full). Drag or flick the grabber, or tap it to step up. After optimising, the sheet has **Plan** and **Timeline** tabs. Tapping a stop shows its card in the sheet, raised to half height. The top bar keeps the logo, the status, **View** and the main action. |
+
+Both layouts render the same components. `App.tsx` picks the arrangement with `useMediaQuery`, and smaller differences use Tailwind's `max-md:` variants.
 
 ## Design system
 
@@ -59,6 +68,7 @@ Both themes live in `src/lib/themes.ts`, with the UI tokens and the matching map
 
 ## Data and algorithm
 
+- `src/data/sg-mask.json` is the area outside Singapore's national boundary (OpenStreetMap relation 536780, simplified). The map dims it. Run `npm run data:sg-mask` to refresh it.
 - `src/data/osrm.json` is a snapshot of a real driving-time matrix and per-leg road geometry from the public OSRM server. It covers the depot, the 7 sample stops and the 3 address-book entries. Run `npm run data:osrm` to refresh it.
 - `src/lib/optimizer.ts` enumerates every stop order: 5,040 for 7 stops, about 60 ms for 8. It returns two plans. The **baseline** minimises drive time only. The **recommended** plan minimises a weighted cost of drive time, weather, parking, traffic, cold-chain exposure and lateness, using the profile's weights.
 - `src/lib/explain.ts` turns the difference between the two plans into the summary and "Why here" text.
@@ -71,19 +81,23 @@ src/
 ├─ App.tsx                 state machine (draft → optimising → optimised), layouts, shortcuts
 ├─ index.css               design tokens and themes
 ├─ components/
-│  ├─ Shell.tsx            nav rail, top bar, brand
+│  ├─ Shell.tsx            top bar and logo
+│  ├─ PanelHandle.tsx      resize / hide handle for the desktop panel
+│  ├─ BottomSheet.tsx      phone bottom sheet
 │  ├─ StopsEditor.tsx      input panel and optimising progress
 │  ├─ ResultsPanel.tsx     KPIs, explanation, stop order
 │  ├─ MapView.tsx          MapLibre map, overlays, markers, layer chips
-│  ├─ StopCard.tsx         stop detail card on the map
+│  ├─ StopCard.tsx         stop detail card (on the map, or in the phone sheet)
 │  ├─ Timeline.tsx         time-axis view
 │  ├─ StyleMenu.tsx        View menu: appearance, layout, demo states
 │  └─ ui.tsx               buttons, segmented control, tags, meters
-├─ lib/                    optimizer, explanations, time helpers, types
-└─ data/                   sample run, OSRM snapshot
+├─ lib/                    optimizer, explanations, themes, hooks, time helpers, types
+└─ data/                   sample run, OSRM snapshot, Singapore mask
 ```
 
 ## Notes
 
 - MapLibre v6 ships an ES-module worker. `MapView.tsx` sets its URL explicitly. `vite.config.ts` emits it as `.js`, so static hosts such as Amplify serve it with a JavaScript MIME type.
 - MapLibre's stylesheet is unlayered, so it overrides Tailwind's layered utilities. That is why the map container is positioned with an inline style.
+- In MapLibre, `easeTo({ padding })` changes the map's padding permanently, and `fitBounds` adds its own padding on top of that. So the stop-focus animation uses `offset` instead, and `fit()` clears any leftover padding first. Without this, the map zooms far out after you close a stop card.
+- Recent Chrome versions return a Promise from `element.scrollTo()`. Never return its value from a React effect, or React treats it as a cleanup and crashes ("destroy is not a function").

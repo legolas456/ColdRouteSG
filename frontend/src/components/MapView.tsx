@@ -4,6 +4,7 @@ import { GeoJSONSource, LngLatBounds, Map as MapLibre, Marker, setWorkerUrl, typ
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { RAIN } from '../data/sample'
+import sgMask from '../data/sg-mask.json'
 import { legGeometry, pathFor } from '../lib/optimizer'
 import { hm } from '../lib/time'
 import type { Depot, OptimiseResult, Stop } from '../lib/types'
@@ -15,6 +16,28 @@ import type { View } from './ResultsPanel'
 setWorkerUrl(workerUrl)
 
 export type { MapPalette }
+
+/** The camera never leaves Singapore: panning and zooming out stop here. */
+export const SG_BOUNDS: [[number, number], [number, number]] = [
+  [103.4, 0.9],
+  [104.25, 1.72],
+]
+
+type Padding = { top: number; bottom: number; left: number; right: number }
+
+/** Shrink padding proportionally when the map is too small to honour it. */
+function clampPadding(map: MapLibre, p: Padding): Padding {
+  const { clientWidth: w, clientHeight: h } = map.getContainer()
+  const axis = (a: number, b: number, size: number): [number, number] => {
+    const room = Math.max(0, size - 140)
+    if (a + b <= room) return [a, b]
+    const k = room / (a + b)
+    return [Math.floor(a * k), Math.floor(b * k)]
+  }
+  const [left, right] = axis(p.left, p.right, w)
+  const [top, bottom] = axis(p.top, p.bottom, h)
+  return { top, bottom, left, right }
+}
 export interface Layers {
   rain: boolean
   parking: boolean
@@ -189,6 +212,22 @@ function addOverlays(map: MapLibre, c: MapPalette) {
     },
     before,
   )
+
+  // Dim Johor and the Riau islands so Singapore stays in focus. Drawn last, so
+  // it also fades their place labels; Singapore itself is a hole in the mask.
+  map.addSource('outside-sg', { type: 'geojson', data: sgMask as unknown as GeoJSON.Feature })
+  map.addLayer({
+    id: 'outside-sg',
+    type: 'fill',
+    source: 'outside-sg',
+    paint: { 'fill-color': c.bg, 'fill-opacity': c.base === 'dark' ? 0.72 : 0.68 },
+  })
+  map.addLayer({
+    id: 'outside-sg-edge',
+    type: 'line',
+    source: 'outside-sg',
+    paint: { 'line-color': c.boundary, 'line-width': 1, 'line-dasharray': [4, 3] },
+  })
 }
 
 /** Gradient that paints the first `p` of a line and leaves the rest transparent. */
@@ -223,6 +262,8 @@ interface Props {
   insetLeft?: number
   insetBottom?: number
   cardOpen?: boolean
+  /** Phone layout: no legend or zoom buttons, chips scroll sideways. */
+  compact?: boolean
   children?: ReactNode
 }
 
@@ -230,6 +271,7 @@ export function MapView(props: Props) {
   const { palette, depot, stops, result, view, phase, selectedId, onSelect, layers, setLayers } = props
   const insetLeft = props.insetLeft ?? 0
   const insetBottom = props.insetBottom ?? 0
+  const compact = !!props.compact
   const ref = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibre | null>(null)
   const themeRef = useRef(palette)
@@ -239,10 +281,15 @@ export function MapView(props: Props) {
   const [styleVersion, setStyleVersion] = useState(0)
   const stopById = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s])), [stops])
 
-  const padding = useMemo(
-    () => ({ top: 80, bottom: 64 + insetBottom, left: 72 + insetLeft, right: props.cardOpen ? 430 : 128 }),
-    [insetLeft, insetBottom, props.cardOpen],
+  const padding = useMemo<Padding>(
+    () =>
+      compact
+        ? { top: 64, bottom: 24 + insetBottom, left: 28 + insetLeft, right: 28 }
+        : { top: 72, bottom: 56 + insetBottom, left: 56 + insetLeft, right: props.cardOpen ? 420 : 72 },
+    [insetLeft, insetBottom, props.cardOpen, compact],
   )
+  // true once the user pans or zooms; container resizes then keep their view
+  const userMoved = useRef(false)
 
   // Spread markers that sit within ~1.6 km of each other so both stay legible.
   const offsets = useMemo(() => {
@@ -271,8 +318,11 @@ export function MapView(props: Props) {
     const map = new MapLibre({
       container: ref.current,
       style: blankStyle(themeRef.current),
-      center: [103.835, 1.34],
-      zoom: 10.7,
+      center: [103.82, 1.352],
+      zoom: 11,
+      minZoom: 9.5,
+      maxBounds: SG_BOUNDS,
+      renderWorldCopies: false,
       attributionControl: { compact: true },
       dragRotate: false,
       pitchWithRotate: false,
@@ -292,9 +342,24 @@ export function MapView(props: Props) {
       setStyleVersion((v) => v + 1)
     })
     map.on('click', () => onSelectRef.current(null))
+    map.on('movestart', (e) => {
+      if ((e as { originalEvent?: Event }).originalEvent) userMoved.current = true
+    })
+    // Re-frame the run when the container changes size (panel drag or collapse,
+    // window resize, bottom sheet), unless the user has moved the map.
+    let resizeTimer = 0
+    const ro = new ResizeObserver(() => {
+      clearTimeout(resizeTimer)
+      resizeTimer = window.setTimeout(() => {
+        if (!userMoved.current && !selectedRef.current) fitRef.current(250)
+      }, 140)
+    })
+    ro.observe(ref.current)
     mapRef.current = map
     applyBasemap(map, themeRef.current)
     return () => {
+      clearTimeout(resizeTimer)
+      ro.disconnect()
       map.remove()
       mapRef.current = null
     }
@@ -302,6 +367,8 @@ export function MapView(props: Props) {
 
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const selectedRef = useRef(selectedId)
+  selectedRef.current = selectedId
 
   // theme swap
   useEffect(() => {
@@ -504,7 +571,10 @@ export function MapView(props: Props) {
     const b = new LngLatBounds()
     b.extend([depot.lng, depot.lat])
     stops.forEach((s) => b.extend([s.lng, s.lat]))
-    map.fitBounds(b, { padding, duration, maxZoom: 12.5 })
+    userMoved.current = false
+    const sticky = map.getPadding()
+    if (sticky.top || sticky.bottom || sticky.left || sticky.right) map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 })
+    map.fitBounds(b, { padding: clampPadding(map, padding), duration, maxZoom: 12.5 })
   }
   const fitRef = useRef(fit)
   fitRef.current = fit
@@ -514,7 +584,15 @@ export function MapView(props: Props) {
     const map = mapRef.current
     const s = selectedId ? stopById[selectedId] : null
     if (map && s) {
-      map.easeTo({ center: [s.lng, s.lat], zoom: Math.max(map.getZoom(), 12.4), padding, duration: 650 })
+      // offset, not padding: easeTo({ padding }) is sticky in MapLibre and would be
+      // added again on top of the next fitBounds padding (the map then zooms far out)
+      const p = clampPadding(map, padding)
+      map.easeTo({
+        center: [s.lng, s.lat],
+        zoom: Math.max(map.getZoom(), 12.4),
+        offset: [(p.left - p.right) / 2, (p.top - p.bottom) / 2],
+        duration: 650,
+      })
     } else fit()
   }, [selectedId, padding, stops.length])
 
@@ -530,7 +608,10 @@ export function MapView(props: Props) {
       {/* inline: maplibre's unlayered CSS sets position:relative on the container */}
       <div ref={ref} style={{ position: 'absolute', inset: 0 }} />
 
-      <div className="absolute top-4 z-10 flex flex-wrap gap-1.5" style={{ left: 16 + insetLeft }}>
+      <div
+        className={clsx('absolute top-4 z-10 flex gap-1.5', compact ? 'no-scrollbar -my-1 overflow-x-auto py-1 pr-4' : 'flex-wrap')}
+        style={{ left: (compact ? 12 : 16) + insetLeft, right: compact ? 0 : undefined }}
+      >
         {toggles
           .filter((t) => t.show)
           .map((t) => (
@@ -538,7 +619,7 @@ export function MapView(props: Props) {
               key={t.key}
               onClick={() => setLayers({ ...layers, [t.key]: !layers[t.key] })}
               className={clsx(
-                'flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium shadow-card transition-colors',
+                'flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium shadow-card transition-colors',
                 layers[t.key] ? 'bg-panel text-fg shadow-[0_0_0_1.5px_var(--brand),0_1px_2px_rgba(16,24,40,0.08)]' : 'bg-panel/90 text-fg-3 hover:text-fg',
               )}
             >
@@ -548,7 +629,7 @@ export function MapView(props: Props) {
           ))}
       </div>
 
-      {phase === 'optimised' && result && (
+      {phase === 'optimised' && result && !compact && (
         <div
           className="absolute z-10 flex items-center gap-3.5 rounded-control bg-panel/95 px-3 py-2 text-[11px] text-fg-2 shadow-card backdrop-blur"
           style={{ left: 16 + insetLeft, bottom: 16 + insetBottom }}
@@ -576,7 +657,12 @@ export function MapView(props: Props) {
         </div>
       )}
 
-      <div className="absolute right-4 z-10 flex flex-col overflow-hidden rounded-control bg-panel shadow-card" style={{ bottom: 16 + insetBottom }}>
+      <div
+        className={clsx('absolute z-10 flex flex-col overflow-hidden rounded-control bg-panel shadow-card', compact ? 'right-3' : 'right-4')}
+        style={compact ? { top: 56 } : { bottom: 16 + insetBottom }}
+      >
+        {!compact && (
+          <>
         <button aria-label="Zoom in" onClick={() => mapRef.current?.zoomIn()} className="flex size-8 items-center justify-center text-fg-2 hover:bg-hover">
           <Plus size={15} />
         </button>
@@ -585,6 +671,8 @@ export function MapView(props: Props) {
           <Minus size={15} />
         </button>
         <span className="h-px bg-line" />
+          </>
+        )}
         <button aria-label="Fit route" onClick={() => fit()} className="flex size-8 items-center justify-center text-fg-2 hover:bg-hover">
           <LocateFixed size={14} />
         </button>

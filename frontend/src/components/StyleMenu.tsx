@@ -28,8 +28,8 @@ export function StyleMenu({ themeId, setThemeId, layout, setLayout, phase, jump 
 
   return (
     <div ref={ref} className="relative">
-      <Button variant="ghost" icon={<Palette size={14} strokeWidth={1.8} />} onClick={() => setOpen(!open)}>
-        View
+      <Button variant="ghost" aria-label="View" icon={<Palette size={14} strokeWidth={1.8} />} onClick={() => setOpen(!open)}>
+        <span className="max-md:hidden">View</span>
       </Button>
       {open && (
         <div className="animate-rise absolute top-10 right-0 z-50 w-[280px] rounded-panel bg-panel p-1.5 shadow-float">

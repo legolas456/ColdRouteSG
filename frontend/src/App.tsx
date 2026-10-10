@@ -1,15 +1,19 @@
+import clsx from 'clsx'
 import { Check, Loader2, Send } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { BottomSheet, type Snap } from './components/BottomSheet'
 import { MapView, type Layers } from './components/MapView'
+import { PANEL, PanelExpand, PanelHandle } from './components/PanelHandle'
 import { ResultsPanel, type View } from './components/ResultsPanel'
-import { NavRail, TopBar } from './components/Shell'
+import { TopBar } from './components/Shell'
 import { StopCard } from './components/StopCard'
 import { OPTIMISE_STEPS, StopsEditor } from './components/StopsEditor'
 import { StyleMenu, type Layout } from './components/StyleMenu'
 import { Timeline } from './components/Timeline'
-import { Button, StatusPill } from './components/ui'
+import { Button, Segmented, StatusPill } from './components/ui'
 import { DEPARTURE, DEPOT, PROFILES, SAMPLE_STOPS } from './data/sample'
 import { optimise } from './lib/optimizer'
+import { isTyping, PHONE_QUERY, useDebounced, useMediaQuery, usePersistentState } from './lib/hooks'
 import { applyTheme, THEME_BY_ID, type ThemeId } from './lib/themes'
 import type { OptimiseResult, ProfileId, Stop } from './lib/types'
 
@@ -38,13 +42,27 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null)
   const timers = useRef<number[]>([])
 
+  // desktop: resizable, collapsible panel (remembered across reloads)
+  const isPhone = useMediaQuery(PHONE_QUERY)
+  const [panelW, setPanelW] = usePersistentState('coldroute.panel.width', PANEL.default)
+  const [collapsed, setCollapsed] = usePersistentState('coldroute.panel.hidden', false)
+  const [resizing, setResizing] = useState(false)
+  // the map re-frames once the drag settles, not on every frame
+  const insetW = useDebounced(collapsed ? 0 : panelW, 160)
+  // phone: bottom sheet
+  const [sheet, setSheet] = useState<Snap>('half')
+  const [sheetH, setSheetH] = useState(0)
+  const [sheetTab, setSheetTab] = useState<'plan' | 'timeline'>('plan')
+
   const theme = THEME_BY_ID[themeId]
   const floating = layout === 'float'
   const stopById = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s])), [stops])
   const names = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s.short])), [stops])
 
   // before paint, so there is no flash of the default theme
-  useLayoutEffect(() => applyTheme(theme), [theme])
+  useLayoutEffect(() => {
+    applyTheme(theme)
+  }, [theme])
 
   useEffect(() => {
     const url = new URL(location.href)
@@ -89,6 +107,10 @@ export default function App() {
         runOptimise()
       }
       if (e.key === 'Escape') setSelectedId(null)
+      if (e.key === '[' && !e.metaKey && !e.ctrlKey && !isTyping()) {
+        e.preventDefault()
+        setCollapsed((c) => !c)
+      }
       if (e.key === '/' && phase === 'draft' && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault()
         document.querySelector<HTMLInputElement>('input[placeholder^="Add a stop"]')?.focus()
@@ -96,7 +118,20 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, runOptimise])
+  }, [phase, runOptimise, setCollapsed])
+
+  // phone: picking a stop on the map raises the sheet so its card is readable
+  useEffect(() => {
+    if (isPhone && selectedId) setSheet((s) => (s === 'peek' ? 'half' : s))
+  }, [isPhone, selectedId])
+  useEffect(() => {
+    if (phase !== 'optimised') setSheetTab('plan')
+  }, [phase])
+
+  const share = () => {
+    const done = () => setToast('Link copied · it opens this run in the same view')
+    navigator.clipboard?.writeText(location.href).then(done, () => setToast(location.href))
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -131,11 +166,11 @@ export default function App() {
         icon={<Send size={13} strokeWidth={2} />}
         onClick={() => setToast(`Sent to Ahmad R. · ${stops.length} stops · first ETA ${result ? fmt(result.recommended.rows[0].arrival) : ''}`)}
       >
-        Dispatch to driver
+        Dispatch<span className="max-md:hidden"> to driver</span>
       </Button>
     ) : (
       <Button variant="primary" kbd="⌘↵" disabled={phase === 'optimising' || stops.length < 2} onClick={() => runOptimise()}>
-        {phase === 'optimising' ? 'Optimising…' : 'Optimise route'}
+        {phase === 'optimising' ? 'Optimising…' : <>Optimise<span className="max-md:hidden"> route</span></>}
       </Button>
     )
 
@@ -176,7 +211,15 @@ export default function App() {
   const selectedStop = selectedId ? stopById[selectedId] : null
   const card =
     phase === 'optimised' && result && selectedStop ? (
-      <StopCard stop={selectedStop} result={result} names={names} departure={departure} onClose={() => setSelectedId(null)} />
+      <StopCard
+        stop={selectedStop}
+        result={result}
+        names={names}
+        departure={departure}
+        onClose={() => setSelectedId(null)}
+        onEdit={() => setPhase('draft')}
+        inline={isPhone}
+      />
     ) : null
 
   const timeline =
@@ -198,50 +241,123 @@ export default function App() {
       setLayers={setLayers}
       insetLeft={insetLeft}
       insetBottom={insetBottom}
-      cardOpen={!!card}
+      cardOpen={!!card && !isPhone}
+      compact={isPhone}
     >
-      {card}
+      {!isPhone && card}
     </MapView>
   )
 
-  return (
-    <div className="flex h-full bg-canvas text-fg">
-      <NavRail />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          status={status}
-          primary={primary}
-          updatedAt="09:05"
-          extra={<StyleMenu themeId={themeId} setThemeId={setThemeId} layout={layout} setLayout={setLayout} phase={phase} jump={jump} />}
-        />
-        {floating ? (
-          <main className="relative min-h-0 flex-1">
-            <div className="absolute inset-0">{map(416, timeline ? 248 : 0)}</div>
-            <aside className="absolute top-4 bottom-4 left-4 z-20 flex w-[400px] flex-col overflow-hidden rounded-panel bg-panel shadow-float">
-              {left}
-            </aside>
-            {timeline && (
-              <div className="animate-rise absolute right-4 bottom-4 left-[432px] z-10 h-[232px] overflow-hidden rounded-panel bg-panel shadow-float">
-                {timeline}
-              </div>
-            )}
-          </main>
-        ) : (
-          <main className="flex min-h-0 flex-1">
-            <aside className="flex w-[420px] shrink-0 flex-col border-r border-line bg-panel">{left}</aside>
-            <section className="flex min-w-0 flex-1 flex-col">
-              <div className="relative min-h-0 flex-1">{map(0, 0)}</div>
-              {timeline && <div className="h-[236px] shrink-0 border-t border-line bg-panel">{timeline}</div>}
-            </section>
-          </main>
-        )}
-      </div>
+  const runLabel = `Morning run · ${stops.length} stops`
+  const EXPAND_W = 168 // room for the "show panel" pill before the layer chips
+  const topBar = (
+    <TopBar
+      status={status}
+      primary={primary}
+      updatedAt="09:05"
+      onShare={share}
+      extra={<StyleMenu themeId={themeId} setThemeId={setThemeId} layout={layout} setLayout={setLayout} phase={phase} jump={jump} />}
+    />
+  )
+  const toastEl = toast && (
+    <div className="animate-rise fixed bottom-6 left-1/2 z-50 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-on-ink shadow-float max-md:top-16 max-md:bottom-auto">
+      <Check size={13} strokeWidth={2.5} className="shrink-0" /> <span className="truncate">{toast}</span>
+    </div>
+  )
+  const handle = (
+    <PanelHandle width={panelW} setWidth={setPanelW} onCollapse={() => setCollapsed(true)} onDragChange={setResizing} />
+  )
+  const expand = collapsed && <PanelExpand label={runLabel} onClick={() => setCollapsed(false)} />
 
-      {toast && (
-        <div className="animate-rise fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-on-ink shadow-float">
-          <Check size={13} strokeWidth={2.5} /> {toast}
-        </div>
+  // Phone: full-bleed map with the panel in a bottom sheet
+  if (isPhone) {
+    const showTimeline = sheetTab === 'timeline' && !!timeline && !card
+    return (
+      <div className="flex h-full flex-col bg-canvas text-fg">
+        {topBar}
+        <main className="relative min-h-0 flex-1 overflow-hidden">
+          <div className="absolute inset-0">{map(0, sheetH)}</div>
+          <BottomSheet
+            snap={sheet}
+            setSnap={setSheet}
+            onHeight={setSheetH}
+            scrollAll={!showTimeline}
+            contentKey={card ? `stop-${selectedId}` : showTimeline ? 'timeline' : phase}
+            header={
+              timeline && !card ? (
+                <div className="px-4 pb-2">
+                  <Segmented
+                    size="sm"
+                    className="w-full"
+                    value={sheetTab}
+                    onChange={setSheetTab}
+                    options={[
+                      { value: 'plan', label: 'Plan' },
+                      { value: 'timeline', label: 'Timeline' },
+                    ]}
+                  />
+                </div>
+              ) : null
+            }
+          >
+            {card ?? (showTimeline ? timeline : left)}
+          </BottomSheet>
+        </main>
+        {toastEl}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-full flex-col bg-canvas text-fg">
+      {topBar}
+      {floating ? (
+        <main className="relative min-h-0 flex-1">
+          <div className="absolute inset-0">{map(collapsed ? EXPAND_W : insetW + 16, timeline ? 248 : 0)}</div>
+          <aside
+            style={{ width: panelW }}
+            className={clsx('absolute top-4 bottom-4 left-4 z-20 flex flex-col rounded-panel bg-panel shadow-float', collapsed && 'hidden')}
+          >
+            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-panel">{left}</div>
+            {!collapsed && handle}
+          </aside>
+          {expand}
+          {timeline && (
+            <div
+              className="animate-rise absolute right-4 bottom-4 z-10 h-[232px] overflow-hidden rounded-panel bg-panel shadow-float"
+              style={{ left: collapsed ? 16 : panelW + 32 }}
+            >
+              {timeline}
+            </div>
+          )}
+        </main>
+      ) : (
+        <main className="flex min-h-0 flex-1">
+          <aside
+            inert={collapsed}
+            style={{ width: collapsed ? 0 : panelW }}
+            className={clsx(
+              'relative flex shrink-0 flex-col bg-panel',
+              collapsed ? 'overflow-hidden' : 'border-r border-line',
+              !resizing && 'transition-[width] duration-200 ease-out',
+            )}
+          >
+            {/* fixed inner width: the content slides out instead of re-wrapping */}
+            <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ width: panelW }}>
+              {left}
+            </div>
+            {!collapsed && handle}
+          </aside>
+          <section className="flex min-w-0 flex-1 flex-col">
+            <div className="relative min-h-0 flex-1">
+              {map(collapsed ? EXPAND_W : 0, 0)}
+              {expand}
+            </div>
+            {timeline && <div className="h-[236px] shrink-0 border-t border-line bg-panel">{timeline}</div>}
+          </section>
+        </main>
       )}
+      {toastEl}
     </div>
   )
 }

@@ -196,7 +196,7 @@ export function ResultsPanel(props: Props) {
         })}
       </ol>
 
-      <div className="flex items-center gap-2 border-t border-line px-5 py-3">
+      <div className="sticky bottom-0 z-10 flex items-center gap-2 border-t border-line bg-panel px-5 py-3">
         <Button variant="ghost" size="sm" icon={<PencilLine size={13} strokeWidth={1.8} />} onClick={onEdit}>
           Edit stops
         </Button>

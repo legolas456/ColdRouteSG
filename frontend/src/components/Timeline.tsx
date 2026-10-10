@@ -30,9 +30,9 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
 
   return (
     <div className="flex h-full min-h-0 flex-col px-5 pt-3 pb-3">
-      <div className="flex items-center gap-4">
-        <h2 className="text-[13px] font-semibold">Timeline</h2>
-        <div className="flex-1" />
+      <div className="flex items-center gap-4 max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1">
+        <h2 className="text-[13px] font-semibold max-md:hidden">Timeline</h2>
+        <div className="flex-1 max-md:hidden" />
         <Legend swatch={<span className="h-2 w-5 rounded-[2px] bg-brand-soft shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_25%,transparent)]" />} label="Delivery window" />
         <Legend swatch={<span className="h-2 w-3 rounded-[2px] bg-brand" />} label="Unloading" />
         <Legend swatch={<span className="hatch-signal h-2 w-4 rounded-[2px]" />} label="Late" />
@@ -41,7 +41,7 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
       </div>
 
       <div className="relative mt-2 min-h-0 flex-1">
-        <div className="absolute inset-0 grid grid-cols-[150px_1fr] pr-5">
+        <div className="absolute inset-0 grid grid-cols-[150px_1fr] max-md:grid-cols-[96px_1fr] pr-5">
           <div />
           <div className="relative">
             {hours.map((h) => (
@@ -67,7 +67,7 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
                 key={row.id}
                 onClick={() => onSelect(selected ? null : row.id)}
                 className={clsx(
-                  'group grid h-[22px] w-full grid-cols-[150px_1fr] items-center rounded-[6px] text-left',
+                  'group grid h-[22px] w-full grid-cols-[150px_1fr] max-md:grid-cols-[96px_1fr] items-center rounded-[6px] text-left',
                   selected ? 'bg-brand-soft/60' : 'hover:bg-hover',
                 )}
               >
@@ -124,7 +124,7 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
 
 function Legend({ swatch, label }: { swatch: React.ReactNode; label: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-[11px] text-fg-3">
+    <span className="flex items-center gap-1.5 text-[11px] whitespace-nowrap text-fg-3">
       {swatch}
       {label}
     </span>

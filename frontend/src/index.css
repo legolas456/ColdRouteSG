@@ -121,6 +121,10 @@
   #root {
     height: 100%;
   }
+  /* phones: follow the visible viewport as the browser bars show and hide */
+  #root {
+    height: 100dvh;
+  }
   body {
     @apply bg-canvas text-fg font-sans antialiased;
     font-size: 13px;
@@ -192,4 +196,11 @@
 }
 [data-theme='dark'] .maplibregl-ctrl-attrib-button {
   filter: invert(1) grayscale(1);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }

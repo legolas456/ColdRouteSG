@@ -3,8 +3,6 @@ import {
   AlertCircle,
   Check,
   ChevronDown,
-  ClipboardPaste,
-  FileUp,
   GripVertical,
   Loader2,
   MapPin,
@@ -98,14 +96,6 @@ export function StopsEditor(props: Props) {
           <h2 className="text-[13px] font-semibold">Stops</h2>
           <span className="num text-[12px] text-fg-3">{stops.length}</span>
         </div>
-        <div className="flex items-center gap-0.5">
-          <Button size="sm" variant="ghost" icon={<FileUp size={13} strokeWidth={1.8} />}>
-            Import CSV
-          </Button>
-          <Button size="sm" variant="ghost" icon={<ClipboardPaste size={13} strokeWidth={1.8} />}>
-            Paste
-          </Button>
-        </div>
       </div>
 
       <div className="px-5 pb-2">
@@ -141,7 +131,7 @@ export function StopsEditor(props: Props) {
         </ul>
       </div>
 
-      <div className="border-t border-line bg-panel px-5 py-3.5">
+      <div className="sticky bottom-0 z-10 border-t border-line bg-panel px-5 py-3.5">
         {busy ? (
           <OptimisingSteps step={step} count={stops.length} />
         ) : (

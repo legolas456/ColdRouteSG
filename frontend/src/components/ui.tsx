@@ -26,7 +26,7 @@ export function Button({ variant = 'secondary', size = 'md', icon, kbd, classNam
       {kbd && (
         <span
           className={clsx(
-            'num ml-1 rounded-[4px] px-1 text-[10.5px]',
+            'num ml-1 rounded-[4px] px-1 text-[10.5px] max-md:hidden',
             variant === 'primary' ? 'bg-white/20 text-on-brand/90 dark:bg-black/15' : 'bg-hover text-fg-3',
           )}
         >
