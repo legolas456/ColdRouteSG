@@ -88,6 +88,7 @@ export function TopBar({
   theme,
   panel,
   onShare,
+  sharePopover,
 }: {
   status: ReactNode
   primary: ReactNode
@@ -95,6 +96,8 @@ export function TopBar({
   theme: { mode: ThemeMode; resolved: ThemeId; onChange: (m: ThemeMode) => void }
   panel?: { collapsed: boolean; onToggle: () => void }
   onShare?: () => void
+  /** rendered under the Share button while open */
+  sharePopover?: ReactNode
 }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-canvas px-4 max-md:gap-2 max-md:px-3">
@@ -123,9 +126,12 @@ export function TopBar({
       </span>
       <ThemeToggle {...theme} />
       {onShare && (
-        <Button variant="ghost" className="max-md:hidden" icon={<Share2 size={14} strokeWidth={1.8} />} onClick={onShare}>
-          Share
-        </Button>
+        <div className="relative max-md:hidden">
+          <Button variant="ghost" aria-expanded={!!sharePopover} icon={<Share2 size={14} strokeWidth={1.8} />} onClick={onShare}>
+            Share
+          </Button>
+          {sharePopover}
+        </div>
       )}
       <span className="shrink-0">{primary}</span>
     </header>

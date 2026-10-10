@@ -8,8 +8,8 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 | Draft: input | Optimised: results |
 | --- | --- |
 | ![Input](docs/screenshots/01-input.png) | ![Results](docs/screenshots/02-results.png) |
-| **Compare view and stop card** | **Share dialog** |
-| ![Compare](docs/screenshots/03-compare-stop-card.png) | ![Share](docs/screenshots/04-share-dialog.png) |
+| **Compare view and stop card** | **Share** |
+| ![Compare](docs/screenshots/03-compare-stop-card.png) | ![Share](docs/screenshots/04-share.png) |
 | **Opened from a share link (view only)** | **Dark mode** |
 | ![Shared view](docs/screenshots/08-shared-view.png) | ![Dark](docs/screenshots/05-dark.png) |
 | **Phone: results and stop card** | |
@@ -36,7 +36,7 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 | Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, a hatched shower cell and carparks with walking links. Optional layers show slow road segments and the shortest route as a ghost. The highest-risk stop pulses. |
 | Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, and every risk factor compared with the shortest route. |
 | Timeline | Delivery windows, unloading blocks, waits, lateness and the shower period on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
-| Share | **Share** opens a dialog with an invite field that suggests names from a mocked workspace directory and accepts any email, plus people with access (owner, Ops team, driver) with Can edit / Can view / Remove. General access can be Restricted, the ColdRoute SG workspace or anyone with the link. You can also pick a link expiry, choose whether the link opens on your current view (e.g. Compare · MBFC), and copy the link. |
+| Share | **Share** opens a small popover under the button. It has three parts: who can open the link (anyone at ColdRoute SG, or anyone with the link; both can view only), an option to open the link on your current view (e.g. Compare · MBFC), and **Copy link**. |
 | Shared view | Opening a `?share=` link shows a read-only snapshot with a "shared with you" banner and a **View only** status. Edit, re-optimise and dispatch are hidden. **Make a copy** turns it into your own editable run. |
 
 Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views redraws the map, list and timeline.
@@ -93,7 +93,7 @@ src/
 │  ├─ MapView.tsx          MapLibre map, overlays, markers, layer chips
 │  ├─ StopCard.tsx         stop detail card (on the map, or in the phone sheet)
 │  ├─ Timeline.tsx         time-axis view
-│  ├─ ShareDialog.tsx      share dialog (mocked people, access and link)
+│  ├─ SharePopover.tsx     share popover: link access, current view, copy
 │  └─ ui.tsx               buttons, segmented control, tags, meters
 ├─ lib/                    optimizer, explanations, themes, hooks, time helpers, types
 └─ data/                   sample run, OSRM snapshot, Singapore mask

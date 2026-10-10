@@ -5,7 +5,7 @@ import { BottomSheet, type Snap } from './components/BottomSheet'
 import { MapView, type Layers } from './components/MapView'
 import { PANEL, PanelHandle } from './components/PanelHandle'
 import { ResultsPanel, type View } from './components/ResultsPanel'
-import { ShareDialog } from './components/ShareDialog'
+import { SharePopover } from './components/SharePopover'
 import { TopBar, type ThemeMode } from './components/Shell'
 import { StopCard } from './components/StopCard'
 import { OPTIMISE_STEPS, StopsEditor } from './components/StopsEditor'
@@ -174,7 +174,7 @@ export default function App() {
   )
 
   const share = () => {
-    if (!readOnly) return setShareOpen(true)
+    if (!readOnly) return setShareOpen((o) => !o)
     // viewers can pass the link on, but not change who has access
     const ok = () => setToast('Link copied · it opens this view for anyone with access')
     navigator.clipboard?.writeText(location.href).then(ok, ok)
@@ -308,6 +308,9 @@ export default function App() {
       primary={primary}
       updatedAt="09:05"
       onShare={share}
+      sharePopover={
+        shareOpen && <SharePopover viewLabel={viewLabel} buildLink={buildLink} onClose={() => setShareOpen(false)} notify={setToast} />
+      }
       theme={{ mode: forcedTheme ?? themeMode, resolved: themeId, onChange: pickTheme }}
       panel={isPhone ? undefined : { collapsed, onToggle: () => setCollapsed((c) => !c) }}
     />
@@ -330,17 +333,6 @@ export default function App() {
     >
       <Check size={13} strokeWidth={2.5} className="shrink-0" /> <span className="truncate">{toast}</span>
     </div>
-  )
-
-  const shareDialog = shareOpen && (
-    <ShareDialog
-      title="Morning run"
-      meta={`Fri 10 Oct · ${stops.length} stops · ${phase === 'optimised' ? 'optimised plan' : 'draft, they will see the optimised plan'}`}
-      viewLabel={viewLabel}
-      buildLink={buildLink}
-      onClose={() => setShareOpen(false)}
-      notify={setToast}
-    />
   )
 
   // Phone: full-bleed map with the panel in a bottom sheet
@@ -379,7 +371,6 @@ export default function App() {
           </BottomSheet>
         </main>
         {toastEl}
-        {shareDialog}
       </div>
     )
   }
@@ -413,7 +404,6 @@ export default function App() {
         </section>
       </main>
       {toastEl}
-      {shareDialog}
     </div>
   )
 }
