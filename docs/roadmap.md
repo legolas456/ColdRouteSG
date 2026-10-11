@@ -41,6 +41,18 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [ ] Depot picker: the depot is fixed to Jurong Cold Store.
 - [ ] Mark a stop delivered and re-plan the rest from there (the old console's "Set current location here").
 
+### 3b. Make the live conditions useful
+
+Plan in [live-conditions.md](live-conditions.md). Feedback from the demo: the feeds are visible but their effect on the plan isn't. Waiting for the team to sign off its six decisions; then one PR per line.
+
+- [x] Proposal written, with the findings from 11 Oct and an offline experiment on the live feeds.
+- [ ] PR 1, fixes: rain on the map only where it overlaps an arrival, weather at unloading on the stop card and rows, the timeline's rain inside the run, a visible "rain not checked" notice outside NEA's 2-hour period, no stop scheduled just after the forecast ends, a stop's own loading bay before HDB lots.
+- [ ] PR 2, "What the conditions changed": a neutral run (no rain, default parking), the cost of ignoring the conditions, causes per stop, source tags.
+- [ ] PR 3, a Conditions tab beside Plan (by stop first, then the feeds); the top-bar pill opens it; the popover goes.
+- [ ] PR 4, map layers: carparks with live lots, LTA cameras.
+- [ ] PR 5, watching during the run: re-check on each refresh, a banner only when a change matters, plan versions, a Simulated change for the demo.
+- [ ] PR 6 (optional): NEA 24-hour regional outlook for later departures, rain gauges.
+
 ### 4. Optimiser
 
 - [ ] Today: exhaustive search up to 8 stops, 2-opt from the input order above that. Seed 2-opt with earliest-deadline or nearest-neighbour (as in the proposal) and check results at 10 and 15 stops.
@@ -79,3 +91,4 @@ What-if panel, runs list, system page, driver app, tracking page, live playback.
 - Which AWS account type do we deploy to, and which services does it allow?
 - Final deadline and demo format (live or recorded)?
 - Who owns each section above?
+- Sign off the six decisions at the end of [live-conditions.md](live-conditions.md#decisions).

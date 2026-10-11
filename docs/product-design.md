@@ -31,6 +31,8 @@ One workspace per run, driven by state. No step-by-step wizard. The dispatcher n
 | Live *(not built)* | Progress and alerts | Van position, rain | Accept suggestion |
 | Completed *(not built)* | Plan vs actual | Actual track | Duplicate run |
 
+How the live feeds should show up in these states, and how to watch them during a run, is proposed in [live-conditions.md](live-conditions.md).
+
 ## Key screens (built)
 
 - **Workspace.** Resizable left panel and map, timeline below. The panel toggle stays in one place in the top bar.

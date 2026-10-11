@@ -9,6 +9,7 @@ Project knowledge for the ColdRoute SG group project (CS5224 Cloud Computing, Gr
 | [project-brief.md](project-brief.md) | One-page summary: problem, users, what the product does, what is built today |
 | [preliminary-proposal.md](preliminary-proposal.md) | The preliminary report we submitted (28 Sep 2026): business case, AWS architecture, cost function, evaluation plan |
 | [product-design.md](product-design.md) | Product definition and UX: the dispatcher flow, key screens, explanations, and the wider ideas we may still build |
+| [live-conditions.md](live-conditions.md) | Proposal (waiting for sign-off): what live data is for, where each feed shows up, "What the conditions changed", watching during the run, data limits, build plan |
 | [brand.md](brand.md) | Name, logo, colours, fonts and tone, for anything visual (slides, posters, images, videos) |
 | [roadmap.md](roadmap.md) | Status and to-dos, in priority order |
 | [deployment.md](deployment.md) | Where the live demo runs, where the AWS keys are (not in the repo), how to deploy, and the CI to-do |
