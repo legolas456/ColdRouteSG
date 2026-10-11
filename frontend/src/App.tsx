@@ -3,18 +3,22 @@ import { Check, Copy, Eye, Loader2, Send } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AccountBar, AccountButton, SignInDialog, type User } from './components/Account'
 import { BottomSheet, type Snap } from './components/BottomSheet'
+import { ConditionsPanel } from './components/ConditionsPanel'
 import { MapView, type Layers } from './components/MapView'
 import { PANEL, PanelHandle } from './components/PanelHandle'
 import { ResultsPanel, type View } from './components/ResultsPanel'
 import { SharePopover } from './components/SharePopover'
-import { TopBar, type ThemeMode } from './components/Shell'
+import { DataPill, TopBar, type ThemeMode } from './components/Shell'
 import { StopCard } from './components/StopCard'
 import { OPTIMISE_STEPS, StopsEditor } from './components/StopsEditor'
 import { Timeline } from './components/Timeline'
 import { Button, Segmented, StatusPill } from './components/ui'
-import { DEPARTURE, DEPOT, PROFILES, SAMPLE_STOPS } from './data/sample'
+import { DEPARTURE, DEPOT, PROFILES, RECORDED_AT, SAMPLE_STOPS } from './data/sample'
+import { camerasNear, liveConditions, recordedConditions, type Conditions, type DataMode } from './lib/conditions'
+import { ensureLive, isLoading, refreshLive, sgMinutes, useLiveFeeds } from './lib/live'
 import { optimise } from './lib/optimizer'
 import { isTyping, PHONE_QUERY, useMediaQuery, usePersistentState } from './lib/hooks'
+import { hm } from './lib/time'
 import { applyTheme, THEME_BY_ID, type ThemeId } from './lib/themes'
 import type { OptimiseResult, ProfileId, Stop } from './lib/types'
 
@@ -24,6 +28,7 @@ type Phase = 'draft' | 'optimising' | 'optimised'
 // ?share=<token>[&view=compare][&stop=<id>]  a teammate's read-only link
 // ?state=results                             open straight on the result (demos, screenshots)
 // ?theme=light|dark                          force a theme for this visit only
+// ?data=live|recorded                        force the data mode for this visit only
 const SHARE_TOKEN = 'mr1010-7k2f'
 const params = new URLSearchParams(location.search)
 const sharedOnLoad = params.has('share')
@@ -32,14 +37,24 @@ const VIEW_LABEL: Record<View, string> = { coldroute: 'ColdRoute', baseline: 'Sh
 const urlView = VIEWS.find((v) => v === params.get('view')) ?? 'coldroute'
 const urlStop = SAMPLE_STOPS.some((s) => s.id === params.get('stop')) ? params.get('stop') : null
 const urlTheme = ((t) => (t === 'dark' || t === 'night' ? 'dark' : t === 'light' ? 'light' : null))(params.get('theme')) as ThemeId | null
+const urlData = ((d) => (d === 'live' || d === 'recorded' ? d : null))(params.get('data')) as DataMode | null
 const openOnResult = sharedOnLoad || params.get('state') === 'results'
 
 // keep the address bar clean: drop one-off and legacy params, keep a share link intact
 {
   const url = new URL(location.href)
-  for (const k of ['theme', 'style', 'layout', 'state']) url.searchParams.delete(k)
+  for (const k of ['theme', 'style', 'layout', 'state', 'data']) url.searchParams.delete(k)
   if (!sharedOnLoad) for (const k of ['view', 'stop']) url.searchParams.delete(k)
   history.replaceState(null, '', url)
+}
+
+const RECORDED_DATE_LABEL = 'Friday, 10 October'
+/** Today in Singapore: "Sunday, 11 October", or "Sun 11 Oct" when short */
+const todayLabel = (short = false) => {
+  const len = short ? 'short' : 'long'
+  const parts = new Intl.DateTimeFormat('en-GB', { weekday: len, day: 'numeric', month: len, timeZone: 'Asia/Singapore' }).formatToParts(new Date())
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
+  return short ? `${get('weekday')} ${get('day')} ${get('month')}` : `${get('weekday')}, ${get('day')} ${get('month')}`
 }
 
 export default function App() {
@@ -70,6 +85,21 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null)
   const [shareOpen, setShareOpen] = useState(false)
   const timers = useRef<number[]>([])
+  const runToken = useRef(0)
+
+  // data: the recorded rainy morning (default, keeps the demo case fixed) or
+  // live public feeds. A shared run is a snapshot, so it always replays.
+  const [savedMode, setSavedMode] = usePersistentState<DataMode>('coldroute.data', 'recorded')
+  const [forcedMode, setForcedMode] = useState<DataMode | null>(urlData)
+  const dataMode: DataMode = readOnly ? 'recorded' : (forcedMode ?? savedMode)
+  const setDataMode = (m: DataMode) => {
+    setForcedMode(null)
+    setSavedMode(m)
+  }
+  const [condOpen, setCondOpen] = useState(false)
+  const feeds = useLiveFeeds(dataMode === 'live' || condOpen)
+  // the data the plan was built on; the draft always shows the current read
+  const [planCond, setPlanCond] = useState<Conditions | null>(null)
 
   // desktop: resizable, collapsible panel (remembered across reloads)
   const isPhone = useMediaQuery(PHONE_QUERY)
@@ -81,8 +111,15 @@ export default function App() {
   const [sheetH, setSheetH] = useState(0)
   const [sheetTab, setSheetTab] = useState<'plan' | 'timeline'>('plan')
 
-  const stopById = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s])), [stops])
   const names = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s.short])), [stops])
+  const nowCond = useMemo(
+    () =>
+      dataMode === 'live' ? liveConditions(stops, feeds, sgMinutes(feeds.fetchedAt ?? Date.now()), departure) : recordedConditions(stops),
+    [dataMode, stops, feeds, departure],
+  )
+  const shownCond = phase === 'optimised' && planCond ? planCond : nowCond
+  // stops as the plan sees them: live forecast area and nearest carpark applied
+  const stopById = useMemo(() => Object.fromEntries(shownCond.stops.map((s) => [s.id, s])), [shownCond])
 
   // before paint, so there is no flash of the other theme
   useLayoutEffect(() => {
@@ -91,11 +128,24 @@ export default function App() {
 
   const runOptimise = useCallback(
     (instant = false) => {
+      const token = ++runToken.current
       timers.current.forEach(clearTimeout)
-      const r = optimise(DEPOT, stops, departure, PROFILES[profile].weights)
-      if (instant) {
+      timers.current = []
+      const read: Promise<Conditions> =
+        dataMode === 'live'
+          ? ensureLive().then((f) => liveConditions(stops, f, sgMinutes(f.fetchedAt ?? Date.now()), departure))
+          : Promise.resolve(recordedConditions(stops))
+      const finish = (c: Conditions) => {
+        if (token !== runToken.current) return
+        const r = optimise(DEPOT, c.stops, departure, PROFILES[profile].weights, c.rain)
+        setPlanCond(c)
         setResult(r)
+        if (!instant) setView('coldroute')
         setPhase('optimised')
+        if (c.mode === 'live' && c.source === 'recorded') setToast('Live data unavailable · planned with the recorded morning')
+      }
+      if (instant) {
+        read.then(finish)
         return
       }
       setSelectedId(null)
@@ -104,15 +154,11 @@ export default function App() {
       OPTIMISE_STEPS.forEach((_, i) => {
         timers.current.push(window.setTimeout(() => setStep(i + 1), 340 * (i + 1)))
       })
-      timers.current.push(
-        window.setTimeout(() => {
-          setResult(r)
-          setView('coldroute')
-          setPhase('optimised')
-        }, 340 * OPTIMISE_STEPS.length + 220),
-      )
+      // the steps play out while the feeds load; whichever takes longer wins
+      const shown = new Promise<void>((done) => timers.current.push(window.setTimeout(done, 340 * OPTIMISE_STEPS.length + 220)))
+      Promise.all([read, shown]).then(([c]) => finish(c))
     },
-    [stops, departure, profile],
+    [stops, departure, profile, dataMode],
   )
 
   // a share link (or ?state=results) opens on the optimised plan
@@ -120,6 +166,15 @@ export default function App() {
     if (openOnResult) runOptimise(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // switching data mode on a finished plan re-plans it on the new data
+  const modeRef = useRef(dataMode)
+  useEffect(() => {
+    if (modeRef.current === dataMode) return
+    modeRef.current = dataMode
+    if (phase === 'optimised' && !readOnly) runOptimise()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataMode])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -193,6 +248,7 @@ export default function App() {
   }
 
   const selectedStop = selectedId ? stopById[selectedId] : null
+  const liveCameras = shownCond.mode === 'live' && shownCond.source !== 'recorded' ? feeds.cameras.data?.cameras : undefined
   const viewLabel = phase === 'optimised' ? `${VIEW_LABEL[view]}${selectedStop ? ` · ${selectedStop.short}` : ''}` : undefined
 
   const status = readOnly ? (
@@ -240,7 +296,7 @@ export default function App() {
       <ResultsPanel
         result={result}
         stops={stopById}
-        stopList={stops}
+        stopList={shownCond.stops}
         view={view}
         setView={setView}
         selectedId={selectedId}
@@ -256,6 +312,7 @@ export default function App() {
         onReoptimise={readOnly ? undefined : () => runOptimise()}
         profileLabel={PROFILES[profile].label}
         departure={departure}
+        data={shownCond}
       />
     ) : (
       <StopsEditor
@@ -270,6 +327,8 @@ export default function App() {
         onOptimise={() => runOptimise()}
         busy={phase === 'optimising'}
         step={step}
+        dateLabel={dataMode === 'live' ? todayLabel() : RECORDED_DATE_LABEL}
+        onDepartNow={() => setDeparture(Math.min(23 * 60 + 55, Math.ceil(sgMinutes(Date.now()) / 5) * 5))}
       />
     )
 
@@ -280,6 +339,9 @@ export default function App() {
         result={result}
         names={names}
         departure={departure}
+        rain={shownCond.rain}
+        depotName={DEPOT.name}
+        camera={liveCameras ? camerasNear(liveCameras, selectedStop, 3, 1)[0] : undefined}
         onClose={() => setSelectedId(null)}
         onEdit={readOnly ? undefined : () => setPhase('draft')}
         inline={isPhone}
@@ -288,14 +350,23 @@ export default function App() {
 
   const timeline =
     phase === 'optimised' && result ? (
-      <Timeline result={result} stops={stopById} view={view} departure={departure} selectedId={selectedId} onSelect={setSelectedId} />
+      <Timeline
+        result={result}
+        stops={stopById}
+        view={view}
+        departure={departure}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        rain={shownCond.rain}
+      />
     ) : null
 
   const map = (insetBottom: number) => (
     <MapView
       palette={theme.map}
       depot={DEPOT}
-      stops={stops}
+      stops={shownCond.stops}
+      rain={shownCond.rain}
       result={phase === 'optimised' ? result : null}
       view={view}
       phase={phase}
@@ -325,7 +396,29 @@ export default function App() {
     <TopBar
       status={status}
       primary={primary}
-      updatedAt="09:05"
+      runDate={shownCond.mode === 'live' ? todayLabel(true) : undefined}
+      data={
+        <>
+          <DataPill
+            conditions={shownCond}
+            loading={dataMode === 'live' && isLoading(feeds) && !feeds.weather.data}
+            open={condOpen}
+            onClick={() => setCondOpen((o) => !o)}
+          />
+          {condOpen && (
+            <ConditionsPanel
+              mode={dataMode}
+              setMode={setDataMode}
+              feeds={feeds}
+              conditions={shownCond}
+              stops={stops}
+              onRefresh={() => refreshLive()}
+              onClose={() => setCondOpen(false)}
+              locked={readOnly}
+            />
+          )}
+        </>
+      }
       onShare={share}
       sharePopover={
         shareOpen && <SharePopover viewLabel={viewLabel} buildLink={buildLink} onClose={() => setShareOpen(false)} notify={setToast} />
@@ -341,7 +434,7 @@ export default function App() {
       <span className="num flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-on-brand">FL</span>
       <span className="min-w-0 truncate">
         <span className="font-medium text-fg">Fiona Lim</span> shared this run with you
-        <span className="max-md:hidden"> · read-only snapshot, data from 09:05</span>
+        <span className="max-md:hidden"> · read-only snapshot, data from {hm(RECORDED_AT)}</span>
       </span>
     </div>
   )

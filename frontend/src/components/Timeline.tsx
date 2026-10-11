@@ -1,7 +1,7 @@
 import clsx from 'clsx'
-import { RAIN } from '../data/sample'
+import { areaName } from '../lib/conditions'
 import { hm } from '../lib/time'
-import type { OptimiseResult, Stop } from '../lib/types'
+import type { OptimiseResult, RainCell, Stop } from '../lib/types'
 import type { View } from './ResultsPanel'
 
 interface Props {
@@ -11,11 +11,21 @@ interface Props {
   departure: number
   selectedId: string | null
   onSelect: (id: string | null) => void
+  /** rain cells the plan was built with */
+  rain: RainCell[]
 }
 
-export function Timeline({ result, stops, view, departure, selectedId, onSelect }: Props) {
+export function Timeline({ result, stops, view, departure, selectedId, onSelect, rain }: Props) {
   const plan = view === 'baseline' ? result.baseline : result.recommended
   const ghost = view === 'compare' ? result.baseline : null
+  // only rain over this run's stops matters; one band per distinct period
+  const areas = new Set(plan.rows.map((r) => stops[r.id]?.area))
+  const wet = rain.filter((c) => areas.has(c.area))
+  const bands = [...new Map(wet.map((c) => [`${c.start}-${c.end}`, c])).values()]
+  const rainLabel =
+    wet.length === 1
+      ? `${wet[0].label} · ${areaName(wet[0].area).replace(/^the /, '')}`
+      : `Rain · ${wet.map((c) => c.area).slice(0, 2).join(', ')}${wet.length > 2 ? ` +${wet.length - 2}` : ''}`
 
   const latest = Math.max(
     ...result.baseline.rows.map((r) => r.finish),
@@ -36,7 +46,7 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
         <Legend swatch={<span className="h-2 w-5 rounded-[2px] bg-brand-soft shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_25%,transparent)]" />} label="Delivery window" />
         <Legend swatch={<span className="h-2 w-3 rounded-[2px] bg-brand" />} label="Unloading" />
         <Legend swatch={<span className="hatch-signal h-2 w-4 rounded-[2px]" />} label="Late" />
-        <Legend swatch={<span className="hatch-rain h-2 w-4 rounded-[2px]" />} label={`${RAIN.label} · ${RAIN.area}`} />
+        {wet.length > 0 && <Legend swatch={<span className="hatch-rain h-2 w-4 rounded-[2px]" />} label={rainLabel} />}
         {ghost && <Legend swatch={<span className="h-2 w-3 rounded-[2px] shadow-[inset_0_0_0_1.5px_var(--text-3)]" />} label="Shortest route" />}
       </div>
 
@@ -50,10 +60,15 @@ export function Timeline({ result, stops, view, departure, selectedId, onSelect 
                 <span className="num absolute top-0 -translate-x-1/2 text-[10.5px] text-fg-3">{hm(h)}</span>
               </div>
             ))}
-            <div
-              className="hatch-rain absolute top-[18px] bottom-0 shadow-[inset_1px_0_0_color-mix(in_srgb,var(--rain)_35%,transparent),inset_-1px_0_0_color-mix(in_srgb,var(--rain)_35%,transparent)]"
-              style={{ left: x(RAIN.start), width: w(RAIN.start, RAIN.end) }}
-            />
+            {bands
+              .filter((c) => c.end > t0 && c.start < t1)
+              .map((c) => (
+              <div
+                key={`${c.start}-${c.end}`}
+                className="hatch-rain absolute top-[18px] bottom-0 shadow-[inset_1px_0_0_color-mix(in_srgb,var(--rain)_35%,transparent),inset_-1px_0_0_color-mix(in_srgb,var(--rain)_35%,transparent)]"
+                style={{ left: x(c.start), width: w(c.start, c.end) }}
+              />
+              ))}
           </div>
         </div>
 

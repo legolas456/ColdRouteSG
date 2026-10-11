@@ -1,4 +1,12 @@
+import { parkingRisk } from '../lib/geo'
 import type { Depot, ProfileId, RainCell, Stop, Weights } from '../lib/types'
+
+/**
+ * The recorded morning: a rainy Friday, read at 09:05. Recorded mode replays it
+ * so the demo case never changes; the values are sample data, not a capture.
+ */
+export const RECORDED_AT = 545
+export const RECORDED_DATE = 'Fri 10 Oct'
 
 export const DEPOT: Depot = {
   id: 'D',
@@ -14,7 +22,7 @@ const park = (name: string, lng: number, lat: number, distanceKm: number, freePc
   lat,
   distanceKm,
   freePct,
-  risk: Math.min(1, Math.round((Math.min(distanceKm / 1.2, 1) * 0.6 + (1 - freePct / 100) * 0.4) * 100) / 100),
+  risk: parkingRisk(distanceKm, freePct),
 })
 
 export const SAMPLE_STOPS: Stop[] = [
@@ -141,6 +149,7 @@ export const RAIN: RainCell = {
   end: 675,
   center: [103.8515, 1.2862],
   radiusKm: 2.4,
+  heavy: true,
 }
 
 /** A smaller, lighter cell. No stop or road of the run is inside it, so it never changes the plan. */
@@ -151,6 +160,7 @@ export const RAIN_LIGHT: RainCell = {
   end: 660,
   center: [103.7449, 1.384],
   radiusKm: 1.3,
+  heavy: false,
 }
 
 export const RAIN_CELLS: RainCell[] = [RAIN, RAIN_LIGHT]
