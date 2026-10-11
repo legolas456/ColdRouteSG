@@ -7,7 +7,7 @@ VPY     := $(VENV)/bin/python
 NPM     := npm --prefix frontend
 
 .DEFAULT_GOAL := help
-.PHONY: help setup env dev frontend backend test test-backend typecheck build preview deploy deploy-only
+.PHONY: help setup env dev frontend backend test test-backend test-frontend typecheck build preview deploy deploy-only
 
 help: ## List commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  make %-13s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -33,10 +33,13 @@ frontend: ## Frontend only, http://localhost:5173
 backend: ## Backend only, http://localhost:8000/docs
 	cd backend && .venv/bin/python -m uvicorn app.main:app --reload --port 8000
 
-test: test-backend typecheck ## Backend tests + frontend type check
+test: test-backend test-frontend typecheck ## Backend + frontend tests and TypeScript check
 
 test-backend: ## Backend pytest
 	cd backend && .venv/bin/python -m pytest -q
+
+test-frontend: ## Deterministic frontend optimiser tests
+	$(NPM) test
 
 typecheck: ## Frontend TypeScript check
 	$(NPM) run typecheck

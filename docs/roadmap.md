@@ -45,7 +45,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 ### 4. Optimiser
 
 - [ ] Today: exhaustive search up to 8 stops, 2-opt from the input order above that. Seed 2-opt with earliest-deadline or nearest-neighbour (as in the proposal) and check results at 10 and 15 stops.
-- [ ] Unit tests on fixed scenarios: rain, parking crunch, tight pharma window.
+- [x] Unit tests on fixed scenarios: rain, parking crunch, tight pharma window. Vitest also covers window waits, rain interval boundaries, cargo sensitivity, empty/single runs, 8-stop exhaustive search, 10/15-stop integrity and the recorded sample; `make test` and GitHub Checks run them. Performance and optimality evaluation are still separate work.
 - [ ] Explanations generated from cost differences, checked against the position change.
 
 ### 5. AWS (the cloud part of the course)

@@ -22,9 +22,13 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 ```bash
 npm install
 npm run dev        # http://localhost:5173
+npm test           # deterministic optimiser tests (no live API calls)
+npm run test:watch # rerun tests while editing
 npm run build      # type-check + production bundle in dist/
 npm run preview    # serve dist/ on http://localhost:4173
 ```
+
+New contributors: read [`../docs/contributing.md`](../docs/contributing.md) for setup, test coverage and the branch/PR workflow.
 
 No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), repainted with the theme's land, water and park colours at load time.
 
