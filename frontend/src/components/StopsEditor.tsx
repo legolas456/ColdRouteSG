@@ -27,18 +27,22 @@ interface Props {
   busy: boolean
   step: number
   onOptimise: () => void
+  /** "Friday, 10 October" for the recorded morning, today in Live mode */
+  dateLabel: string
+  /** set the departure to the current Singapore time */
+  onDepartNow: () => void
 }
 
 export const OPTIMISE_STEPS = [
   { label: 'Reading 2-hour forecast', source: 'NEA' },
-  { label: 'Checking carpark availability', source: 'HDB · URA' },
+  { label: 'Checking carpark availability', source: 'HDB' },
   { label: 'Estimating traffic on approaches', source: 'LTA' },
   { label: 'Scoring every stop order', source: 'ColdRoute' },
   { label: 'Comparing with the shortest route', source: 'OSRM' },
 ]
 
 export function StopsEditor(props: Props) {
-  const { stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step } = props
+  const { stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step, dateLabel, onDepartNow } = props
   const reviewCount = stops.filter((s) => s.review).length
 
   const estimate = useMemo(() => {
@@ -62,7 +66,7 @@ export function StopsEditor(props: Props) {
       <div className="px-5 pt-5">
         <div className="eyebrow">Draft · not dispatched</div>
         <h1 className="mt-1.5 font-serif text-[26px] leading-[1.15] tracking-[-0.02em]">Morning run</h1>
-        <p className="mt-1 text-fg-3">Friday, 10 October · Van SGX 4821K · Ahmad R.</p>
+        <p className="mt-1 text-fg-3">{dateLabel} · Van SGX 4821K · Ahmad R.</p>
         {busy ? (
           <div className="mt-3 rounded-[10px] bg-subtle px-3.5 py-3">
             <OptimisingSteps step={step} count={stops.length} />
@@ -81,9 +85,22 @@ export function StopsEditor(props: Props) {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-[104px_1fr] gap-2 px-5">
+      <div className="mt-4 grid grid-cols-[124px_1fr] gap-2 px-5">
         <Field label="Depart">
-          <TimeInput value={departure} onChange={setDeparture} className="text-[13px]" />
+          <span className="flex items-center gap-1">
+            <TimeInput value={departure} onChange={setDeparture} className="min-w-0 flex-1 text-[13px]" />
+            <button
+              type="button"
+              title="Leave now (Singapore time)"
+              onClick={(e) => {
+                e.preventDefault()
+                onDepartNow()
+              }}
+              className="-mr-1 shrink-0 rounded-[5px] px-1.5 text-[11px] font-medium text-brand-fg hover:bg-brand-soft"
+            >
+              Now
+            </button>
+          </span>
         </Field>
         <Field label="From depot">
           <span className="flex items-center justify-between gap-2">

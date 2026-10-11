@@ -4,7 +4,7 @@ ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation i
 
 Project background, the preliminary proposal, product design, brand and to-dos are in [`docs/`](docs/README.md).
 
-**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify; GitHub Actions redeploys it on every merge to `main`, see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. Live feeds, address search and accounts are mocked, and the optimiser runs in the browser.
+**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify; GitHub Actions redeploys it on every merge to `main`, see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. **Live data** (top bar) plans with the live NEA forecast and HDB carpark availability from data.gov.sg; the default **Recorded** mode replays a rainy sample morning. Traffic is estimated, address search and accounts are mocked, and the optimiser runs in the browser.
 
 The app does **not require any API key or registration** to run locally.
 
@@ -155,7 +155,7 @@ Open:
 
 `http://localhost:5173`
 
-The console runs on its own. It uses a real OSRM road snapshot, mocked live feeds and an in-browser optimiser, so the backend is optional for the demo. `VITE_API_BASE_URL` (in `.env.production`) is kept for when the UI switches to the FastAPI endpoints. Try `?style=mapfirst`, `?style=dark` or `?style=editorial`, or use **Style** in the top bar.
+The console runs on its own. It uses a real OSRM road snapshot, live data.gov.sg feeds read straight from the browser (or the recorded sample morning) and an in-browser optimiser, so the backend is optional for the demo. `VITE_API_BASE_URL` (in `.env.production`) is kept for when the UI switches to the FastAPI endpoints. Try `?state=results` (open on the plan), `?data=live` (live feeds) or `?theme=dark`.
 
 ## 3. Optional convenience launchers
 

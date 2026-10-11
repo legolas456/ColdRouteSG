@@ -10,6 +10,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [x] Project docs (this folder).
 - [x] New console deployed by hand to Amplify: https://main.daledp6z7ncmz.amplifyapp.com/ (`make deploy`, see [deployment.md](deployment.md)).
 - [x] CI with GitHub Actions: Checks on every PR, and every merge to `main` deploys the frontend to Amplify (see [deployment.md](deployment.md)).
+- [x] Live public feeds back in the new console: **Live data / Recorded** switch, the Conditions panel (NEA forecast, HDB carparks, LTA cameras), plans built on live rain and parking, Journey/Weather/Parking/Camera details on the stop card, late-delivery alert. The browser calls data.gov.sg directly; no backend needed.
 
 ## Next, in priority order
 
@@ -24,14 +25,15 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 ### 2. Connect the frontend and the backend
 
 - [ ] Call the backend optimise endpoint from the frontend, keeping the shapes in `frontend/src/lib/types.ts`.
-- [ ] Keep the current in-browser data as the fallback ("Recorded" mode) so the demo never breaks.
-- [ ] Show data mode and snapshot time in the top bar.
+- [x] Keep the current in-browser data as the fallback ("Recorded" mode) so the demo never breaks. Recorded is the default; Live is one click away in the top bar, or `?data=live`.
+- [x] Show data mode and snapshot time in the top bar.
 
 ### 3. Real data
 
-- [ ] NEA 2-hour forecast → rain risk per stop and time slot.
-- [ ] HDB carpark availability → parking risk.
+- [x] NEA 2-hour forecast → rain risk per stop and time slot. Each NEA area forecasting rain becomes a rain cell for the forecast's 2-hour period; each stop takes its nearest area.
+- [x] HDB carpark availability → parking risk. Used only when an HDB carpark is within 600 m; otherwise the stop keeps its own loading bay. Coordinates are a snapshot (`npm run data:hdb-carparks`), free lots are live.
 - [ ] LTA DataMall traffic speed bands (needs a free AccountKey) to replace the traffic-camera proxy.
+- [ ] LTA cameras: shown in the Conditions panel and on the stop card, but data.gov.sg serves only 8 cameras today (Woodlands and Tuas checkpoints), so most stops have none nearby.
 - [ ] OneMap search for addresses.
 
 ### 4. Optimiser

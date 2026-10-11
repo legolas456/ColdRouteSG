@@ -3,7 +3,6 @@ import { Check, LocateFixed, Minus, Plus } from 'lucide-react'
 import { GeoJSONSource, LngLatBounds, Map as MapLibre, Marker, setWorkerUrl, type ExpressionSpecification, type LayerSpecification, type StyleSpecification } from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { RAIN_CELLS } from '../data/sample'
 import sgMask from '../data/sg-mask.json'
 import { legGeometry, pathFor } from '../lib/optimizer'
 import { hm } from '../lib/time'
@@ -134,18 +133,18 @@ function rainPolygon(cell: RainCell, i: number): GeoJSON.Feature<GeoJSON.Polygon
     const r = cell.radiusKm * (1 + 0.1 * Math.sin(3 * t + 0.6 + i * 1.7) + 0.06 * Math.cos(5 * t + i))
     ring.push([lng + (r / (111.32 * Math.cos((lat * Math.PI) / 180))) * Math.cos(t), lat + (r / 110.574) * Math.sin(t)])
   }
-  return { type: 'Feature', properties: { heavy: i === 0 }, geometry: { type: 'Polygon', coordinates: [ring] } }
+  return { type: 'Feature', properties: { heavy: cell.heavy }, geometry: { type: 'Polygon', coordinates: [ring] } }
 }
 
-/** The first cell is the heavy one that drives the plan; the rest are lighter. */
-const rainCells = (): GeoJSON.FeatureCollection<GeoJSON.Polygon> => ({
+/** Heavy or thundery cells are drawn stronger than light rain. */
+const rainCells = (rain: RainCell[]): GeoJSON.FeatureCollection<GeoJSON.Polygon> => ({
   type: 'FeatureCollection',
-  features: RAIN_CELLS.map(rainPolygon),
+  features: rain.map(rainPolygon),
 })
 
 const HEAVY = ['==', ['get', 'heavy'], true] as ExpressionSpecification
 
-function addOverlays(map: MapLibre, c: MapPalette) {
+function addOverlays(map: MapLibre, c: MapPalette, rain: RainCell[]) {
   // Carto puts a few water labels before the road layers; anchor overlays above
   // the last road/building layer so white road fills never cover the route.
   const styleLayers = map.getStyle().layers ?? []
@@ -157,7 +156,7 @@ function addOverlays(map: MapLibre, c: MapPalette) {
   if (map.hasImage('hatch')) map.removeImage('hatch')
   map.addImage('hatch', hatchImage(c.rainHatch), { pixelRatio: 2 })
 
-  map.addSource('rain', { type: 'geojson', data: rainCells() })
+  map.addSource('rain', { type: 'geojson', data: rainCells(rain) })
   const dark = c.base === 'dark'
   map.addLayer(
     {
@@ -312,6 +311,8 @@ interface Props {
   palette: MapPalette
   depot: Depot
   stops: Stop[]
+  /** rain cells to draw: the plan's once optimised, the current ones in the draft */
+  rain: RainCell[]
   result: OptimiseResult | null
   view: View
   phase: 'draft' | 'optimising' | 'optimised'
@@ -328,13 +329,15 @@ interface Props {
 }
 
 export function MapView(props: Props) {
-  const { palette, depot, stops, result, view, phase, selectedId, onSelect, layers, setLayers } = props
+  const { palette, depot, stops, rain, result, view, phase, selectedId, onSelect, layers, setLayers } = props
   const insetLeft = props.insetLeft ?? 0
   const insetBottom = props.insetBottom ?? 0
   const compact = !!props.compact
   const ref = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibre | null>(null)
   const themeRef = useRef(palette)
+  const rainRef = useRef(rain)
+  rainRef.current = rain
   const markersRef = useRef<Marker[]>([])
   const animRef = useRef(0)
   const revealTimer = useRef(0)
@@ -394,7 +397,7 @@ export function MapView(props: Props) {
     map.on('style.load', () => {
       // the blank placeholder style also fires style.load; wait for the basemap
       if (!Object.keys(map.getStyle().sources ?? {}).length) return
-      addOverlays(map, themeRef.current)
+      addOverlays(map, themeRef.current, rainRef.current)
       if (firstStyle) {
         firstStyle = false
         fitRef.current(0)
@@ -432,6 +435,33 @@ export function MapView(props: Props) {
   onSelectRef.current = onSelect
   const selectedRef = useRef(selectedId)
   selectedRef.current = selectedId
+
+  // live rain changes between refreshes and runs
+  useEffect(() => {
+    const src = mapRef.current?.getSource('rain') as GeoJSONSource | undefined
+    if (styleVersion && src) src.setData(rainCells(rain))
+  }, [rain, styleVersion])
+
+  // With live data there can be a dozen cells: label only those over this
+  // run's stops, one per kind of rain and period (the cell with most stops),
+  // and never two within ~3 km.
+  const labelled = useMemo(() => {
+    const count = (c: RainCell) => stops.filter((s) => s.area === c.area).length
+    const pool = (rain.length <= 3 ? [...rain] : rain.filter((c) => count(c) > 0)).sort(
+      (a, b) => Number(b.heavy) - Number(a.heavy) || count(b) - count(a),
+    )
+    const out: RainCell[] = []
+    const kinds = new Set<string>()
+    for (const c of pool) {
+      if (out.length >= 4) break
+      const kind = `${c.label}|${c.start}|${c.end}`
+      if (rain.length > 3 && kinds.has(kind)) continue
+      if (out.some((o) => kmBetween(o.center, c.center) < 3)) continue
+      kinds.add(kind)
+      out.push(c)
+    }
+    return out
+  }, [rain, stops])
 
   // theme swap
   useEffect(() => {
@@ -565,32 +595,39 @@ export function MapView(props: Props) {
       lngLat: [number, number],
       z = 1,
       offset: [number, number] = [0, 0],
-      anchor: 'center' | 'top-left' | 'bottom' = 'center',
+      anchor: 'center' | 'top-left' | 'bottom' | 'top' | 'bottom-right' = 'center',
     ) => {
       el.style.zIndex = String(z)
       markersRef.current.push(new Marker({ element: el, anchor, offset }).setLngLat(lngLat).addTo(map))
     }
 
-    // rain labels, attached to each cell's rim
+    // rain labels, attached to each cell's rim. Heavy cells hang theirs off the
+    // south-east rim, light ones sit on the north rim; when a stop is right
+    // there, try the other sides so the label never covers a stop.
     if (layers.rain) {
-      RAIN_CELLS.forEach((cell, i) => {
-        const heavy = i === 0
+      type Spot = { dx: number; dy: number; anchor: 'top-left' | 'bottom' | 'top' | 'bottom-right'; offset: [number, number] }
+      const SE: Spot = { dx: 0.72, dy: -0.72, anchor: 'top-left', offset: [4, 4] }
+      const N: Spot = { dx: 0, dy: 0.95, anchor: 'bottom', offset: [0, -4] }
+      const S: Spot = { dx: 0, dy: -0.95, anchor: 'top', offset: [0, 4] }
+      const NW: Spot = { dx: -0.72, dy: 0.72, anchor: 'bottom-right', offset: [-4, -4] }
+      const places: [number, number][] = [[depot.lng, depot.lat], ...stops.map((s): [number, number] => [s.lng, s.lat])]
+      labelled.forEach((cell) => {
+        const heavy = cell.heavy
         const kx = 1 / (111.32 * Math.cos((cell.center[1] * Math.PI) / 180))
         const ky = 1 / 110.574
+        const at = (s: Spot): [number, number] => [cell.center[0] + cell.radiusKm * s.dx * kx, cell.center[1] + cell.radiusKm * s.dy * ky]
+        const options = heavy ? [SE, S, N, NW] : [N, S, NW, SE]
+        const spot = options.find((s) => !places.some((p) => kmBetween(p, at(s)) < 1.2)) ?? options[0]
         add(
           markerEl(
             `<div class="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-panel ${heavy ? 'px-2.5 py-1 text-[11px]' : 'px-2 py-[3px] text-[10.5px]'} text-fg shadow-[0_0_0_1.5px_color-mix(in_srgb,var(--rain)_65%,transparent),0_2px_6px_rgba(16,24,40,0.12)]">
               <svg class="text-rain" width="${heavy ? 13 : 11}" height="${heavy ? 13 : 11}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/><path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2"/></svg>
               <span class="font-semibold">${cell.label}</span>${compact ? '' : `<span class="num text-fg-2">${hm(cell.start)}–${hm(cell.end)}</span>`}</div>`,
           ),
-          heavy
-            ? // south-east rim, the label hangs off it over the sea
-              [cell.center[0] + cell.radiusKm * 0.72 * kx, cell.center[1] - cell.radiusKm * 0.72 * ky]
-            : // north rim, the label sits on top of it
-              [cell.center[0], cell.center[1] + cell.radiusKm * 0.95 * ky],
+          at(spot),
           2,
-          heavy ? [4, 4] : [0, -4],
-          heavy ? 'top-left' : 'bottom',
+          spot.offset,
+          spot.anchor,
         )
       })
     }
@@ -623,9 +660,11 @@ export function MapView(props: Props) {
     if (layers.parking) {
       for (const s of stops) {
         const risky = s.parking.risk >= 0.7
+        const p = s.parking
+        const tip = `${p.code ? `${p.code} · ` : ''}${p.name} · ${p.live ? `${p.live.free}/${p.live.total} lots free` : `${p.freePct}% free`} · ${p.distanceKm} km from ${s.short}`
         add(
           markerEl(
-            `<div class="relative flex size-[18px] items-center justify-center rounded-[5px] bg-panel num text-[9.5px] font-bold text-fg-2 shadow-[inset_0_0_0_1.5px_var(--text-3)]">P
+            `<div title="${tip.replace(/"/g, '&quot;')}" class="relative flex size-[18px] items-center justify-center rounded-[5px] bg-panel num text-[9.5px] font-bold text-fg-2 shadow-[inset_0_0_0_1.5px_var(--text-3)]">P
               ${risky ? `<div class="absolute left-[24px] top-1/2 -translate-y-1/2 whitespace-nowrap rounded-[5px] bg-panel px-1.5 py-0.5 text-[10.5px] text-fg-2 shadow-card"><span class="num">${s.parking.distanceKm} km</span> walk · <span class="num">${s.parking.freePct}%</span> free</div>` : ''}
             </div>`,
           ),
@@ -681,7 +720,7 @@ export function MapView(props: Props) {
         offset,
       )
     })
-  }, [styleVersion, stops, primaryPlan, selectedId, layers, phase, view, result, depot, offsets, jams, compact])
+  }, [styleVersion, stops, primaryPlan, selectedId, layers, phase, view, result, depot, offsets, jams, compact, labelled])
 
   // camera
   const fit = (duration = 700) => {

@@ -4,12 +4,16 @@ export type ProfileId = 'pharma' | 'balanced' | 'fastest'
 
 export interface Carpark {
   name: string
+  /** HDB carpark number, when the carpark comes from the live feed */
+  code?: string
   lng: number
   lat: number
   distanceKm: number
   freePct: number
   /** 0–1, derived from walking distance and live availability */
   risk: number
+  /** set when the free lots come from the HDB live feed */
+  live?: { free: number; total: number }
 }
 
 export interface Stop {
@@ -47,6 +51,8 @@ export interface RainCell {
   end: number
   center: [number, number]
   radiusKm: number
+  /** heavy or thundery: drawn stronger on the map */
+  heavy: boolean
 }
 
 export interface Weights {

@@ -1,5 +1,5 @@
 import osrm from '../data/osrm.json'
-import { CARGO_SENSITIVITY, RAIN } from '../data/sample'
+import { CARGO_SENSITIVITY, RAIN_CELLS } from '../data/sample'
 import type { Depot, OptimiseResult, Plan, RainCell, Stop, StopResult, Weights } from './types'
 
 type Point = { id: string; lng: number; lat: number }
@@ -53,7 +53,8 @@ interface Context {
   stops: Record<string, Stop>
   departure: number
   weights: Weights
-  rain: RainCell
+  /** every rain cell in play; a stop is only affected by the one over its area */
+  rain: RainCell[]
 }
 
 export function simulate(order: string[], ctx: Context): Plan {
@@ -79,7 +80,8 @@ export function simulate(order: string[], ctx: Context): Plan {
     const start = Math.max(t, s.windowStart)
     const late = Math.max(0, start - s.windowEnd)
     const slack = s.windowEnd - start
-    const inRain = s.area === rain.area && start < rain.end && start + s.service > rain.start
+    const cells = rain.filter((c) => c.area === s.area)
+    const inRain = cells.some((c) => start < c.end && start + s.service > c.start)
     const park = s.parking.risk
     const sens = CARGO_SENSITIVITY[s.cargo]
     const unload = s.service * (1 + 1.5 * park) * (inRain ? 1.4 : 1)
@@ -93,7 +95,7 @@ export function simulate(order: string[], ctx: Context): Plan {
       lateness: late * weights.late,
     }
 
-    const nearRain = s.area === rain.area && Math.abs(start - rain.end) < 30
+    const nearRain = cells.some((c) => Math.abs(start - c.end) < 30)
     const risk = {
       W: inRain ? 0.9 : nearRain ? 0.35 : 0.1,
       P: park,
@@ -190,7 +192,7 @@ export function optimise(
   stopList: Stop[],
   departure: number,
   weights: Weights,
-  rain: RainCell = RAIN,
+  rain: RainCell[] = RAIN_CELLS,
 ): OptimiseResult {
   const t0 = performance.now()
   const stops = Object.fromEntries(stopList.map((s) => [s.id, s]))

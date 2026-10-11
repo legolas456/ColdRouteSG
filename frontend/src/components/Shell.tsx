@@ -1,8 +1,10 @@
 import clsx from 'clsx'
-import { Moon, PanelLeftClose, PanelLeftOpen, Share2, Sun } from 'lucide-react'
+import { Loader2, Moon, PanelLeftClose, PanelLeftOpen, Share2, Sun } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { Conditions } from '../lib/conditions'
+import { hm } from '../lib/time'
 import type { ThemeId } from '../lib/themes'
-import { Button, StatusPill } from './ui'
+import { Button } from './ui'
 
 export type ThemeMode = 'system' | ThemeId
 
@@ -96,10 +98,59 @@ function PanelToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: ()
   )
 }
 
+/**
+ * Which data the plan reads, and how fresh it is. Opens the Conditions panel.
+ * Only a live, complete read gets the green pulse; recorded data never does.
+ */
+export function DataPill({
+  conditions,
+  loading,
+  open,
+  onClick,
+}: {
+  conditions: Pick<Conditions, 'mode' | 'source' | 'at'>
+  loading: boolean
+  open: boolean
+  onClick: () => void
+}) {
+  const { mode, source, at } = conditions
+  const live = mode === 'live'
+  const label = !live ? 'Recorded' : loading && source === 'recorded' ? 'Live' : source === 'recorded' ? 'Live unavailable' : source === 'mixed' ? 'Live · partial' : 'Live'
+  const ok = live && source === 'live'
+  return (
+    <button
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-label={`${label} data${source !== 'recorded' || !live ? ` from ${hm(at)}` : ''}. Open conditions`}
+      onClick={onClick}
+      title={live ? 'Planning with live NEA and HDB data. Open the live feeds.' : 'Planning with the recorded rainy morning (sample data). Open the live feeds.'}
+      className={clsx(
+        // phones: just the status dot, so the run title keeps its room
+        'flex h-[26px] shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] max-md:w-[26px] max-md:justify-center max-md:px-0',
+        open ? 'bg-hover text-fg shadow-[inset_0_0_0_1px_var(--border-dark)]' : 'text-fg-3 shadow-[inset_0_0_0_1px_var(--border-main)] hover:bg-hover hover:text-fg',
+      )}
+    >
+      {loading ? (
+        <Loader2 size={11} className="animate-spin" />
+      ) : (
+        <span className="relative flex size-1.5">
+          {ok && <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-60" />}
+          <span className={clsx('relative inline-flex size-1.5 rounded-full', ok ? 'bg-ok' : live ? 'bg-warn' : 'bg-fg-4')} />
+        </span>
+      )}
+      <span className="max-md:hidden">{label}</span>
+      {/* what the plan reads; LTA cameras are shown but do not feed the plan */}
+      {ok && <span className="max-xl:hidden">· NEA · HDB</span>}
+      {(!live || source !== 'recorded') && <span className="num max-md:hidden">{hm(at)}</span>}
+    </button>
+  )
+}
+
 export function TopBar({
   status,
   primary,
-  updatedAt,
+  runDate = 'Fri 10 Oct',
+  data,
   theme,
   panel,
   onShare,
@@ -108,7 +159,10 @@ export function TopBar({
 }: {
   status: ReactNode
   primary: ReactNode
-  updatedAt: string
+  /** short date of the run: the recorded morning, or today in Live mode */
+  runDate?: string
+  /** the data pill and, while open, the Conditions panel under it */
+  data?: ReactNode
   theme: { mode: ThemeMode; resolved: ThemeId; onChange: (m: ThemeMode) => void }
   panel?: { collapsed: boolean; onToggle: () => void }
   onShare?: () => void
@@ -127,19 +181,11 @@ export function TopBar({
       <span className="text-fg-3 max-lg:hidden">Runs</span>
       <span className="text-fg-4 max-lg:hidden">/</span>
       <span className="min-w-0 truncate font-medium text-fg">
-        Morning run<span className="max-md:hidden"> · Fri 10 Oct</span>
+        Morning run<span className="max-md:hidden"> · {runDate}</span>
       </span>
       <span className="shrink-0">{status}</span>
       <div className="flex-1" />
-      <span className="shrink-0 max-xl:hidden">
-        <StatusPill tone="live">
-          <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-ok opacity-60" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-ok" />
-          </span>
-          NEA · LTA · HDB <span className="num">{updatedAt}</span>
-        </StatusPill>
-      </span>
+      {data && <div className="relative shrink-0">{data}</div>}
       <ThemeToggle {...theme} />
       {onShare && (
         <div className="relative max-md:hidden">

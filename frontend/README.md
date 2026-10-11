@@ -12,8 +12,8 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 | ![Compare](docs/screenshots/03-compare-stop-card.png) | ![Share](docs/screenshots/04-share.png) |
 | **Opened from a share link (view only)** | **Dark mode** |
 | ![Shared view](docs/screenshots/08-shared-view.png) | ![Dark](docs/screenshots/05-dark.png) |
-| **Phone: results and stop card** | |
-| <img src="docs/screenshots/06-phone-results.png" width="49%" alt="Phone results"> <img src="docs/screenshots/07-phone-stop-card.png" width="49%" alt="Phone stop card"> | |
+| **Phone: results and stop card** | **Live data: the Conditions panel** |
+| <img src="docs/screenshots/06-phone-results.png" width="49%" alt="Phone results"> <img src="docs/screenshots/07-phone-stop-card.png" width="49%" alt="Phone stop card"> | ![Conditions](docs/screenshots/09-conditions.png) |
 
 ## Run it
 
@@ -30,12 +30,13 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 
 | Area | What it does |
 | --- | --- |
-| Input panel | Departure time, depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. **Optimise route** sits right under the run title. |
+| Data mode | The pill in the top bar shows what the plan is built on: **Recorded 09:05** (the rainy sample morning, the default, so the demo case never changes) or **Live · NEA · HDB 13:49**. Click it for the **Conditions** panel: the Live data / Recorded switch, then the live public feeds with their own update times: the NEA 2-hour forecast for all 47 areas, HDB carpark availability with the nearest carpark to each stop, and the LTA traffic cameras nearest the stops. Feeds refresh every 5 minutes while the panel is open or Live is on. Switching mode on a finished plan re-plans it. `?data=live` forces Live for one visit. |
+| Input panel | Departure time (with **Now**), depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. **Optimise route** sits right under the run title. |
 | Optimising | A short, staged progress list for the five data sources takes the place of the Optimise button, then the result appears. `⌘↵` runs it from anywhere. |
-| Results panel | **Re-optimise** and **Edit stops** sit under the title. Then four KPIs, each compared with the shortest route, a plain-language "Why this route" summary, and the stop order. Each stop lists only what needs attention, in words: "Unloads in rain", "1.1 km walk", "Heavy traffic", "2 h 57 min on board", "12 min spare". Red means high risk. The whole panel scrolls as one, with the view switch pinned to the top. |
-| Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, two hatched rain cells that drift slowly (light rain in the west, heavy rain over the City), and heavy-traffic stretches marked on the route. Optional layers show carparks with walking links and the shortest route as a ghost. The highest-risk stop pulses. |
-| Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, and every risk factor compared with the shortest route. |
-| Timeline | Delivery windows, unloading blocks, waits, lateness and the heavy-rain period on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
+| Results panel | **Re-optimise** and **Edit stops** sit under the title, with the data the plan used ("Live data from 13:49"). Then four KPIs, each compared with the shortest route, a red alert listing any late delivery, a plain-language "Why this route" summary, and the stop order. Each stop lists only what needs attention, in words: "Unloads in rain", "300 m walk", "Heavy traffic", "2 h 57 min on board", "12 min spare". Red means high risk. The whole panel scrolls as one, with the view switch pinned to the top. |
+| Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, hatched rain cells that drift slowly, and heavy-traffic stretches marked on the route. Recorded mode has two cells (light rain in the west, heavy rain over the City); Live mode draws one per NEA area that forecasts rain, and labels only those over the run's stops. Optional layers show carparks with walking links and the shortest route as a ghost. The highest-risk stop pulses. |
+| Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, the details behind it (Journey from the previous stop, NEA weather, the carpark used and its free lots, the nearest LTA camera in Live mode), and every risk factor compared with the shortest route. |
+| Timeline | Delivery windows, unloading blocks, waits, lateness and the rain periods over this run's stops on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
 | Share | **Share** opens a small popover under the button. It has three parts: who can open the link (anyone at ColdRoute SG, or anyone with the link; both can view only), an option to open the link on your current view (e.g. Compare · MBFC), and **Copy link**. |
 | Shared view | Opening a `?share=` link shows a read-only snapshot with a "shared with you" banner and a **View only** status. Edit, re-optimise and dispatch are hidden. **Make a copy** turns it into your own editable run. |
 | Account (mock) | The bottom of the panel shows who is signed in (Fiona Lim, Admin). Click it for the account menu and **Sign out**. Signed out, it offers **Sign in**, which opens a demo account picker. **Dispatch to driver** asks you to sign in first, then sends. On phones, and when the panel is hidden, the avatar moves to the top bar. Nothing leaves the browser: the user is kept in `localStorage`. |
@@ -89,7 +90,7 @@ The brand colour is **Safety Orange** on warm paper, the high-vis orange used ac
 
 Dark mode (**Night Shift**) uses warm charcoal with a brighter orange (`#ff7a33`) and dark text on orange buttons.
 
-Appearance follows the operating system by default. The **System / Light / Dark** switch in the top bar overrides it, and the choice is saved. On phones it is a single light/dark button. For demos and screenshots, `?theme=dark` forces a theme for one visit and `?state=results` opens straight on the optimised plan.
+Appearance follows the operating system by default. The **System / Light / Dark** switch in the top bar overrides it, and the choice is saved. On phones it is a single light/dark button. For demos and screenshots, `?theme=dark` forces a theme for one visit, `?data=live` forces live data, and `?state=results` opens straight on the optimised plan.
 
 Both themes live in `src/lib/themes.ts`, with the UI tokens and the matching map palette in one place. `applyTheme()` writes the tokens to `<html>` as CSS variables before first paint. Components only use semantic utilities (`bg-panel`, `text-fg-2`, `bg-brand`, `text-ok`, `bg-bad-soft`, …). The other palettes explored earlier (teal, glacier blue, indigo, mono) are in commit `94abb12`.
 
@@ -99,7 +100,10 @@ Both themes live in `src/lib/themes.ts`, with the UI tokens and the matching map
 - `src/data/osrm.json` is a snapshot of a real driving-time matrix and per-leg road geometry from the public OSRM server. It covers the depot, the 7 sample stops and the 3 address-book entries. Run `npm run data:osrm` to refresh it.
 - `src/lib/optimizer.ts` enumerates every stop order: 5,040 for 7 stops, about 60 ms for 8. It returns two plans. The **baseline** minimises drive time only. The **recommended** plan minimises a weighted cost of drive time, weather, parking, traffic, cold-chain exposure and lateness, using the profile's weights.
 - `src/lib/explain.ts` turns the difference between the two plans into the summary and "Why here" text.
-- Weather, parking and traffic values are mocked in `src/data/sample.ts`. The shapes match the backend's `/api/data/*` responses, so moving to live data only changes where the values come from. The UI stays the same.
+- **Recorded mode** uses the rainy morning in `src/data/sample.ts` (sample data, recorded at 09:05 on Fri 10 Oct). It never changes, so the demo case is always the same.
+- **Live mode** reads data.gov.sg straight from the browser (`src/lib/live.ts`; no key, CORS is open): the NEA 2-hour forecast, HDB carpark availability and LTA traffic images. `src/lib/conditions.ts` turns them into what the optimiser needs: one rain cell per NEA area forecasting rain, over the forecast period; each stop's nearest NEA area; and the nearest HDB carpark if it is within 600 m (further away, the stop keeps its own loading bay). The availability feed has no coordinates, so `src/data/hdb-carparks.json` holds them (data.gov.sg HDB Carpark Information, SVY21 converted to WGS84). Run `npm run data:hdb-carparks` to refresh it. If the forecast does not load, the plan falls back to the recorded morning and says so.
+- Traffic is still an estimate in both modes: live speed bands need an LTA DataMall key.
+- The plan keeps the data it was built on, so the feeds refreshing in the background never change a finished plan. **Re-optimise** reads them again.
 
 ## Structure
 
@@ -109,6 +113,7 @@ src/
 ├─ index.css               design tokens and themes
 ├─ components/
 │  ├─ Shell.tsx            top bar, logo, panel toggle, theme switch
+│  ├─ ConditionsPanel.tsx  data mode switch and the live public feeds
 │  ├─ PanelHandle.tsx      resize handle for the desktop panel
 │  ├─ BottomSheet.tsx      phone bottom sheet
 │  ├─ StopsEditor.tsx      input panel and optimising progress
@@ -119,8 +124,8 @@ src/
 │  ├─ SharePopover.tsx     share popover: link access, current view, copy
 │  ├─ Account.tsx          mock sign-in, panel account bar, top-bar avatar
 │  └─ ui.tsx               buttons, tabs, segmented control, tags
-├─ lib/                    optimizer, explanations, themes, hooks, time helpers, types
-└─ data/                   sample run, OSRM snapshot, Singapore mask
+├─ lib/                    optimizer, explanations, live feeds, conditions, geo, themes, hooks, time helpers, types
+└─ data/                   sample run, OSRM snapshot, HDB carpark coordinates, Singapore mask
 ```
 
 ## Notes

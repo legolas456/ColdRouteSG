@@ -1,10 +1,27 @@
 import clsx from 'clsx'
-import { ArrowDown, ArrowUp, Car, Check, Clock, CloudRain, Minus, PencilLine, RefreshCw, Sparkles, SquareParking, Thermometer, type LucideIcon } from 'lucide-react'
-import { DEPOT, RAIN } from '../data/sample'
+import {
+  ArrowDown,
+  ArrowUp,
+  Car,
+  Check,
+  Clock,
+  CloudRain,
+  Minus,
+  PencilLine,
+  RefreshCw,
+  Sparkles,
+  SquareParking,
+  Thermometer,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react'
+import { DEPOT } from '../data/sample'
+import { areaName, rainFor, type Conditions } from '../lib/conditions'
 import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
 import { duration, hm, signed } from '../lib/time'
-import type { OptimiseResult, Plan, Stop, StopResult } from '../lib/types'
+import type { OptimiseResult, Plan, RainCell, Stop, StopResult } from '../lib/types'
+import { distanceLabel } from './ConditionsPanel'
 import { Button, CargoTag, Segmented } from './ui'
 
 export type View = 'coldroute' | 'baseline' | 'compare'
@@ -22,13 +39,18 @@ interface Props {
   onReoptimise?: () => void
   profileLabel: string
   departure: number
-  /** time of the live data the plan was built on */
-  dataAt?: string
+  /** the data the plan was built on */
+  data: Pick<Conditions, 'source' | 'at' | 'rain'>
+}
+
+const SOURCE_LABEL: Record<Conditions['source'], string> = {
+  live: 'Live data',
+  mixed: 'Live and recorded data',
+  recorded: 'Recorded data',
 }
 
 export function ResultsPanel(props: Props) {
-  const { result, stops, stopList, view, setView, selectedId, onSelect, onEdit, onReoptimise, profileLabel, departure } = props
-  const dataAt = props.dataAt ?? '09:05'
+  const { result, stops, stopList, view, setView, selectedId, onSelect, onEdit, onReoptimise, profileLabel, departure, data } = props
   const { recommended: rec, baseline: base } = result
   const shown: Plan = view === 'baseline' ? base : rec
   const other: Plan = view === 'baseline' ? rec : base
@@ -44,7 +66,7 @@ export function ResultsPanel(props: Props) {
         <div className="eyebrow">Optimised · {profileLabel}</div>
         <h1 className="mt-1.5 font-serif text-[26px] leading-[1.15] tracking-[-0.02em]">Morning run</h1>
         <p className="mt-1 text-fg-3">
-          Live data from <span className="num">{dataAt}</span> · {result.evaluated.toLocaleString()} stop orders checked in{' '}
+          {SOURCE_LABEL[data.source]} from <span className="num">{hm(data.at)}</span> · {result.evaluated.toLocaleString()} stop orders checked in{' '}
           <span className="whitespace-nowrap">{Math.max(1, Math.round(result.elapsedMs))} ms</span>
         </p>
         {(onEdit || onReoptimise) && (
@@ -58,7 +80,7 @@ export function ResultsPanel(props: Props) {
               <Button
                 variant="tonal"
                 className="min-w-0 flex-1"
-                title="Run again with the latest live data"
+                title={data.source === 'recorded' ? 'Run again on the same data' : 'Run again with the latest live data'}
                 icon={<RefreshCw size={14} strokeWidth={1.8} />}
                 onClick={onReoptimise}
               >
@@ -125,6 +147,21 @@ export function ResultsPanel(props: Props) {
           sub={`${otherName}: ${other.km.toFixed(1)} km`}
         />
       </div>
+
+      {shown.lateStops > 0 && (
+        <div role="alert" className="mx-5 mt-3 flex items-start gap-2 rounded-[10px] bg-bad-soft px-3.5 py-2.5">
+          <TriangleAlert size={14} strokeWidth={2} className="mt-[2px] shrink-0 text-bad" />
+          <p className="text-[12.5px] leading-relaxed text-fg">
+            <span className="font-medium">
+              {shown.lateStops} {shown.lateStops === 1 ? 'delivery' : 'deliveries'} late:
+            </span>{' '}
+            {shown.rows
+              .filter((r) => r.late > 0)
+              .map((r) => `${stops[r.id]?.short ?? r.id} +${Math.round(r.late)} min`)
+              .join(' · ')}
+          </p>
+        </div>
+      )}
 
       {view !== 'baseline' ? (
         <div className="mx-5 mt-4 rounded-[10px] bg-brand-soft px-3.5 py-3">
@@ -200,7 +237,7 @@ export function ResultsPanel(props: Props) {
                       </span>
                     )}
                   </span>
-                  <Watchouts row={row} stop={s} departure={departure} />
+                  <Watchouts row={row} stop={s} departure={departure} rain={data.rain} />
                 </span>
                 <span className="flex flex-col items-end">
                   <span className="num text-[14px] font-medium">{hm(row.arrival)}</span>
@@ -307,20 +344,29 @@ interface Watchout {
  * actually need attention show up, worst first; the full five-factor breakdown
  * lives in the stop card.
  */
-function watchouts(row: StopResult, s: Stop, departure: number): Watchout[] {
+function watchouts(row: StopResult, s: Stop, departure: number, rain: RainCell[]): Watchout[] {
   const out: Watchout[] = []
   const { W, P, T, C, L } = row.risk
+  const cell = rainFor(s, rain)
   if (W >= 0.66)
-    out.push({ key: 'W', Icon: CloudRain, value: W, text: 'Unloads in rain', title: `Unloading starts ${hm(row.start)}, inside the ${RAIN.area} rain` })
+    out.push({
+      key: 'W',
+      Icon: CloudRain,
+      value: W,
+      text: 'Unloads in rain',
+      title: cell
+        ? `Unloading starts ${hm(row.start)}, inside the ${cell.label.toLowerCase()} over ${areaName(cell.area)} (${hm(cell.start)}–${hm(cell.end)})`
+        : `Unloading starts ${hm(row.start)}, in rain`,
+    })
   if (P >= 0.4)
     out.push({
       key: 'P',
       Icon: SquareParking,
       value: P,
-      text: `${s.parking.distanceKm} km walk`,
-      title: `Nearest loading bay: ${s.parking.name}, ${s.parking.distanceKm} km away, ${s.parking.freePct}% of lots free (HDB · URA)`,
+      text: `${distanceLabel(s.parking.distanceKm)} walk`,
+      title: `Nearest carpark: ${s.parking.name}, ${distanceLabel(s.parking.distanceKm)} away, ${s.parking.freePct}% of lots free (${s.parking.live ? 'HDB live' : 'HDB · URA'})`,
     })
-  if (T >= 0.4) out.push({ key: 'T', Icon: Car, value: T, text: 'Heavy traffic', title: `Slow approach: about ${Math.round(row.legMinutes)} min on congested roads (LTA)` })
+  if (T >= 0.4) out.push({ key: 'T', Icon: Car, value: T, text: 'Heavy traffic', title: `Slow approach: about ${Math.round(row.legMinutes)} min on congested roads (estimated)` })
   if (C >= 0.4)
     out.push({
       key: 'C',
@@ -334,8 +380,8 @@ function watchouts(row: StopResult, s: Stop, departure: number): Watchout[] {
   return out.sort((a, b) => b.value - a.value)
 }
 
-function Watchouts({ row, stop, departure }: { row: StopResult; stop: Stop; departure: number }) {
-  const items = watchouts(row, stop, departure)
+function Watchouts({ row, stop, departure, rain }: { row: StopResult; stop: Stop; departure: number; rain: RainCell[] }) {
+  const items = watchouts(row, stop, departure, rain)
   if (!items.length)
     return (
       <span className="mt-1.5 flex items-center gap-1 text-[11.5px] text-fg-4">

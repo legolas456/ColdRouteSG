@@ -75,11 +75,11 @@ Out of scope: multi-vehicle optimisation, real SMS, payments.
 
 | Mode | Source | Use |
 | --- | --- | --- |
-| Live | NEA, LTA, OneMap now | Prove the data is real |
-| Recorded | A saved real snapshot, e.g. a rainy morning | Repeat the interesting case reliably |
-| Simulated | Manual overrides | What-if and controlled experiments |
+| Live | NEA forecast and HDB carparks now, LTA cameras for context (built) | Prove the data is real |
+| Recorded | The rainy sample morning, Fri 10 Oct 09:05 (built, the default) | Repeat the interesting case reliably |
+| Simulated | Manual overrides (not built) | What-if and controlled experiments |
 
-Always show the current mode and snapshot time.
+Always show the current mode and snapshot time: the pill in the top bar does this, and opens the Conditions panel with every feed's own update time.
 
 **Suggested three-minute script:**
 
