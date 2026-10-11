@@ -1,10 +1,11 @@
 import clsx from 'clsx'
-import { ExternalLink, PencilLine, X } from 'lucide-react'
+import { Maximize2, PencilLine, X } from 'lucide-react'
 import { rainFor } from '../lib/conditions'
 import { explainStop } from '../lib/explain'
 import type { Camera } from '../lib/live'
 import { duration, hm } from '../lib/time'
 import type { OptimiseResult, RainCell, Stop } from '../lib/types'
+import type { CameraView } from './CameraViewer'
 import { distanceLabel } from './ConditionsPanel'
 import { Button, CargoTag } from './ui'
 
@@ -18,6 +19,8 @@ interface Props {
   depotName: string
   /** nearest live LTA camera, in Live mode */
   camera?: { camera: Camera; km: number }
+  /** show the camera image large, in the console */
+  onViewCamera?: (v: CameraView) => void
   onClose: () => void
   /** Back to the draft with this stop open for editing. */
   onEdit?: () => void
@@ -25,7 +28,7 @@ interface Props {
   inline?: boolean
 }
 
-export function StopCard({ stop, result, names, departure, rain, depotName, camera, onClose, onEdit, inline }: Props) {
+export function StopCard({ stop, result, names, departure, rain, depotName, camera, onViewCamera, onClose, onEdit, inline }: Props) {
   const rec = result.recommended.byId[stop.id]
   const base = result.baseline.byId[stop.id]
   if (!rec || !base) return null
@@ -153,25 +156,28 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
           </Detail>
           {camera && (
             <Detail label="Camera" source="LTA live">
-              <a
-                href={camera.camera.image}
-                target="_blank"
-                rel="noreferrer"
-                title="Open the full camera image"
-                className="group flex items-center gap-2.5"
+              <button
+                type="button"
+                onClick={() => onViewCamera?.({ camera: camera.camera, stop: { name: stop.name, km: camera.km } })}
+                title={`Enlarge camera ${camera.camera.id}${camera.camera.place ? ` · ${camera.camera.place}` : ''}`}
+                className="group flex w-full items-center gap-2.5 rounded-[6px] text-left"
               >
-                <span className="relative block h-[45px] w-[80px] shrink-0 overflow-hidden rounded-[6px] bg-subtle">
+                <span className="relative block h-[45px] w-[80px] shrink-0 overflow-hidden rounded-[6px] bg-subtle shadow-[inset_0_0_0_1px_var(--border-main)]">
                   <img src={camera.camera.image} alt={`LTA camera ${camera.camera.id}`} loading="lazy" className="size-full object-cover" />
+                  <Maximize2
+                    size={11}
+                    className="absolute top-1 right-1 text-white opacity-0 drop-shadow transition-opacity group-hover:opacity-100"
+                  />
                 </span>
                 <span className="min-w-0 text-fg-3">
-                  <span className="block text-fg group-hover:underline">
-                    Camera {camera.camera.id} <ExternalLink size={11} className="inline align-[-1px]" />
+                  <span className="block truncate text-fg group-hover:underline">
+                    {camera.camera.place ?? `Camera ${camera.camera.id}`}
                   </span>
                   <span className="num">
                     {distanceLabel(camera.km)} away · {hm(camera.camera.taken)}
                   </span>
                 </span>
-              </a>
+              </button>
             </Detail>
           )}
         </dl>

@@ -60,6 +60,24 @@ export interface Camera {
   lat: number
   image: string
   taken: number
+  /** what the camera looks at, when LTA names it (see CAMERA_PLACES) */
+  place?: string
+}
+
+/**
+ * What each camera looks at, from LTA's OneMotoring traffic cameras page
+ * (October 2026). The data.gov.sg feed only has ids and positions; cameras not
+ * listed here are described by their nearest NEA area instead.
+ */
+export const CAMERA_PLACES: Record<string, string> = {
+  '2701': 'Woodlands Causeway (towards Johor)',
+  '2702': 'Woodlands Checkpoint (towards BKE)',
+  '2704': 'Woodlands Flyover (towards Checkpoint)',
+  '4703': 'Second Link at Tuas',
+  '4712': 'After Tuas West Road',
+  '4713': 'Tuas Checkpoint',
+  '4798': 'Sentosa Gateway (towards Telok Blangah)',
+  '4799': 'Sentosa Gateway (towards Sentosa)',
 }
 
 export interface CameraFeed {
@@ -158,7 +176,8 @@ export function parseCameras(raw: Json): CameraFeed {
   if (!item) throw new Error('No cameras in the response')
   const cameras = arr(item.cameras).map((c) => {
     const loc = c.location as { latitude: number; longitude: number }
-    return { id: String(c.camera_id), lng: loc.longitude, lat: loc.latitude, image: c.image as string, taken: sgMinutes(c.timestamp as string) }
+    const id = String(c.camera_id)
+    return { id, lng: loc.longitude, lat: loc.latitude, image: c.image as string, taken: sgMinutes(c.timestamp as string), place: CAMERA_PLACES[id] }
   })
   return { updated: sgMinutes(item.timestamp as string), cameras }
 }

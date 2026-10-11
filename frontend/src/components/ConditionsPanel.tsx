@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Cctv, CloudRain, CloudSun, ExternalLink, Loader2, RefreshCw, SquareParking, TriangleAlert, X, type LucideIcon } from 'lucide-react'
+import { Cctv, CloudRain, CloudSun, Loader2, Maximize2, RefreshCw, SquareParking, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { RECORDED_AT, RECORDED_DATE } from '../data/sample'
 import { camerasNear, MAX_WALK_KM, type Conditions, type DataMode } from '../lib/conditions'
@@ -7,6 +7,7 @@ import { nearest } from '../lib/geo'
 import { isLoading, sgMinutes, type Camera, type Feed, type LiveFeeds } from '../lib/live'
 import { hm } from '../lib/time'
 import type { Stop } from '../lib/types'
+import type { CameraView } from './CameraViewer'
 import { Segmented } from './ui'
 
 interface Props {
@@ -18,6 +19,10 @@ interface Props {
   stops: Stop[]
   onRefresh: () => void
   onClose: () => void
+  /** show a camera image large, in the console */
+  onViewCamera: (v: CameraView) => void
+  /** a dialog (the camera viewer) sits on top: leave Esc and outside clicks to it */
+  covered?: boolean
   /** view-only runs keep the snapshot they were shared with */
   locked?: boolean
 }
@@ -29,17 +34,19 @@ const fmt = (n: number) => n.toLocaleString('en-SG')
  * the data pill in the top bar. The feeds always show what is live now, even
  * when the plan replays the recorded morning.
  */
-export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRefresh, onClose, locked }: Props) {
+export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRefresh, onClose, onViewCamera, covered, locked }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  const coveredRef = useRef(covered)
+  coveredRef.current = covered
 
   useEffect(() => {
     // the wrapper also holds the pill, so clicking it toggles instead of re-opening
     const wrap = ref.current?.parentElement
-    const onDown = (e: MouseEvent) => wrap && !wrap.contains(e.target as Node) && closeRef.current()
+    const onDown = (e: MouseEvent) => !coveredRef.current && wrap && !wrap.contains(e.target as Node) && closeRef.current()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || coveredRef.current) return
       e.stopPropagation()
       closeRef.current()
     }
@@ -137,7 +144,7 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
       <div className="space-y-2 px-3 pb-3">
         <WeatherSection feed={feeds.weather} stops={stops} />
         <ParkingSection feed={feeds.carparks} stops={stops} />
-        <CameraSection feed={feeds.cameras} stops={stops} />
+        <CameraSection feed={feeds.cameras} stops={stops} onView={onViewCamera} />
       </div>
     </div>
   )
@@ -308,7 +315,7 @@ function ParkingSection({ feed, stops }: { feed: LiveFeeds['carparks']; stops: S
 
 type CameraPick = { camera: Camera; stop?: Stop; km?: number }
 
-function CameraSection({ feed, stops }: { feed: LiveFeeds['cameras']; stops: Stop[] }) {
+function CameraSection({ feed, stops, onView }: { feed: LiveFeeds['cameras']; stops: Stop[]; onView: (v: CameraView) => void }) {
   const cams = feed.data
   // the camera nearest each stop (within 4 km, never twice), then whatever else
   // is online: LTA sometimes serves only a handful of cameras
@@ -331,16 +338,20 @@ function CameraSection({ feed, stops }: { feed: LiveFeeds['cameras']; stops: Sto
             <ul className="grid grid-cols-2 gap-2">
               {shown.map(({ camera, stop, km }) => (
                 <li key={camera.id}>
-                  <a
-                    href={camera.image}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={`Camera ${camera.id}${stop && km !== undefined ? `, ${distanceLabel(km)} from ${stop.name}` : ''}. Opens the full image.`}
-                    className="group block"
+                  <button
+                    type="button"
+                    onClick={() => onView({ camera, stop: stop && km !== undefined ? { name: stop.name, km } : undefined })}
+                    title={`Camera ${camera.id}${camera.place ? ` · ${camera.place}` : ''}${stop && km !== undefined ? `, ${distanceLabel(km)} from ${stop.name}` : ''}. Click to enlarge.`}
+                    className="group block w-full rounded-md text-left"
                   >
-                    <span className="relative block aspect-video overflow-hidden rounded-md bg-subtle">
-                      <img src={camera.image} alt={`LTA camera ${camera.id}`} loading="lazy" className="size-full object-cover" />
-                      <ExternalLink
+                    <span className="relative block aspect-video overflow-hidden rounded-md bg-subtle shadow-[inset_0_0_0_1px_var(--border-main)]">
+                      <img
+                        src={camera.image}
+                        alt={`LTA camera ${camera.id}`}
+                        loading="lazy"
+                        className="size-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                      />
+                      <Maximize2
                         size={12}
                         className="absolute top-1.5 right-1.5 text-white opacity-0 drop-shadow transition-opacity group-hover:opacity-100"
                       />
@@ -352,12 +363,12 @@ function CameraSection({ feed, stops }: { feed: LiveFeeds['cameras']; stops: Sto
                             Near <span className="font-medium text-fg">{stop.short}</span> · {distanceLabel(km)}
                           </>
                         ) : (
-                          <>Camera {camera.id}</>
+                          <>{camera.place ?? `Camera ${camera.id}`}</>
                         )}
                       </span>
                       <span className="num shrink-0 text-fg-4">{hm(camera.taken)}</span>
                     </span>
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>

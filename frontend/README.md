@@ -14,8 +14,8 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 | ![Shared view](docs/screenshots/08-shared-view.png) | ![Dark](docs/screenshots/05-dark.png) |
 | **Phone: results and stop card** | **Live data: the Conditions panel** |
 | <img src="docs/screenshots/06-phone-results.png" width="49%" alt="Phone results"> <img src="docs/screenshots/07-phone-stop-card.png" width="49%" alt="Phone stop card"> | ![Conditions](docs/screenshots/09-conditions.png) |
-| **Editing a stop: pick the closing time** | |
-| ![Time picker](docs/screenshots/10-time-picker.png) | |
+| **Editing a stop: pick the closing time** | **A live LTA camera, enlarged** |
+| ![Time picker](docs/screenshots/10-time-picker.png) | ![Camera viewer](docs/screenshots/11-camera-viewer.png) |
 
 ## Run it
 
@@ -32,12 +32,12 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 
 | Area | What it does |
 | --- | --- |
-| Data mode | The pill in the top bar shows what the plan is built on: **Recorded 09:05** (the rainy sample morning, the default, so the demo case never changes) or **Live · NEA · HDB 13:49**. Click it for the **Conditions** panel: the Live data / Recorded switch, then the live public feeds with their own update times: the NEA 2-hour forecast for all 47 areas, HDB carpark availability with the nearest carpark to each stop, and the LTA traffic cameras nearest the stops. Feeds refresh every 5 minutes while the panel is open or Live is on. Switching mode on a finished plan re-plans it. `?data=live` forces Live for one visit. |
+| Data mode | The pill in the top bar shows what the plan is built on: **Recorded 09:05** (the rainy sample morning, the default, so the demo case never changes) or **Live · NEA · HDB 13:49**. Click it for the **Conditions** panel: the Live data / Recorded switch, then the live public feeds with their own update times: the NEA 2-hour forecast for all 47 areas, HDB carpark availability with the nearest carpark to each stop, and the LTA traffic cameras nearest the stops. Click a camera to enlarge it in the app: the full image, the camera number and place, when LTA took it and how far it is from the nearest stop. Esc or a click on the backdrop closes it; on a phone it fills the screen. Feeds refresh every 5 minutes while the panel is open or Live is on. Switching mode on a finished plan re-plans it. `?data=live` forces Live for one visit. |
 | Input panel | Departure time (pick a slot, type it, or **Now**), depot, **Optimise for** (Pharma, Balanced, Fastest), address search on **OneMap** (any building, street or postal code; the sample customers show when the box is empty), **Load sample** and **Clear**, inline editing of the time window (pick from 15-minute slots; closing times show the window length, "+2 h"), unloading time (5 to 60 min, or **Custom…**) and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. A new stop opens with a four-hour window from the departure, chilled cargo and 10 min to unload, ready to edit. The run is kept across reloads, up to 15 stops. **Optimise route** sits right under the run title. |
 | Optimising | A short, staged progress list for the five data sources takes the place of the Optimise button, then the result appears. `⌘↵` runs it from anywhere. |
 | Results panel | **Re-optimise** and **Edit stops** sit under the title, with the data the plan used ("Live data from 13:49"). Then four KPIs, each compared with the shortest route, a red alert listing any late delivery, a plain-language "Why this route" summary, and the stop order. Each stop lists only what needs attention, in words: "Unloads in rain", "300 m walk", "Heavy traffic", "2 h 57 min on board", "12 min spare". Red means high risk. The whole panel scrolls as one, with the view switch pinned to the top. |
 | Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, hatched rain cells that drift slowly, and heavy-traffic stretches marked on the route. Recorded mode has two cells (light rain in the west, heavy rain over the City); Live mode draws one per NEA area that forecasts rain, and labels only those over the run's stops. Optional layers show carparks with walking links and the shortest route as a ghost. The highest-risk stop pulses. |
-| Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, the details behind it (Journey from the previous stop, NEA weather, the carpark used and its free lots, the nearest LTA camera in Live mode), and every risk factor compared with the shortest route. |
+| Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, the details behind it (Journey from the previous stop, NEA weather, the carpark used and its free lots, the nearest LTA camera in Live mode, which opens the same camera viewer), and every risk factor compared with the shortest route. |
 | Timeline | Delivery windows, unloading blocks, waits, lateness and the rain periods over this run's stops on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
 | Share | **Share** opens a small popover under the button. It has three parts: who can open the link (anyone at ColdRoute SG, or anyone with the link; both can view only), an option to open the link on your current view (e.g. Compare · MBFC), and **Copy link**. |
 | Shared view | Opening a `?share=` link shows a read-only snapshot with a "shared with you" banner and a **View only** status. Edit, re-optimise and dispatch are hidden. **Make a copy** turns it into your own editable run. |
@@ -119,6 +119,7 @@ src/
 ├─ components/
 │  ├─ Shell.tsx            top bar, logo, panel toggle, theme switch
 │  ├─ ConditionsPanel.tsx  data mode switch and the live public feeds
+│  ├─ CameraViewer.tsx     enlarged LTA camera image (dialog; full screen on a phone)
 │  ├─ PanelHandle.tsx      resize handle for the desktop panel
 │  ├─ BottomSheet.tsx      phone bottom sheet
 │  ├─ StopsEditor.tsx      input panel and optimising progress
