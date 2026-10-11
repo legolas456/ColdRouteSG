@@ -5,16 +5,21 @@ import {
   ChevronDown,
   Loader2,
   MapPin,
+  Scale,
   Search,
+  ShieldCheck,
   X,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ADDRESS_BOOK, DEPOT, PROFILES } from '../data/sample'
 import { travel } from '../lib/optimizer'
 import { MAX_STOPS, searchPlaces, stopFromPlace, type Place } from '../lib/places'
 import { useRoadsVersion } from '../lib/roads'
-import { duration, hm, parseHm } from '../lib/time'
+import { duration, hm } from '../lib/time'
 import type { Cargo, ProfileId, Stop } from '../lib/types'
+import { LAST_SLOT, MinutesPicker, TimePicker } from './Pickers'
 import { Button, Divider, Kbd, Segmented, CargoTag } from './ui'
 
 interface Props {
@@ -72,7 +77,7 @@ export function StopsEditor(props: Props) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="@container flex h-full min-h-0 flex-col">
       <div className="px-5 pt-5">
         <div className="eyebrow">Draft · not dispatched</div>
         <h1 className="mt-1.5 font-serif text-[26px] leading-[1.15] tracking-[-0.02em]">Morning run</h1>
@@ -95,10 +100,13 @@ export function StopsEditor(props: Props) {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-[124px_1fr] gap-2 px-5">
-        <Field label="Depart">
-          <span className="flex items-center gap-1">
-            <TimeInput value={departure} onChange={setDeparture} className="min-w-0 flex-1 text-[13px]" />
+      <div className="mt-4 grid grid-cols-[148px_1fr] gap-2 px-5">
+        <TimePicker
+          label="Depart"
+          variant="field"
+          value={departure}
+          onChange={setDeparture}
+          extra={
             <button
               type="button"
               title="Leave now (Singapore time)"
@@ -106,12 +114,12 @@ export function StopsEditor(props: Props) {
                 e.preventDefault()
                 onDepartNow()
               }}
-              className="-mr-1 shrink-0 rounded-[5px] px-1.5 text-[11px] font-medium text-brand-fg hover:bg-brand-soft"
+              className="shrink-0 rounded-[5px] px-1.5 text-[11px] font-medium text-brand-fg hover:bg-brand-soft"
             >
               Now
             </button>
-          </span>
-        </Field>
+          }
+        />
         <Field label="From depot">
           <span className="flex items-center justify-between gap-2">
             <span className="truncate">{DEPOT.name}</span>
@@ -121,12 +129,13 @@ export function StopsEditor(props: Props) {
       </div>
 
       <div className="mt-3 px-5">
+        <div className="mb-1.5 text-[11.5px] text-fg-3">Optimise for</div>
         <Segmented
-          label="Optimisation profile"
+          label="Optimise for"
           className="w-full"
           value={profile}
           onChange={setProfile}
-          options={(Object.keys(PROFILES) as ProfileId[]).map((p) => ({ value: p, label: PROFILES[p].label }))}
+          options={(Object.keys(PROFILES) as ProfileId[]).map((p) => ({ value: p, label: PROFILES[p].label, icon: PROFILE_ICONS[p], title: PROFILES[p].hint }))}
         />
         <p className="mt-1.5 text-[12px] text-fg-3">{PROFILES[profile].hint}</p>
       </div>
@@ -306,21 +315,20 @@ function StopRow({
 
       {open && (
         <div className="animate-rise grid grid-cols-3 gap-2 px-5 pb-3 pl-[54px]">
-          <MiniField label="Opens">
-            <TimeInput value={stop.windowStart} onChange={(windowStart) => onChange({ windowStart })} />
-          </MiniField>
-          <MiniField label="Closes">
-            <TimeInput value={stop.windowEnd} onChange={(windowEnd) => onChange({ windowEnd })} />
-          </MiniField>
-          <MiniField label="Unload (min)">
-            <input
-              type="number"
-              min={1}
-              value={stop.service}
-              onChange={(e) => onChange({ service: Math.max(1, Number(e.target.value)) })}
-              className="num w-full bg-transparent outline-none"
-            />
-          </MiniField>
+          <TimePicker
+            label="Opens"
+            value={stop.windowStart}
+            onChange={(windowStart) =>
+              // opening at or after the close keeps the window's length
+              onChange(
+                windowStart < stop.windowEnd
+                  ? { windowStart }
+                  : { windowStart, windowEnd: Math.min(LAST_SLOT, windowStart + Math.max(30, stop.windowEnd - stop.windowStart)) },
+              )
+            }
+          />
+          <TimePicker label="Closes" value={stop.windowEnd} after={stop.windowStart} onChange={(windowEnd) => onChange({ windowEnd })} />
+          <MinutesPicker label="Unload" value={stop.service} onChange={(service) => onChange({ service })} />
           <div role="radiogroup" aria-label="Cargo" className="col-span-3 grid grid-cols-3 gap-1.5">
             {CARGO_CHOICES.map((c) => {
               const on = stop.cargo === c.value
@@ -331,10 +339,10 @@ function StopRow({
                   aria-checked={on}
                   onClick={() => onChange({ cargo: c.value })}
                   className={clsx(
-                    'flex min-w-0 flex-col items-start rounded-control bg-panel px-2 py-1.5 text-left transition-shadow focus-visible:outline-offset-[-1px]',
+                    'flex min-w-0 flex-col items-start rounded-control px-2 py-1.5 text-left transition-[background-color,box-shadow] focus-visible:outline-offset-[-1px]',
                     on
-                      ? 'shadow-[inset_0_0_0_1.5px_var(--brand)]'
-                      : 'shadow-[inset_0_0_0_1px_var(--border-dark)] hover:shadow-[inset_0_0_0_1px_var(--text-4)]',
+                      ? 'bg-brand-soft shadow-[inset_0_0_0_1.5px_var(--brand)]'
+                      : 'bg-panel shadow-[inset_0_0_0_1px_var(--border-dark)] hover:shadow-[inset_0_0_0_1px_var(--text-4)] active:bg-hover',
                   )}
                 >
                   <span className={clsx('flex max-w-full items-center gap-1.5 text-[12px] font-medium', on ? 'text-brand-fg' : 'text-fg')}>
@@ -352,42 +360,13 @@ function StopRow({
   )
 }
 
+const PROFILE_ICONS: Record<ProfileId, LucideIcon> = { pharma: ShieldCheck, balanced: Scale, fastest: Zap }
+
 const CARGO_CHOICES: Array<{ value: Cargo; label: string; temp: string; dot: string }> = [
   { value: 'PHARMA', label: 'Pharma', temp: '2 to 8 °C', dot: 'bg-pharma' },
   { value: 'FROZEN', label: 'Frozen', temp: '−18 °C', dot: 'bg-frozen' },
   { value: 'CHILLED', label: 'Chilled', temp: '0 to 4 °C', dot: 'bg-chilled' },
 ]
-
-/** 24-hour HH:MM field; commits on blur or Enter, reverts on invalid input. */
-function TimeInput({ value, onChange, className }: { value: number; onChange: (m: number) => void; className?: string }) {
-  const [draft, setDraft] = useState<string | null>(null)
-  const commit = () => {
-    if (draft === null) return
-    const ok = /^([01]?\d|2[0-3]):?([0-5]\d)$/.exec(draft.trim())
-    if (ok) onChange(parseHm(`${ok[1]}:${ok[2]}`))
-    setDraft(null)
-  }
-  return (
-    <input
-      inputMode="numeric"
-      value={draft ?? hm(value)}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
-      onClick={(e) => e.stopPropagation()}
-      className={clsx('num w-full bg-transparent outline-none', className)}
-    />
-  )
-}
-
-function MiniField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block rounded-control bg-panel px-2 py-1 shadow-[inset_0_0_0_1px_var(--border-dark)] focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
-      <span className="block text-[10px] text-fg-3">{label}</span>
-      <span className="block text-[12.5px]">{children}</span>
-    </label>
-  )
-}
 
 type Hit = { kind: 'sample'; stop: Stop } | { kind: 'place'; place: Place }
 
@@ -547,12 +526,13 @@ function AddressSearch({
 }
 
 function OptimisingSteps({ step, count }: { step: number; count: number }) {
-  const orders = Array.from({ length: count }, (_, i) => i + 1).reduce((a, b) => a * b, 1)
+  // every order is scored up to 8 stops; above that the optimiser improves a route by local search
+  const orders = count <= 8 ? Array.from({ length: count }, (_, i) => i + 1).reduce((a, b) => a * b, 1) : 0
   return (
     <div className="animate-rise">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-[12.5px] font-medium">Optimising…</span>
-        <span className="num text-[11px] text-fg-3">{orders.toLocaleString()} orders</span>
+        <span className="num text-[11px] text-fg-3">{orders ? `${orders.toLocaleString()} orders` : 'local search'}</span>
       </div>
       <ol className="space-y-1">
         {OPTIMISE_STEPS.map((s, i) => (
