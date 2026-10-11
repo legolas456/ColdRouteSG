@@ -46,7 +46,7 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
     {
       key: 'P' as const,
       label: 'Parking',
-      source: park.live ? 'HDB live' : 'Recorded',
+      source: park.live ? 'HDB live' : park.estimated ? 'Estimate' : 'Recorded',
       now: `${distanceLabel(park.distanceKm)} walk · ${park.freePct}% free`,
       was: park.code ? `Carpark ${park.code}` : park.name,
     },
@@ -135,7 +135,7 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
             )}
             <span className="text-fg-3"> · {stop.area}</span>
           </Detail>
-          <Detail label="Parking" source={park.live ? 'HDB live' : 'Recorded'}>
+          <Detail label="Parking" source={park.live ? 'HDB live' : park.estimated ? 'Estimate' : 'Recorded'}>
             <span className="block truncate" title={park.name}>
               {park.code && <span className="num mr-1 text-fg-3">{park.code}</span>}
               {park.name}
@@ -147,7 +147,7 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
                   {park.live.free}/{park.live.total} lots free
                 </span>
               ) : (
-                `${park.freePct}% free`
+                `${park.freePct}% free${park.estimated ? ' (assumed)' : ''}`
               )}
             </span>
           </Detail>

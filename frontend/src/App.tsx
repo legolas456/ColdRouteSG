@@ -17,6 +17,8 @@ import { DEPARTURE, DEPOT, PROFILES, RECORDED_AT, SAMPLE_STOPS } from './data/sa
 import { camerasNear, liveConditions, recordedConditions, type Conditions, type DataMode } from './lib/conditions'
 import { ensureLive, isLoading, refreshLive, sgMinutes, useLiveFeeds } from './lib/live'
 import { optimise } from './lib/optimizer'
+import { MAX_STOPS } from './lib/places'
+import { allReal, ensureLegs, ensureMatrix } from './lib/roads'
 import { isTyping, PHONE_QUERY, useMediaQuery, usePersistentState } from './lib/hooks'
 import { hm } from './lib/time'
 import { applyTheme, THEME_BY_ID, type ThemeId } from './lib/themes'
@@ -30,6 +32,25 @@ type Phase = 'draft' | 'optimising' | 'optimised'
 // ?theme=light|dark                          force a theme for this visit only
 // ?data=live|recorded                        force the data mode for this visit only
 const SHARE_TOKEN = 'mr1010-7k2f'
+
+const SAMPLE_JSON = JSON.stringify(SAMPLE_STOPS)
+/** Saved stops from an older build may not match today's shape: then start from the sample. */
+const validStops = (v: unknown): v is Stop[] =>
+  Array.isArray(v) &&
+  v.length <= MAX_STOPS &&
+  v.every(
+    (s) =>
+      s &&
+      typeof s.id === 'string' &&
+      typeof s.name === 'string' &&
+      typeof s.short === 'string' &&
+      Number.isFinite(s.lng) &&
+      Number.isFinite(s.lat) &&
+      Number.isFinite(s.windowStart) &&
+      Number.isFinite(s.windowEnd) &&
+      s.parking &&
+      Number.isFinite(s.parking.distanceKm),
+  )
 const params = new URLSearchParams(location.search)
 const sharedOnLoad = params.has('share')
 const VIEWS: View[] = ['coldroute', 'baseline', 'compare']
@@ -74,7 +95,12 @@ export default function App() {
   const [user, setUser] = usePersistentState<User | null>('coldroute.user', null)
   const [signIn, setSignIn] = useState<{ reason?: string; then?: () => void } | null>(null)
   const [phase, setPhase] = useState<Phase>('draft')
-  const [stops, setStops] = useState<Stop[]>(SAMPLE_STOPS)
+  // the run's stops are kept across reloads; a shared link shows its own snapshot
+  const [savedStops, setSavedStops] = usePersistentState<Stop[]>('coldroute.stops.v1', SAMPLE_STOPS)
+  const [snapshotStops, setSnapshotStops] = useState<Stop[]>(SAMPLE_STOPS)
+  const stops = readOnly ? snapshotStops : validStops(savedStops) ? savedStops : SAMPLE_STOPS
+  const setStops = readOnly ? setSnapshotStops : setSavedStops
+  const isSample = useMemo(() => JSON.stringify(stops) === SAMPLE_JSON, [stops])
   const [departure, setDeparture] = useState(DEPARTURE)
   const [profile, setProfile] = useState<ProfileId>('pharma')
   const [result, setResult] = useState<OptimiseResult | null>(null)
@@ -131,10 +157,14 @@ export default function App() {
       const token = ++runToken.current
       timers.current.forEach(clearTimeout)
       timers.current = []
-      const read: Promise<Conditions> =
+      const conditions: Promise<Conditions> =
         dataMode === 'live'
           ? ensureLive().then((f) => liveConditions(stops, f, sgMinutes(f.fetchedAt ?? Date.now()), departure))
           : Promise.resolve(recordedConditions(stops))
+      // real drive times for stops outside the bundled snapshot (one OSRM call)
+      const read = Promise.all([conditions, ensureMatrix([DEPOT, ...stops])]).then(([c, roadsOk]): Conditions =>
+        roadsOk ? c : { ...c, notes: [...c.notes, 'OSRM did not respond, so drive times between new stops are estimated.'] },
+      )
       const finish = (c: Conditions) => {
         if (token !== runToken.current) return
         const r = optimise(DEPOT, c.stops, departure, PROFILES[profile].weights, c.rain)
@@ -143,6 +173,10 @@ export default function App() {
         if (!instant) setView('coldroute')
         setPhase('optimised')
         if (c.mode === 'live' && c.source === 'recorded') setToast('Live data unavailable · planned with the recorded morning')
+        else if (!allReal([DEPOT, ...c.stops])) setToast('OSRM did not respond · drive times are estimated')
+        // road geometry for both plans' legs; the map redraws when it arrives
+        const byId = Object.fromEntries(c.stops.map((s) => [s.id, s]))
+        void ensureLegs([r.recommended.order, r.baseline.order].map((o) => [DEPOT, ...o.map((id) => byId[id])]))
       }
       if (instant) {
         read.then(finish)
@@ -160,6 +194,26 @@ export default function App() {
     },
     [stops, departure, profile, dataMode],
   )
+
+  // fetch real drive times as stops are added, so the estimate and the
+  // optimiser do not wait for them later
+  useEffect(() => {
+    if (readOnly) return
+    const t = window.setTimeout(() => void ensureMatrix([DEPOT, ...stops]), 400)
+    return () => window.clearTimeout(t)
+  }, [stops, readOnly])
+
+  const loadSample = () => {
+    timers.current.forEach(clearTimeout)
+    runToken.current++
+    setStops(SAMPLE_STOPS)
+    setDeparture(DEPARTURE)
+    setDataMode('recorded')
+    setSelectedId(null)
+    setResult(null)
+    setPhase('draft')
+    setToast('Sample run loaded · the recorded rainy morning')
+  }
 
   // a share link (or ?state=results) opens on the optimised plan
   useEffect(() => {
@@ -240,6 +294,7 @@ export default function App() {
   }
 
   const makeCopy = () => {
+    setSavedStops(snapshotStops)
     setReadOnly(false)
     const url = new URL(location.href)
     for (const k of ['share', 'view', 'stop']) url.searchParams.delete(k)
@@ -329,6 +384,8 @@ export default function App() {
         step={step}
         dateLabel={dataMode === 'live' ? todayLabel() : RECORDED_DATE_LABEL}
         onDepartNow={() => setDeparture(Math.min(23 * 60 + 55, Math.ceil(sgMinutes(Date.now()) / 5) * 5))}
+        onLoadSample={loadSample}
+        isSample={isSample}
       />
     )
 

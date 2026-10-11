@@ -1,40 +1,10 @@
-import osrm from '../data/osrm.json'
 import { CARGO_SENSITIVITY, RAIN_CELLS } from '../data/sample'
 import type { Depot, OptimiseResult, Plan, RainCell, Stop, StopResult, Weights } from './types'
 
-type Point = { id: string; lng: number; lat: number }
+import { legGeometry, travel, type Point } from './roads'
 
-const matrix = osrm as unknown as {
-  minutes: Record<string, Record<string, number>>
-  km: Record<string, Record<string, number>>
-  legs: Record<string, [number, number][]>
-}
-
-const haversineKm = (a: Point, b: Point) => {
-  const R = 6371
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180
-  const s =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(s))
-}
-
-/** Real OSRM values for the sample network, a road-factor estimate otherwise. */
-export function travel(a: Point, b: Point) {
-  const minutes = matrix.minutes[a.id]?.[b.id]
-  const km = matrix.km[a.id]?.[b.id]
-  if (minutes !== undefined && km !== undefined) return { minutes, km }
-  const crow = haversineKm(a, b)
-  return { km: crow * 1.35, minutes: ((crow * 1.35) / 38) * 60 + 4 }
-}
-
-export function legGeometry(a: Point, b: Point): [number, number][] {
-  return matrix.legs[`${a.id}>${b.id}`] ?? [
-    [a.lng, a.lat],
-    [b.lng, b.lat],
-  ]
-}
+// drive times and road geometry live in roads.ts (snapshot + runtime OSRM)
+export { legGeometry, travel }
 
 export function pathFor(depot: Depot, order: string[], stops: Record<string, Stop>) {
   const coords: [number, number][] = []

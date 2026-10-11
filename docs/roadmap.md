@@ -11,6 +11,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [x] New console deployed by hand to Amplify: https://main.daledp6z7ncmz.amplifyapp.com/ (`make deploy`, see [deployment.md](deployment.md)).
 - [x] CI with GitHub Actions: Checks on every PR, and every merge to `main` deploys the frontend to Amplify (see [deployment.md](deployment.md)).
 - [x] Live public feeds back in the new console: **Live data / Recorded** switch, the Conditions panel (NEA forecast, HDB carparks, LTA cameras), plans built on live rain and parking, Journey/Weather/Parking/Camera details on the stop card, late-delivery alert. The browser calls data.gov.sg directly; no backend needed.
+- [x] Real stops: OneMap address search (any building, street or postal code), real OSRM drive times and road geometry for new stops, **Load sample** / **Clear**, the run kept across reloads, at most 15 stops per run.
 
 ## Next, in priority order
 
@@ -34,7 +35,10 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [x] HDB carpark availability → parking risk. Used only when an HDB carpark is within 600 m; otherwise the stop keeps its own loading bay. Coordinates are a snapshot (`npm run data:hdb-carparks`), free lots are live.
 - [ ] LTA DataMall traffic speed bands (needs a free AccountKey) to replace the traffic-camera proxy.
 - [ ] LTA cameras: shown in the Conditions panel and on the stop card, but data.gov.sg serves only 8 cameras today (Woodlands and Tuas checkpoints), so most stops have none nearby.
-- [ ] OneMap search for addresses.
+- [x] OneMap search for addresses. Called from the browser without a token; a new stop gets its nearest NEA area and HDB carpark straight away.
+- [x] OSRM at runtime: one table call for the run's drive times as stops are added, one route call per plan for the road geometry. Falls back to an estimate (and says so) if OSRM is down. The sample run still uses the bundled snapshot.
+- [ ] Depot picker: the depot is fixed to Jurong Cold Store.
+- [ ] Mark a stop delivered and re-plan the rest from there (the old console's "Set current location here").
 
 ### 4. Optimiser
 

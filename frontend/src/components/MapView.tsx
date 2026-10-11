@@ -5,6 +5,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import sgMask from '../data/sg-mask.json'
 import { legGeometry, pathFor } from '../lib/optimizer'
+import { useRoadsVersion } from '../lib/roads'
 import { hm } from '../lib/time'
 import type { Depot, OptimiseResult, RainCell, Stop } from '../lib/types'
 import type { MapPalette } from '../lib/themes'
@@ -343,6 +344,8 @@ export function MapView(props: Props) {
   const revealTimer = useRef(0)
   const [styleVersion, setStyleVersion] = useState(0)
   const stopById = useMemo(() => Object.fromEntries(stops.map((s) => [s.id, s])), [stops])
+  // bumps when OSRM legs arrive for stops outside the snapshot
+  const roads = useRoadsVersion()
 
   const padding = useMemo<Padding>(
     () =>
@@ -496,7 +499,8 @@ export function MapView(props: Props) {
       prev = s
     }
     return out
-  }, [primaryPlan, depot, stopById])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryPlan, depot, stopById, roads])
 
   // lines + overlay visibility
   useEffect(() => {
@@ -566,7 +570,7 @@ export function MapView(props: Props) {
       paint(1)
       showJams()
     }, total + 200)
-  }, [styleVersion, primaryPlan, secondaryPlan, layers, depot, stopById, stops, view, jams])
+  }, [styleVersion, primaryPlan, secondaryPlan, layers, depot, stopById, stops, view, jams, roads])
 
   // Rain drifts slowly down the hatch: 8 frames on a loop, about 8 fps. Quiet
   // enough to read as weather, not as an alert. Off for reduced motion.

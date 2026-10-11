@@ -128,7 +128,7 @@ export function parseWeather(raw: Json): WeatherFeed {
 type HdbRow = [string, string, number, number]
 let hdbIndex: Promise<HdbRow[]> | null = null
 /** Carpark positions (a snapshot: they rarely move). Loaded only when Live mode needs it. */
-const loadHdb = () => (hdbIndex ??= import('../data/hdb-carparks.json').then((m) => m.default.carparks as HdbRow[]))
+export const loadHdb = () => (hdbIndex ??= import('../data/hdb-carparks.json').then((m) => m.default.carparks as HdbRow[]))
 
 export async function parseCarparks(raw: Json): Promise<CarparkFeed> {
   const item = arr(raw.items)[0] as Json | undefined

@@ -5,7 +5,7 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 
 ## Screenshots
 
-| Draft: input | Optimised: results |
+| Draft: input and OneMap search | Optimised: results |
 | --- | --- |
 | ![Input](docs/screenshots/01-input.png) | ![Results](docs/screenshots/02-results.png) |
 | **Compare view and stop card** | **Share** |
@@ -31,7 +31,7 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 | Area | What it does |
 | --- | --- |
 | Data mode | The pill in the top bar shows what the plan is built on: **Recorded 09:05** (the rainy sample morning, the default, so the demo case never changes) or **Live · NEA · HDB 13:49**. Click it for the **Conditions** panel: the Live data / Recorded switch, then the live public feeds with their own update times: the NEA 2-hour forecast for all 47 areas, HDB carpark availability with the nearest carpark to each stop, and the LTA traffic cameras nearest the stops. Feeds refresh every 5 minutes while the panel is open or Live is on. Switching mode on a finished plan re-plans it. `?data=live` forces Live for one visit. |
-| Input panel | Departure time (with **Now**), depot, optimisation profile (Pharma, Balanced, Fastest), address search with a mocked OneMap lookup, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. **Optimise route** sits right under the run title. |
+| Input panel | Departure time (with **Now**), depot, optimisation profile (Pharma, Balanced, Fastest), address search on **OneMap** (any building, street or postal code; the sample customers show when the box is empty), **Load sample** and **Clear**, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. A new stop opens with a four-hour window from the departure, chilled cargo and 10 min to unload, ready to edit. The run is kept across reloads, up to 15 stops. **Optimise route** sits right under the run title. |
 | Optimising | A short, staged progress list for the five data sources takes the place of the Optimise button, then the result appears. `⌘↵` runs it from anywhere. |
 | Results panel | **Re-optimise** and **Edit stops** sit under the title, with the data the plan used ("Live data from 13:49"). Then four KPIs, each compared with the shortest route, a red alert listing any late delivery, a plain-language "Why this route" summary, and the stop order. Each stop lists only what needs attention, in words: "Unloads in rain", "300 m walk", "Heavy traffic", "2 h 57 min on board", "12 min spare". Red means high risk. The whole panel scrolls as one, with the view switch pinned to the top. |
 | Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, hatched rain cells that drift slowly, and heavy-traffic stretches marked on the route. Recorded mode has two cells (light rain in the west, heavy rain over the City); Live mode draws one per NEA area that forecasts rain, and labels only those over the run's stops. Optional layers show carparks with walking links and the shortest route as a ghost. The highest-risk stop pulses. |
@@ -97,7 +97,9 @@ Both themes live in `src/lib/themes.ts`, with the UI tokens and the matching map
 ## Data and algorithm
 
 - `src/data/sg-mask.json` is the area outside Singapore's national boundary (OpenStreetMap relation 536780, simplified). The map dims it. Run `npm run data:sg-mask` to refresh it.
-- `src/data/osrm.json` is a snapshot of a real driving-time matrix and per-leg road geometry from the public OSRM server. It covers the depot, the 7 sample stops and the 3 address-book entries. Run `npm run data:osrm` to refresh it.
+- `src/data/osrm.json` is a snapshot of a real driving-time matrix and per-leg road geometry from the public OSRM server. It covers the depot, the 7 sample stops and the 3 sample customers, so the demo never waits on the network. Run `npm run data:osrm` to refresh it.
+- Any other stop comes from **OneMap** search (`src/lib/places.ts`, no token, called from the browser). It takes its nearest NEA forecast area (`src/data/nea-areas.json`, `npm run data:nea-areas`) and nearest HDB carpark within 600 m, with free lots assumed until Live data reads them. Traffic is a rough guess (busier near the CBD).
+- `src/lib/roads.ts` gets real drive times for such stops from the OSRM table service as they are added (one call for the run), and the road geometry for the two plans after optimising (one route call each). If OSRM is down, times fall back to a road-factor estimate, legs are straight lines, and the plan says so.
 - `src/lib/optimizer.ts` enumerates every stop order: 5,040 for 7 stops, about 60 ms for 8. It returns two plans. The **baseline** minimises drive time only. The **recommended** plan minimises a weighted cost of drive time, weather, parking, traffic, cold-chain exposure and lateness, using the profile's weights.
 - `src/lib/explain.ts` turns the difference between the two plans into the summary and "Why here" text.
 - **Recorded mode** uses the rainy morning in `src/data/sample.ts` (sample data, recorded at 09:05 on Fri 10 Oct). It never changes, so the demo case is always the same.
@@ -124,8 +126,8 @@ src/
 │  ├─ SharePopover.tsx     share popover: link access, current view, copy
 │  ├─ Account.tsx          mock sign-in, panel account bar, top-bar avatar
 │  └─ ui.tsx               buttons, tabs, segmented control, tags
-├─ lib/                    optimizer, explanations, live feeds, conditions, geo, themes, hooks, time helpers, types
-└─ data/                   sample run, OSRM snapshot, HDB carpark coordinates, Singapore mask
+├─ lib/                    optimizer, roads (OSRM), places (OneMap), explanations, live feeds, conditions, geo, themes, hooks, time helpers, types
+└─ data/                   sample run, OSRM snapshot, HDB carpark coordinates, NEA areas, Singapore mask
 ```
 
 ## Notes
