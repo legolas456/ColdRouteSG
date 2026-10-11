@@ -180,8 +180,9 @@ export function TopBar({
       <span className="h-5 w-px shrink-0 bg-line-strong max-md:hidden" />
       <span className="text-fg-3 max-lg:hidden">Runs</span>
       <span className="text-fg-4 max-lg:hidden">/</span>
-      <span className="min-w-0 truncate font-medium text-fg">
-        Morning run<span className="max-md:hidden"> · {runDate}</span>
+      {/* phones: no room next to status, data, theme and the primary action; the sheet shows the title */}
+      <span className="min-w-0 truncate font-medium text-fg max-md:hidden">
+        Morning run · {runDate}
       </span>
       <span className="shrink-0">{status}</span>
       <div className="flex-1" />

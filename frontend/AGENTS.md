@@ -20,11 +20,12 @@ npm run data:sg-mask # re-fetch the Singapore outline used to dim the neighbours
 | --- | --- |
 | `src/App.tsx` | The state machine (draft → optimising → optimised), layout, theme, account, sharing, shortcuts. Components are controlled from here. |
 | `src/components/ui.tsx` | Shared primitives: `Button`, `IconButton`, `Segmented`, `Tag`, `StatusPill`, `CargoTag`, `Kbd`, `Divider`. Reuse them before writing new ones. |
+| `src/components/Pickers.tsx` | `TimePicker` and `MinutesPicker`: pick-or-type fields for times of day and durations. |
 | `src/components/*` | One main component per file, PascalCase. |
 | `src/index.css` | Tailwind setup, design tokens, the few global classes (`num`, `eyebrow`, `scroll-thin`). |
 | `src/lib/themes.ts` | Light and dark token values, plus the map palette for each. |
 | `src/lib/types.ts` | Shared types. Keep these shapes when wiring the backend. |
-| `src/data/` | Sample run, mocked live feeds, pre-fetched OSRM data. |
+| `src/data/` | The sample run (a recorded rainy morning) and snapshots: OSRM roads, HDB carpark coordinates, NEA areas, the Singapore mask. |
 
 ## Design rules
 
@@ -52,7 +53,8 @@ npm run data:sg-mask # re-fetch the Singapore outline used to dim the neighbours
 
 ### Switches and controls
 
-- **One switch style.** Choosing one of 2–4 options is always `Segmented`: the optimisation profile, the route view, Plan / Timeline on phones. Don't build tabs, underline tabs or pill variants.
+- **One switch style.** Choosing one of 2–4 options is always `Segmented`: the optimisation profile, the route view, the data mode, Plan / Timeline on phones. Each option is its own outlined button and the chosen one is filled (brand-soft with a brand ring), so it reads as clickable. Options may carry an icon; icons hide on a narrow panel. Don't build tabs, underline tabs or pill variants.
+- **Pick, don't make people type.** Times use `TimePicker` (15-minute slots, a closing time lists only later slots with "+2 h" hints) and durations use `MinutesPicker` (common values, then **Custom…**). Typing stays as a shortcut. Lists render in a portal so the panel never clips them; on touch screens time lists open without the keyboard.
 - Map layers use the existing layer chips in `MapView.tsx`.
 - Every control needs a hover state, a pressed state and a visible keyboard focus ring. The global `:focus-visible` style handles the ring, so don't remove outlines.
 
@@ -92,7 +94,7 @@ Serif is only for titles and big numbers. Don't add new sizes for one-off cases.
 ### Mock vs real
 
 - Mocks live in `src/data/`. Keep them realistic: real places, plausible times. Where a real system would differ, say so in the UI (e.g. the note in the sign-in dialog).
-- Apart from basemap tiles, nothing calls external services at runtime.
+- Runtime calls go only to public, keyless services, straight from the browser: OneMap (search and tiles), OSRM (drive times and roads) and data.gov.sg (live feeds). Each one has a fallback, and the UI says when it is used. The sample run makes no calls apart from tiles.
 - Saved UI preferences use `usePersistentState` with `coldroute.*` keys.
 
 ## Code

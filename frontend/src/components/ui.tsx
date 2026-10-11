@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import type { LucideIcon } from 'lucide-react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -66,6 +67,10 @@ export function IconButton({
  * with a brand ring; the others sit in a visible track and light up on hover.
  * Labels never wrap: they truncate, so the control keeps one height.
  */
+/**
+ * The one switch for picking 1 of 2–4 options. Every option is drawn as its own
+ * outlined button so it reads as clickable; the chosen one is filled.
+ */
 export function Segmented<T extends string>({
   value,
   options,
@@ -75,36 +80,36 @@ export function Segmented<T extends string>({
   label,
 }: {
   value: T
-  options: Array<{ value: T; label: ReactNode; title?: string }>
+  options: Array<{ value: T; label: ReactNode; title?: string; icon?: LucideIcon }>
   onChange: (v: T) => void
   size?: 'sm' | 'md'
   className?: string
   label?: string
 }) {
   return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className={clsx('inline-flex gap-0.5 rounded-control bg-hover p-[3px] shadow-[inset_0_0_0_1px_var(--border-main)]', className)}
-    >
+    <div role="radiogroup" aria-label={label} className={clsx('inline-flex gap-1.5', className)}>
       {options.map((o) => {
         const on = value === o.value
+        const Icon = o.icon
         return (
           <button
             key={o.value}
+            type="button"
             role="radio"
             aria-checked={on}
             title={o.title}
             onClick={() => onChange(o.value)}
             className={clsx(
-              'min-w-0 flex-1 truncate whitespace-nowrap rounded-[calc(var(--r-control)-3px)] font-medium transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-offset-[-1px]',
-              size === 'sm' ? 'h-7 px-2 text-[12px]' : 'h-8 px-3 text-[13px]',
+              'flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-offset-[-1px]',
+              size === 'sm' ? 'h-7 px-2 text-[12px]' : 'h-8 px-2.5 text-[13px]',
               on
-                ? 'bg-panel text-brand-fg shadow-[0_0_0_1.5px_var(--brand),0_1px_2px_rgba(16,24,40,0.08)]'
-                : 'text-fg-2 hover:bg-panel/70 hover:text-fg',
+                ? 'bg-brand-soft text-brand-fg shadow-[inset_0_0_0_1.5px_var(--brand)]'
+                : 'bg-panel text-fg-2 shadow-[inset_0_0_0_1px_var(--border-dark)] hover:text-fg hover:shadow-[inset_0_0_0_1px_var(--text-4)] active:bg-hover',
             )}
           >
-            {o.label}
+            {/* icons drop out on a narrow panel so labels never truncate */}
+            {Icon && <Icon size={size === 'sm' ? 12 : 14} strokeWidth={1.8} className="shrink-0 @max-sm:hidden" />}
+            <span className="truncate">{o.label}</span>
           </button>
         )
       })}

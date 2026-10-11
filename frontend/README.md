@@ -14,6 +14,8 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 | ![Shared view](docs/screenshots/08-shared-view.png) | ![Dark](docs/screenshots/05-dark.png) |
 | **Phone: results and stop card** | **Live data: the Conditions panel** |
 | <img src="docs/screenshots/06-phone-results.png" width="49%" alt="Phone results"> <img src="docs/screenshots/07-phone-stop-card.png" width="49%" alt="Phone stop card"> | ![Conditions](docs/screenshots/09-conditions.png) |
+| **Editing a stop: pick the closing time** | |
+| ![Time picker](docs/screenshots/10-time-picker.png) | |
 
 ## Run it
 
@@ -31,7 +33,7 @@ No API key is needed. Basemap tiles come from CARTO (Positron and Dark Matter), 
 | Area | What it does |
 | --- | --- |
 | Data mode | The pill in the top bar shows what the plan is built on: **Recorded 09:05** (the rainy sample morning, the default, so the demo case never changes) or **Live · NEA · HDB 13:49**. Click it for the **Conditions** panel: the Live data / Recorded switch, then the live public feeds with their own update times: the NEA 2-hour forecast for all 47 areas, HDB carpark availability with the nearest carpark to each stop, and the LTA traffic cameras nearest the stops. Feeds refresh every 5 minutes while the panel is open or Live is on. Switching mode on a finished plan re-plans it. `?data=live` forces Live for one visit. |
-| Input panel | Departure time (with **Now**), depot, optimisation profile (Pharma, Balanced, Fastest), address search on **OneMap** (any building, street or postal code; the sample customers show when the box is empty), **Load sample** and **Clear**, inline editing of time window, unloading time and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. A new stop opens with a four-hour window from the departure, chilled cargo and 10 min to unload, ready to edit. The run is kept across reloads, up to 15 stops. **Optimise route** sits right under the run title. |
+| Input panel | Departure time (pick a slot, type it, or **Now**), depot, **Optimise for** (Pharma, Balanced, Fastest), address search on **OneMap** (any building, street or postal code; the sample customers show when the box is empty), **Load sample** and **Clear**, inline editing of the time window (pick from 15-minute slots; closing times show the window length, "+2 h"), unloading time (5 to 60 min, or **Custom…**) and cargo class, and an ambiguous-address resolver. Stops can be added in any order: the list is a set of orders, and the optimiser decides the sequence. A new stop opens with a four-hour window from the departure, chilled cargo and 10 min to unload, ready to edit. The run is kept across reloads, up to 15 stops. **Optimise route** sits right under the run title. |
 | Optimising | A short, staged progress list for the five data sources takes the place of the Optimise button, then the result appears. `⌘↵` runs it from anywhere. |
 | Results panel | **Re-optimise** and **Edit stops** sit under the title, with the data the plan used ("Live data from 13:49"). Then four KPIs, each compared with the shortest route, a red alert listing any late delivery, a plain-language "Why this route" summary, and the stop order. Each stop lists only what needs attention, in words: "Unloads in rain", "300 m walk", "Heavy traffic", "2 h 57 min on board", "12 min spare". Red means high risk. The whole panel scrolls as one, with the view switch pinned to the top. |
 | Map | Locked to Singapore: you can't pan or zoom out past the island, and Johor and the Riau islands are dimmed. Numbered stops, a route drawn on real roads, hatched rain cells that drift slowly, and heavy-traffic stretches marked on the route. Recorded mode has two cells (light rain in the west, heavy rain over the City); Live mode draws one per NEA area that forecasts rain, and labels only those over the run's stops. Optional layers show carparks with walking links and the shortest route as a ghost. The highest-risk stop pulses. |
@@ -58,7 +60,8 @@ The full rules are in [`AGENTS.md`](AGENTS.md); read it before changing the UI. 
 
 - **Tokens only.** Colours, radii and shadows come from `index.css` and `lib/themes.ts`, and every colour means something (orange = action, green = better, amber = medium risk, rose = late or high risk, blue = rain).
 - **One solid primary per screen.** Run actions sit in the top bar, plan actions at the top of the panel, and the account at the bottom.
-- **One switch style.** Any choice between 2 and 4 options uses `Segmented`.
+- **One switch style.** Any choice between 2 and 4 options uses `Segmented`: outlined buttons, the chosen one filled.
+- **Pick, don't type.** Times and durations use `TimePicker` and `MinutesPicker`; typing is a shortcut.
 - **Same type scale everywhere.** Serif for titles and big numbers, `num` for times and distances, sentence-case copy in plain words.
 - **Check before a PR.** Light and dark, panel widths 340 and 600, a 390 px phone, and `npm run build`.
 
@@ -119,13 +122,14 @@ src/
 │  ├─ PanelHandle.tsx      resize handle for the desktop panel
 │  ├─ BottomSheet.tsx      phone bottom sheet
 │  ├─ StopsEditor.tsx      input panel and optimising progress
+│  ├─ Pickers.tsx          time and minutes pickers (pick a slot or type)
 │  ├─ ResultsPanel.tsx     plan actions, KPIs, explanation, stop order with watch-outs
 │  ├─ MapView.tsx          MapLibre map, overlays, markers, layer chips
 │  ├─ StopCard.tsx         stop detail card (on the map, or in the phone sheet)
 │  ├─ Timeline.tsx         time-axis view
 │  ├─ SharePopover.tsx     share popover: link access, current view, copy
 │  ├─ Account.tsx          mock sign-in, panel account bar, top-bar avatar
-│  └─ ui.tsx               buttons, tabs, segmented control, tags
+│  └─ ui.tsx               buttons, segmented control, tags
 ├─ lib/                    optimizer, roads (OSRM), places (OneMap), explanations, live feeds, conditions, geo, themes, hooks, time helpers, types
 └─ data/                   sample run, OSRM snapshot, HDB carpark coordinates, NEA areas, Singapore mask
 ```
