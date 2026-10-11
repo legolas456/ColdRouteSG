@@ -14,6 +14,8 @@ export interface Carpark {
   risk: number
   /** set when the free lots come from the HDB live feed */
   live?: { free: number; total: number }
+  /** a stop added by search, before live data: free lots are assumed */
+  estimated?: boolean
 }
 
 export interface Stop {

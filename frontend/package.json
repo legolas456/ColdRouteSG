@@ -13,7 +13,8 @@
     "typecheck": "tsc -b --noEmit",
     "data:osrm": "node scripts/fetch-osrm.mjs",
     "data:sg-mask": "node scripts/fetch-sg-mask.mjs",
-    "data:hdb-carparks": "node scripts/fetch-hdb-carparks.mjs"
+    "data:hdb-carparks": "node scripts/fetch-hdb-carparks.mjs",
+    "data:nea-areas": "node scripts/fetch-nea-areas.mjs"
   },
   "dependencies": {
     "@fontsource/libre-baskerville": "^5.3.0",

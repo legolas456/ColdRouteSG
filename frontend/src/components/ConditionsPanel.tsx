@@ -107,7 +107,7 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
             </>
           )}
         </p>
-        {mode === 'live' &&
+        {!locked &&
           conditions.notes.map((n) => (
             <p key={n} className="mt-1.5 flex items-start gap-1.5 text-[12px] text-fg-2">
               <TriangleAlert size={13} className="mt-[2px] shrink-0 text-warn" /> {n}

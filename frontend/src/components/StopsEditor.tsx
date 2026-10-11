@@ -8,9 +8,11 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ADDRESS_BOOK, DEPOT, PROFILES } from '../data/sample'
 import { travel } from '../lib/optimizer'
+import { MAX_STOPS, searchPlaces, stopFromPlace, type Place } from '../lib/places'
+import { useRoadsVersion } from '../lib/roads'
 import { duration, hm, parseHm } from '../lib/time'
 import type { Cargo, ProfileId, Stop } from '../lib/types'
 import { Button, Divider, Kbd, Segmented, CargoTag } from './ui'
@@ -31,6 +33,10 @@ interface Props {
   dateLabel: string
   /** set the departure to the current Singapore time */
   onDepartNow: () => void
+  /** replace the run with the 7 sample stops on the recorded rainy morning */
+  onLoadSample: () => void
+  /** true while the stops are exactly the sample run */
+  isSample: boolean
 }
 
 export const OPTIMISE_STEPS = [
@@ -42,8 +48,10 @@ export const OPTIMISE_STEPS = [
 ]
 
 export function StopsEditor(props: Props) {
-  const { stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step, dateLabel, onDepartNow } = props
+  const { stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step, dateLabel, onDepartNow, onLoadSample, isSample } =
+    props
   const reviewCount = stops.filter((s) => s.review).length
+  const roads = useRoadsVersion()
 
   const estimate = useMemo(() => {
     let prev: { id: string; lng: number; lat: number } = DEPOT
@@ -53,7 +61,9 @@ export function StopsEditor(props: Props) {
       prev = s
     }
     return minutes
-  }, [stops])
+    // roads: re-estimate once OSRM has real times for new stops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stops, roads])
 
   const update = (id: string, patch: Partial<Stop>) => setStops(stops.map((s) => (s.id === id ? { ...s, ...patch } : s)))
   const remove = (id: string) => {
@@ -135,11 +145,31 @@ export function StopsEditor(props: Props) {
             <span className="flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-fg-2">
               <AlertCircle size={12} className="text-warn" /> {reviewCount} to check
             </span>
-          ) : (
-            <span className="shrink-0 text-[11.5px] text-fg-3">Verified with OneMap</span>
-          )}
+          ) : stops.length > 0 ? (
+            <span className="shrink-0 text-[11.5px] text-fg-3">{isSample ? 'Sample run' : 'Addresses from OneMap'}</span>
+          ) : null}
         </div>
-        <p className="mt-0.5 text-[11.5px] text-fg-3">Add them in any order. ColdRoute sets the delivery sequence.</p>
+        <div className="mt-0.5 flex items-baseline justify-between gap-3">
+          <p className="min-w-0 text-[11.5px] text-fg-3">Add them in any order. ColdRoute sets the delivery sequence.</p>
+          <span className="flex shrink-0 items-center gap-0.5">
+            {!isSample && stops.length > 0 && (
+              <TextButton onClick={onLoadSample} title="Replace the stops with the 7-stop sample run on the recorded rainy morning">
+                Load sample
+              </TextButton>
+            )}
+            {stops.length > 0 && (
+              <TextButton
+                onClick={() => {
+                  setStops([])
+                  onSelect(null)
+                }}
+                title="Remove every stop"
+              >
+                Clear
+              </TextButton>
+            )}
+          </span>
+        </div>
       </div>
 
       <div className="px-5 pb-2">
@@ -148,7 +178,9 @@ export function StopsEditor(props: Props) {
             setStops([...stops, entry])
             onSelect(entry.id)
           }}
-          existing={stops.map((s) => s.address)}
+          existing={stops}
+          departure={departure}
+          full={stops.length >= MAX_STOPS}
         />
       </div>
 
@@ -157,7 +189,10 @@ export function StopsEditor(props: Props) {
           <div className="mx-5 mt-2 rounded-panel border border-dashed border-line-strong px-5 py-8 text-center">
             <MapPin className="mx-auto text-fg-4" size={20} strokeWidth={1.5} />
             <p className="mt-2 font-medium">No stops yet</p>
-            <p className="mt-1 text-[12px] text-fg-3">Search an address above, paste rows from Excel, or import a CSV.</p>
+            <p className="mt-1 text-[12px] text-fg-3">Search any Singapore address or postal code above. For a demo, load the sample run.</p>
+            <Button className="mt-3" onClick={onLoadSample}>
+              Load sample run
+            </Button>
           </div>
         )}
         <ul>
@@ -176,6 +211,15 @@ export function StopsEditor(props: Props) {
       </div>
 
     </div>
+  )
+}
+
+/** Small inline action in the brand colour, for secondary list actions. */
+function TextButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type="button" {...rest} className="rounded-[5px] px-1.5 py-0.5 text-[11.5px] font-medium whitespace-nowrap text-brand-fg hover:bg-brand-soft">
+      {children}
+    </button>
   )
 }
 
@@ -345,31 +389,104 @@ function MiniField({ label, children }: { label: string; children: React.ReactNo
   )
 }
 
-function AddressSearch({ onPick, existing }: { onPick: (s: Stop) => void; existing: string[] }) {
+type Hit = { kind: 'sample'; stop: Stop } | { kind: 'place'; place: Place }
+
+/**
+ * Add a stop: OneMap results for what you type (debounced, real addresses),
+ * or the sample customers when the box is empty.
+ */
+function AddressSearch({
+  onPick,
+  existing,
+  departure,
+  full,
+}: {
+  onPick: (s: Stop) => void
+  existing: Stop[]
+  departure: number
+  /** the run is at MAX_STOPS */
+  full: boolean
+}) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
+  const [found, setFound] = useState<{ q: string; places: Place[] } | null>(null)
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [adding, setAdding] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const results = ADDRESS_BOOK.filter(
-    (a) =>
-      !existing.includes(a.address) &&
-      (!q || `${a.name} ${a.address}`.toLowerCase().includes(q.toLowerCase().trim())),
-  )
+  const query = q.trim()
 
-  const pick = (entry: Stop) => {
-    onPick(entry)
+  // debounced OneMap search; a newer query cancels the previous request
+  useEffect(() => {
+    if (query.length < 2) {
+      setState('idle')
+      return
+    }
+    const ctrl = new AbortController()
+    setState('loading')
+    const t = window.setTimeout(() => {
+      searchPlaces(query, ctrl.signal)
+        .then((places) => {
+          setFound({ q: query, places })
+          setState('idle')
+        })
+        .catch((e) => {
+          if (!ctrl.signal.aborted) setState('error')
+          if (!(e instanceof DOMException)) console.warn('OneMap search failed', e)
+        })
+    }, 250)
+    return () => {
+      ctrl.abort()
+      window.clearTimeout(t)
+    }
+  }, [query])
+
+  const taken = new Set(existing.map((s) => `${s.name}|${s.address}`))
+  const hits: Hit[] = query
+    ? (found?.q === query ? found.places : [])
+        .filter((p) => !taken.has(`${p.name}|${p.address}`))
+        .map((place) => ({ kind: 'place', place }))
+    : ADDRESS_BOOK.filter((a) => !taken.has(`${a.name}|${a.address}`)).map((stop) => ({ kind: 'sample', stop }))
+
+  const pick = async (hit: Hit) => {
+    if (adding) return
+    if (hit.kind === 'sample') onPick(hit.stop)
+    else {
+      setAdding(hit.place.key)
+      try {
+        onPick(await stopFromPlace(hit.place, departure, existing.map((s) => s.id)))
+      } finally {
+        setAdding(null)
+      }
+    }
     setQ('')
+    setFound(null)
     setOpen(false)
     inputRef.current?.blur()
   }
 
+  const settled = query.length >= 2 && state === 'idle' && found?.q === query
+
   return (
     <div className="relative">
-      <div className="flex h-9 items-center gap-2 rounded-control bg-subtle px-2.5 transition-shadow focus-within:bg-panel focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]">
-        <Search size={14} className="text-fg-3" />
+      <div
+        className={clsx(
+          'flex h-9 items-center gap-2 rounded-control bg-subtle px-2.5 transition-shadow focus-within:bg-panel focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)]',
+          full && 'opacity-60',
+        )}
+      >
+        {state === 'loading' || adding ? (
+          <Loader2 size={14} className="animate-spin text-fg-3" />
+        ) : (
+          <Search size={14} className="text-fg-3" />
+        )}
         <input
           ref={inputRef}
           value={q}
+          disabled={full}
+          aria-label="Add a stop"
+          spellCheck={false}
+          autoComplete="off"
           onChange={(e) => {
             setQ(e.target.value)
             setActive(0)
@@ -378,39 +495,51 @@ function AddressSearch({ onPick, existing }: { onPick: (s: Stop) => void; existi
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') setActive((a) => Math.min(a + 1, results.length - 1))
+            if (e.key === 'ArrowDown') setActive((a) => Math.min(a + 1, hits.length - 1))
             if (e.key === 'ArrowUp') setActive((a) => Math.max(a - 1, 0))
-            if (e.key === 'Enter' && results[active]) pick(results[active])
+            if (e.key === 'Enter' && hits[active]) pick(hits[active])
             if (e.key === 'Escape') inputRef.current?.blur()
           }}
-          placeholder="Add a stop by address or postal code"
+          placeholder={full ? `${MAX_STOPS} stops is the most for one van` : 'Add a stop by address or postal code'}
           className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-fg-4"
         />
         <Kbd>/</Kbd>
       </div>
-      {open && (
+      {open && !full && (
         <div className="animate-rise absolute inset-x-0 top-10 z-30 overflow-hidden rounded-panel bg-panel p-1 shadow-float">
-          <div className="eyebrow px-2.5 pt-1.5 pb-1">{q ? 'OneMap results' : 'Recent customers'}</div>
-          {results.length === 0 && <div className="px-2.5 py-2 text-[12px] text-fg-3">No matches. Try a postal code.</div>}
-          {results.map((r, i) => (
-            <button
-              key={r.address}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => pick(r)}
-              onMouseEnter={() => setActive(i)}
-              className={clsx(
-                'flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left',
-                i === active && 'bg-hover',
-              )}
-            >
-              <MapPin size={14} className="shrink-0 text-fg-3" strokeWidth={1.7} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{r.name}</span>
-                <span className="block truncate text-[12px] text-fg-3">{r.address}</span>
-              </span>
-              <CargoTag cargo={r.cargo} />
-            </button>
-          ))}
+          <div className="flex items-baseline justify-between gap-2 px-2.5 pt-1.5 pb-1">
+            <span className="eyebrow">{query ? 'OneMap results' : 'Sample customers'}</span>
+            {query && <span className="text-[10.5px] text-fg-4">Singapore Land Authority</span>}
+          </div>
+          {query.length === 1 && <div className="px-2.5 py-2 text-[12px] text-fg-3">Keep typing: a building, street or postal code.</div>}
+          {state === 'error' && <div className="px-2.5 py-2 text-[12px] text-bad">OneMap did not respond. Check the connection and try again.</div>}
+          {state === 'loading' && !hits.length && <div className="px-2.5 py-2 text-[12px] text-fg-3">Searching OneMap…</div>}
+          {settled && hits.length === 0 && <div className="px-2.5 py-2 text-[12px] text-fg-3">No matches. Try a postal code.</div>}
+          {hits.map((h, i) => {
+            const name = h.kind === 'sample' ? h.stop.name : h.place.name
+            const address = h.kind === 'sample' ? h.stop.address : h.place.address
+            const key = h.kind === 'sample' ? h.stop.id : h.place.key
+            return (
+              <button
+                key={key}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(h)}
+                onMouseEnter={() => setActive(i)}
+                className={clsx('flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left', i === active && 'bg-hover')}
+              >
+                {adding === key ? (
+                  <Loader2 size={14} className="shrink-0 animate-spin text-fg-3" />
+                ) : (
+                  <MapPin size={14} className="shrink-0 text-fg-3" strokeWidth={1.7} />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{name}</span>
+                  <span className="block truncate text-[12px] text-fg-3">{address}</span>
+                </span>
+                {h.kind === 'sample' && <CargoTag cargo={h.stop.cargo} />}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

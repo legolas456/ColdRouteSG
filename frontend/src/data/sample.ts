@@ -187,7 +187,7 @@ export const PROFILES: Record<ProfileId, { label: string; hint: string; weights:
 
 export const CARGO_SENSITIVITY = { PHARMA: 1, FROZEN: 0.8, CHILLED: 0.6 } as const
 
-/** Mock OneMap search results. Ids match scripts/fetch-osrm.mjs so legs follow real roads. */
+/** Sample customers, shown when the search box is empty. Ids match scripts/fetch-osrm.mjs so legs follow real roads offline. */
 export const ADDRESS_BOOK: Stop[] = [
   {
     id: 'BDK',
