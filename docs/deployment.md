@@ -23,6 +23,12 @@ So for teammates: **open a PR, wait for Checks to go green, merge. The site upda
 
 Deploys run one at a time. A newer merge waits for the running deploy to finish.
 
+To see which commit is live, look for `<meta name="coldroute-build" content="<sha> <build time>">` in the page source, or run:
+
+```bash
+curl -s https://main.daledp6z7ncmz.amplifyapp.com/ | grep coldroute-build
+```
+
 ## Keys
 
 - Deploys use the IAM user **`coldroute-deployer`**, which has only the AWS managed policy `AdministratorAccess-Amplify`. Don't deploy with root keys.
