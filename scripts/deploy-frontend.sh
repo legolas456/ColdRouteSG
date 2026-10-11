@@ -4,7 +4,8 @@
 # already exist and only uploads a new build.
 #
 # Settings come from .env.deploy.local (copy .env.deploy.example). AWS keys are
-# NOT read from this repo: they come from the AWS CLI profile in ~/.aws.
+# NOT read from this repo: locally they come from the AWS CLI profile in ~/.aws,
+# in GitHub Actions from the AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -16,13 +17,18 @@ if [ -f "$ENV_FILE" ]; then
   set +a
 fi
 
-AWS_PROFILE="${AWS_PROFILE:-coldroute}"
 AWS_REGION="${AWS_REGION:-ap-southeast-1}"
 AMPLIFY_APP_NAME="${AMPLIFY_APP_NAME:-coldroute-sg}"
 AMPLIFY_BRANCH="${AMPLIFY_BRANCH:-main}"
 AMPLIFY_APP_ID="${AMPLIFY_APP_ID:-}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
-export AWS_PROFILE AWS_REGION AWS_PAGER=""
+export AWS_REGION AWS_PAGER=""
+# Keys in the environment (CI) win; otherwise use the local profile.
+if [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+  unset AWS_PROFILE
+else
+  export AWS_PROFILE="${AWS_PROFILE:-coldroute}"
+fi
 
 command -v aws >/dev/null || { echo "AWS CLI v2 not found. See docs/deployment.md." >&2; exit 1; }
 
@@ -42,7 +48,8 @@ if [ -z "$AMPLIFY_APP_ID" ] || [ "$AMPLIFY_APP_ID" = "None" ]; then
     --query app.appId --output text)"
 fi
 if [ -f "$ENV_FILE" ] && ! grep -q "^AMPLIFY_APP_ID=." "$ENV_FILE"; then
-  sed -i '' '/^AMPLIFY_APP_ID=/d' "$ENV_FILE" 2>/dev/null || true
+  grep -v '^AMPLIFY_APP_ID=' "$ENV_FILE" > "$ENV_FILE.tmp" || true
+  mv "$ENV_FILE.tmp" "$ENV_FILE"
   echo "AMPLIFY_APP_ID=$AMPLIFY_APP_ID" >> "$ENV_FILE"
 fi
 echo "==> App $AMPLIFY_APP_ID"
@@ -87,4 +94,8 @@ for _ in $(seq 1 60); do
 done
 [ "$STATUS" = "SUCCEED" ] || { echo "Timed out waiting for job $JOB_ID" >&2; exit 1; }
 
-echo "==> Live: https://$AMPLIFY_BRANCH.$AMPLIFY_APP_ID.amplifyapp.com/"
+URL="https://$AMPLIFY_BRANCH.$AMPLIFY_APP_ID.amplifyapp.com/"
+echo "==> Live: $URL"
+if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+  echo "Deployed Amplify job $JOB_ID: $URL" >> "$GITHUB_STEP_SUMMARY"
+fi
