@@ -4,7 +4,7 @@ ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation i
 
 Project background, the preliminary proposal, product design, brand and to-dos are in [`docs/`](docs/README.md).
 
-**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify, deployed by hand with `make deploy`; see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. Live feeds, address search and accounts are mocked, and the optimiser runs in the browser.
+**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify; GitHub Actions redeploys it on every merge to `main`, see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. Live feeds, address search and accounts are mocked, and the optimiser runs in the browser.
 
 The app does **not require any API key or registration** to run locally.
 
@@ -19,7 +19,7 @@ From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`)
 | `make frontend` / `make backend` | Just one of them (the console works without the backend) |
 | `make test` | Backend `pytest` plus the frontend type check |
 | `make build` / `make preview` | Production build into `frontend/dist`, and serve it on http://localhost:4173 |
-| `make deploy` | Build and upload the frontend to Amplify. Needs the `coldroute` AWS profile, see [`docs/deployment.md`](docs/deployment.md) |
+| `make deploy` | Deploy by hand (CI normally does this on merge). Needs the `coldroute` AWS profile, see [`docs/deployment.md`](docs/deployment.md) |
 
 `make help` lists them all. Local env files (`backend/.env`, `.env.deploy.local`) are created from the `*.example` files and ignored by git. AWS keys never go in the repo. On Windows without `make`, use the manual steps below or `run_local.bat`.
 
@@ -320,7 +320,7 @@ pytest
 
 # AWS status
 
-The frontend is on **Amplify Hosting** as a manual deployment (no CI yet, see [`docs/deployment.md`](docs/deployment.md)). An earlier API Gateway + Lambda copy of the backend (`backend/lambda_handler.py`) runs in a teammate's account, but the new console doesn't call it. There is no:
+The frontend is on **Amplify Hosting**, deployed by GitHub Actions on every merge to `main` (see [`docs/deployment.md`](docs/deployment.md)). An earlier API Gateway + Lambda copy of the backend (`backend/lambda_handler.py`) runs in a teammate's account, but the new console doesn't call it. There is no:
 
 - DynamoDB
 - Cognito
