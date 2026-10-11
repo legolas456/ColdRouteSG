@@ -13,6 +13,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [x] Live public feeds back in the new console: **Live data / Recorded** switch, the Conditions panel (NEA forecast, HDB carparks, LTA cameras), plans built on live rain and parking, Journey/Weather/Parking/Camera details on the stop card, late-delivery alert. The browser calls data.gov.sg directly; no backend needed.
 - [x] Real stops: OneMap address search (any building, street or postal code), real OSRM drive times and road geometry for new stops, **Load sample** / **Clear**, the run kept across reloads, at most 15 stops per run.
 - [x] Easier editing: times and unloading minutes are picked from lists (typing still works, **Custom…** for odd durations), and every `Segmented` switch is drawn as outlined buttons so the options read as clickable.
+- [x] LTA cameras open in the app instead of downloading: clicking a thumbnail (Conditions panel or stop card) shows the full image with the camera's number, place, capture time and distance to the nearest stop. data.gov.sg serves the images as `application/octet-stream`, so a plain link only downloaded them.
 
 ## Next, in priority order
 
@@ -35,7 +36,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [x] NEA 2-hour forecast → rain risk per stop and time slot. Each NEA area forecasting rain becomes a rain cell for the forecast's 2-hour period; each stop takes its nearest area.
 - [x] HDB carpark availability → parking risk. Used only when an HDB carpark is within 600 m; otherwise the stop keeps its own loading bay. Coordinates are a snapshot (`npm run data:hdb-carparks`), free lots are live.
 - [ ] LTA DataMall traffic speed bands (needs a free AccountKey) to replace the traffic-camera proxy.
-- [ ] LTA cameras: shown in the Conditions panel and on the stop card, but data.gov.sg serves only 8 cameras today (Woodlands and Tuas checkpoints), so most stops have none nearby.
+- [ ] LTA cameras: shown in the Conditions panel and on the stop card, and enlarged in the app, but data.gov.sg serves only 8 cameras today (Woodlands and Tuas checkpoints, and Sentosa Gateway), so most stops have none nearby.
 - [x] OneMap search for addresses. Called from the browser without a token; a new stop gets its nearest NEA area and HDB carpark straight away.
 - [x] OSRM at runtime: one table call for the run's drive times as stops are added, one route call per plan for the road geometry. Falls back to an estimate (and says so) if OSRM is down. The sample run still uses the bundled snapshot.
 - [ ] Depot picker: the depot is fixed to Jurong Cold Store.

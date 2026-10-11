@@ -3,6 +3,7 @@ import { Check, Copy, Eye, Loader2, Send } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AccountBar, AccountButton, SignInDialog, type User } from './components/Account'
 import { BottomSheet, type Snap } from './components/BottomSheet'
+import { CameraViewer, type CameraView } from './components/CameraViewer'
 import { ConditionsPanel } from './components/ConditionsPanel'
 import { MapView, type Layers } from './components/MapView'
 import { PANEL, PanelHandle } from './components/PanelHandle'
@@ -124,6 +125,8 @@ export default function App() {
   }
   const [condOpen, setCondOpen] = useState(false)
   const feeds = useLiveFeeds(dataMode === 'live' || condOpen)
+  // an LTA camera image shown large, from the Conditions panel or a stop card
+  const [cameraView, setCameraView] = useState<CameraView | null>(null)
   // the data the plan was built on; the draft always shows the current read
   const [planCond, setPlanCond] = useState<Conditions | null>(null)
 
@@ -399,6 +402,7 @@ export default function App() {
         rain={shownCond.rain}
         depotName={DEPOT.name}
         camera={liveCameras ? camerasNear(liveCameras, selectedStop, 3, 1)[0] : undefined}
+        onViewCamera={setCameraView}
         onClose={() => setSelectedId(null)}
         onEdit={readOnly ? undefined : () => setPhase('draft')}
         inline={isPhone}
@@ -471,6 +475,8 @@ export default function App() {
               stops={stops}
               onRefresh={() => refreshLive()}
               onClose={() => setCondOpen(false)}
+              onViewCamera={setCameraView}
+              covered={!!cameraView}
               locked={readOnly}
             />
           )}
@@ -518,6 +524,10 @@ export default function App() {
     </div>
   )
 
+  const cameraViewer = cameraView && (
+    <CameraViewer key={cameraView.camera.image} view={cameraView} stops={shownCond.stops} onClose={() => setCameraView(null)} />
+  )
+
   // Phone: full-bleed map with the panel in a bottom sheet
   if (isPhone) {
     const showTimeline = sheetTab === 'timeline' && !!timeline && !card
@@ -554,6 +564,7 @@ export default function App() {
             {card ?? (showTimeline ? timeline : left)}
           </BottomSheet>
         </main>
+        {cameraViewer}
         {signInDialog}
         {toastEl}
       </div>
@@ -589,6 +600,7 @@ export default function App() {
           {timeline && <div className="h-[236px] shrink-0 border-t border-line bg-panel">{timeline}</div>}
         </section>
       </main>
+      {cameraViewer}
       {signInDialog}
       {toastEl}
     </div>
