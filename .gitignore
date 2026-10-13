@@ -10,7 +10,7 @@ node_modules/
 dist/
 
 # Environment
-.env
+
 *.local
 
 # Editors/OS
