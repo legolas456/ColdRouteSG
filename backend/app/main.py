@@ -2,13 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import data, routes
+from app.routers import admin, data, routes
 
 settings = get_settings()
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="Local-first ColdRoute SG prototype. No AWS integration and no API keys required for configured public endpoints.",
+    description="ColdRoute SG API deployed on AWS Lambda with Cognito-protected routes and DynamoDB route history.",
 )
 
 app.add_middleware(
@@ -21,6 +21,7 @@ app.add_middleware(
 
 app.include_router(data.router)
 app.include_router(routes.router)
+app.include_router(admin.router)
 
 
 @app.get("/")
@@ -32,7 +33,8 @@ def root():
 def health():
     return {
         "status": "ok",
-        "aws_connected": False,
-        "mode": "local",
-        "public_api_policy": "No credentials are configured. Optional data.gov.sg API keys are intentionally not used.",
+        "aws_connected": bool(settings.dynamodb_routes_table),
+        "mode": "aws" if settings.dynamodb_routes_table else "local",
+        "dynamodb_route_history": bool(settings.dynamodb_routes_table),
+        "public_api_policy": "External routing and public-data integrations are retrieved by the backend.",
     }

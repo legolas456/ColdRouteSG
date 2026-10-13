@@ -1,6 +1,7 @@
 import {
   DeleteOutlined,
   EnvironmentOutlined,
+  HistoryOutlined,
   PlusOutlined,
   ReloadOutlined,
   RocketOutlined,
@@ -105,6 +106,7 @@ interface Props {
   onDepartureTimeChange: (value: string) => void
   onStopsChange: (value: DeliveryStop[]) => void
   onLoadSample: () => void
+  onLoadFromHistory: () => void
   onOptimize: () => void
 }
 
@@ -119,6 +121,7 @@ export function DeliveryForm({
   onDepartureTimeChange,
   onStopsChange,
   onLoadSample,
+  onLoadFromHistory,
   onOptimize,
 }: Props) {
   const updateStop = (index: number, patch: Partial<DeliveryStop>) => {
@@ -152,7 +155,10 @@ export function DeliveryForm({
           <Title level={4} style={{ margin: 0 }}>Delivery locations</Title>
           <Text type="secondary">Enter the starting depot and delivery locations before building the route.</Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={onLoadSample}>Load demo</Button>
+        <Flex gap={8} wrap>
+          <Button icon={<HistoryOutlined />} onClick={onLoadFromHistory}>Load from route history</Button>
+          <Button icon={<ReloadOutlined />} onClick={onLoadSample}>Load demo</Button>
+        </Flex>
       </Flex>
 
       <Divider orientation="left">Depot</Divider>

@@ -6,8 +6,11 @@ import {
   DashboardOutlined,
   EnvironmentOutlined,
   InfoCircleOutlined,
+  HistoryOutlined,
+  LogoutOutlined,
   MoonOutlined,
   SunOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -30,6 +33,7 @@ import type { ThemeMode } from '../App'
 import { api } from '../api/client'
 import { defaultStops, sampleDepot, sampleStops } from '../data/sample'
 import type { Coordinate, DeliveryStop, RouteLeg, RouteResponse } from '../types'
+import type { LoadedRoutePlan } from './LoadRouteHistoryModal'
 
 const { Text, Title } = Typography
 
@@ -37,12 +41,16 @@ const DeliveryForm = lazy(() => import('./DeliveryForm').then((module) => ({ def
 const LiveDataPanel = lazy(() => import('./LiveDataPanel').then((module) => ({ default: module.LiveDataPanel })))
 const RouteSummary = lazy(() => import('./RouteSummary').then((module) => ({ default: module.RouteSummary })))
 const RouteMap = lazy(() => import('./RouteMap').then((module) => ({ default: module.RouteMap })))
+const RouteHistory = lazy(() => import('./RouteHistory').then((module) => ({ default: module.RouteHistory })))
+const LoadRouteHistoryModal = lazy(() => import('./LoadRouteHistoryModal').then((module) => ({ default: module.LoadRouteHistoryModal })))
 
 type PlannerPage = 'setup' | 'route'
 
 type DashboardProps = {
   themeMode: ThemeMode
   onThemeModeChange: (mode: ThemeMode) => void
+  username?: string
+  onSignOut?: () => void
 }
 
 function normalisePriority(value: number): 1 | 2 | 3 {
@@ -89,8 +97,8 @@ function copyStops(stops: DeliveryStop[]) {
   return stops.map((stop) => ({ ...stop }))
 }
 
-export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
-  const [view, setView] = useState<'planner' | 'feeds'>('planner')
+export function Dashboard({ themeMode, onThemeModeChange, username, onSignOut }: DashboardProps) {
+  const [view, setView] = useState<'planner' | 'feeds' | 'history'>('planner')
   const [plannerPage, setPlannerPage] = useState<PlannerPage>('setup')
   const [depot, setDepot] = useState<Coordinate>({ ...sampleDepot })
   const [depotName, setDepotName] = useState('Jurong Cold Storage Depot')
@@ -103,6 +111,7 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
   const [apiError, setApiError] = useState<string | null>(null)
   const [mapOpen, setMapOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
+  const [historyLoaderOpen, setHistoryLoaderOpen] = useState(false)
   const [recalibrationNote, setRecalibrationNote] = useState<string | null>(null)
   const [routeComplete, setRouteComplete] = useState(false)
   const [msg, contextHolder] = message.useMessage()
@@ -116,6 +125,22 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
     setResult(null)
     setRouteComplete(false)
     setRecalibrationNote(null)
+  }
+
+  const loadRouteFromHistory = (plan: LoadedRoutePlan) => {
+    setDepot({ ...plan.depot })
+    setDepotName(plan.depotName)
+    setDepartureTime(plan.departureTime)
+    setStops(copyStops(plan.stops))
+    setResult(null)
+    setRouteComplete(false)
+    setRecalibrationNote(null)
+    setApiError(null)
+    setMapOpen(false)
+    setView('planner')
+    setPlannerPage('setup')
+    setHistoryLoaderOpen(false)
+    void msg.success(`Loaded ${plan.stops.length} ${plan.stops.length === 1 ? 'stop' : 'stops'} from route history`)
   }
 
   const runOptimization = async (
@@ -265,10 +290,11 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
         <Flex gap={10} align="center" wrap className="hero-actions">
           <Segmented
             value={view}
-            onChange={(value) => setView(value as 'planner' | 'feeds')}
+            onChange={(value) => setView(value as 'planner' | 'feeds' | 'history')}
             options={[
               { label: 'Route planner', value: 'planner', icon: <DashboardOutlined /> },
               { label: 'Live public feeds', value: 'feeds', icon: <ApiOutlined /> },
+              { label: 'Route history', value: 'history', icon: <HistoryOutlined /> },
             ]}
           />
           <Button
@@ -285,12 +311,35 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
             unCheckedChildren={<SunOutlined />}
             onChange={(checked) => onThemeModeChange(checked ? 'dark' : 'light')}
           />
+          {(username || onSignOut) && (
+            <div className="user-account-control">
+              {username && (
+                <div className="user-account-pill" title={username}>
+                  <UserOutlined />
+                  <span>{username}</span>
+                </div>
+              )}
+              {onSignOut && (
+                <Button
+                  className="sign-out-button"
+                  icon={<LogoutOutlined />}
+                  onClick={onSignOut}
+                >
+                  Sign out
+                </Button>
+              )}
+            </div>
+          )}
         </Flex>
       </div>
 
       {view === 'feeds' ? (
         <Suspense fallback={<div className="component-loading-state">Loading public feeds…</div>}>
           <LiveDataPanel />
+        </Suspense>
+      ) : view === 'history' ? (
+        <Suspense fallback={<div className="component-loading-state">Loading route history…</div>}>
+          <RouteHistory />
         </Suspense>
       ) : (
         <>
@@ -320,6 +369,7 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
                   onDepartureTimeChange={setDepartureTime}
                   onStopsChange={setStops}
                   onLoadSample={loadSample}
+                  onLoadFromHistory={() => setHistoryLoaderOpen(true)}
                   onOptimize={() => void optimize()}
                 />
               </Suspense>
@@ -395,6 +445,16 @@ export function Dashboard({ themeMode, onThemeModeChange }: DashboardProps) {
             </div>
           )}
         </>
+      )}
+
+      {historyLoaderOpen && (
+        <Suspense fallback={null}>
+          <LoadRouteHistoryModal
+            open={historyLoaderOpen}
+            onClose={() => setHistoryLoaderOpen(false)}
+            onLoad={loadRouteFromHistory}
+          />
+        </Suspense>
       )}
 
       <Modal

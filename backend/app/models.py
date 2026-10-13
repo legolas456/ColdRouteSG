@@ -97,6 +97,7 @@ class RouteLeg(BaseModel):
 
 
 class RouteResponse(BaseModel):
+    route_id: Optional[str] = None
     generated_at: datetime
     data_mode: Literal["live", "mixed", "mock"]
     total_distance_km: float

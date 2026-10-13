@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     allow_mock_fallback: bool = True
     request_timeout_seconds: float = 12.0
     cors_origins: str = "http://localhost:5173"
+    dynamodb_routes_table: str = ""
+    aws_region: str = "ap-southeast-1"
+    cognito_user_pool_id: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
