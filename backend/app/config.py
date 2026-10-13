@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # instead of calling LTA on request.
     traffic_bucket: str = ""
     traffic_key: str = "traffic/speed-grid.json"
+    dynamodb_routes_table: str = ""
+    aws_region: str = "ap-southeast-1"
+    cognito_user_pool_id: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
