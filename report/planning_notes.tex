@@ -1,0 +1,103 @@
+% Internal planning companion to main.tex. Import as a separate Overleaf project.
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=22mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\begin{document}
+\begin{center}
+  {\LARGE\bfseries ColdRoute SG --- Working Plan\par}
+  \vspace{0.3em}
+  {\large CS5224 Group 36 | 14 October 2026\par}
+\end{center}
+\noindent\textbf{Internal document.} Use this file for drafting, coordination and decisions. It is separate from \texttt{main.tex} and is not part of the report submission. The outline and dates below are proposals for the team to agree on.
+
+\section{Report outline and page budget}
+The final report is limited to 10 pages \emph{including} cover, references and figures. Reserve one page for the cover. The percentages below divide the approximately nine pages remaining; they are editing budgets, not course requirements. Revise them once actual figures and results are available.
+\begin{itemize}
+  \item \textbf{Cover: one page.} Project title, course/group, all six members and NUS NetIDs, following the preliminary report.
+  \item \textbf{Abstract and Motivation/Business Case: 15\% of body (about 1.4 pages).}
+    \begin{itemize}
+      \item Problem, target dispatcher, scope and why delays matter for cold-chain runs.
+      \item Named competitor comparison: existing route-planning capabilities, published prices, credible differentiation and limits.
+      \item Concise abstract with actual findings only after evaluation is complete.
+    \end{itemize}
+  \item \textbf{Business Model and Market Estimate: 10\% (about 0.9 page).}
+    \begin{itemize}
+      \item Proposed SGD pricing and billing unit; label assumptions.
+      \item Bottom-up market funnel, source count, eligibility/vehicle assumptions, and sensitivity range.
+      \item Customer validation and value-versus-cost argument.
+    \end{itemize}
+  \item \textbf{Architecture and Implementation: 35\% (about 3.2 pages).}
+    \begin{itemize}
+      \item Current architecture diagram, actual AWS integration status, user journey and feature boundary.
+      \item Spatial/time joins for traffic, weather and parking; freshness and fallback policy.
+      \item Route algorithm, term normalisation, weight choice, baseline and explanation logic.
+    \end{itemize}
+  \item \textbf{Evaluation: 25\% (about 2.3 pages).}
+    \begin{itemize}
+      \item Predeclared system scenarios, raw metrics, targets, performance, ablation and results.
+      \item User study tasks, participants, completion, comprehension and usability findings.
+      \item Measured cloud cost versus equivalent on-premise cost for the same workload.
+    \end{itemize}
+  \item \textbf{Discussion and Future Work: 5\% (about 0.45 page).} Interpret trade-offs, failures and proxy limitations; separate future features from implemented ones.
+  \item \textbf{Code Explanation and Reproducibility: 5\% (about 0.45 page).} Public repo URL, key modules, demo URL, run steps and experiment reproduction.
+  \item \textbf{AI declaration and references: 5\% (about 0.45 page).} Accurate AI-use statement and primary sources. This allocation may need more room after the references are finalised.
+\end{itemize}
+
+\section{Course specification checklist}
+From the supplied CS5224 Group Project specification:
+\begin{itemize}
+  \item Develop a useful cloud SaaS with a working prototype and web interface; explain the problem and business case. Do not customise an existing SaaS off the shelf.
+  \item Compare the cost of hosting the \emph{same service} on the cloud and on premises. Include system and user evaluation, not only implementation details.
+  \item Final report: maximum 10 pages \emph{including} cover, references and figures; submit as \texttt{Final.pdf} by \textbf{13 November 2026, 23:59 Singapore time}.
+  \item Include a code explanation and a public repository URL that remains accessible until marks and feedback are released. State assumptions and declare AI use, what was done with AI, and what the team learned.
+  \item Presentation: submit \texttt{Slides.pdf} by the same deadline; up to 15 minutes plus 10 minutes of Q\&A, online with the TA, with every group member presenting by the end of 13 November.
+\end{itemize}
+
+\section{TA comments on the preliminary report}
+\begin{enumerate}
+  \item \textbf{Background:} Name and compare existing last-mile planning SaaS products rather than merely saying that they exist.
+  \item \textbf{Business model:} Give a proposed subscription price and an evidence-based market-size estimate with assumptions.
+  \item \textbf{Plan and evaluation:} Add dates, task allocation, measurable targets and acceptance criteria.
+  \item \textbf{Data fusion:} Explain how traffic, weather and parking are combined despite different spatial and temporal granularity.
+  \item \textbf{Optimisation:} Normalise $T,L,W,P,C$ and explain how $\alpha$--$\varepsilon$ are selected and tuned.
+\end{enumerate}
+
+\section{Current evidence gaps and possible improvements}
+\begin{itemize}
+  \item \textbf{Architecture:} Confirm the actual Amplify build, deployed API Gateway/Lambda endpoint, Cognito driver/admin flows, per-user DynamoDB access and CloudWatch evidence. The new AWS branch is not yet merged into \texttt{main}; decide which frontend is canonical before updating the diagram.
+  \item \textbf{Traffic:} Obtain and map LTA speed bands to road legs, or explicitly evaluate only OSRM times plus a labelled traffic proxy. Camera images are not a speed feed.
+  \item \textbf{Data provenance:} Save weather, parking and traffic timestamps/validity; document out-of-horizon and missing-data behaviour; keep recorded scenarios reproducible.
+  \item \textbf{Objective:} The currently deployed frontend and local backend use different scores. Select one implementation; align the normalisation and profiles in code with the report; inspect weather/parking double-counting.
+  \item \textbf{Business evidence:} Validate the S\$49 hypothesis and the eligible-market filter with operator conversations. Report observed AWS cost and a like-for-like on-premise estimate.
+  \item \textbf{Evaluation:} Freeze scenarios and thresholds before running them, keep raw outputs, test 5/10/15 stops and real user tasks, and report negative results.
+\end{itemize}
+
+\section{Tentative schedule and ownership}
+These dates are planning targets, \emph{not} assignments agreed by the six members. In the next group discussion, name one owner and one reviewer for each deliverable and record the decision in this table.
+\begin{center}
+\small
+\begin{tabular}{p{2.5cm}p{8.1cm}p{2.7cm}}
+\toprule
+Target dates & Deliverable & Owner / reviewer \\
+\midrule
+14--17 Oct & Agree canonical branch/architecture, traffic decision, report outline and review process & To agree \\
+18--24 Oct & Competitor/market evidence, data joins, objective; verify cloud sign-in/save/load & To agree \\
+25--31 Oct & Freeze scenarios and targets; integration, correctness, route quality, performance & To agree \\
+1--7 Nov & User sessions, cloud/on-premise cost model, report results and figures & To agree \\
+8--10 Nov & Independent claims, reproducibility, page-count and citation review; presentation rehearsal & To agree \\
+11--13 Nov & Final edits, slides and demo rehearsal; submit both PDFs by 23:59 on 13 Nov & To agree \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Decisions for the group}
+\begin{enumerate}
+  \item Which frontend/backend combination is the final demonstrable product, and who owns integration?
+  \item Are LTA speed bands feasible before the experiment freeze? If not, what exact claim replaces ``live traffic-aware''?
+  \item Which objective, fixed normalisation scales and weight profiles will be frozen for evaluation?
+  \item Who owns competitor/market research, data/algorithm, cloud integration, system/user evaluation, costs, report editing, slides and submission? Who reviews each deliverable?
+\end{enumerate}
+\end{document}
