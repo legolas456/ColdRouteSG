@@ -17,13 +17,14 @@ import { Button, Segmented, StatusPill } from './components/ui'
 import { DEPARTURE, DEPOT, PROFILES, RECORDED_AT, SAMPLE_STOPS } from './data/sample'
 import { camerasNear, liveConditions, recordedConditions, type Conditions, type DataMode } from './lib/conditions'
 import { ensureLive, isLoading, refreshLive, sgMinutes, useLiveFeeds } from './lib/live'
+import { validDepot } from './lib/depot'
 import { optimise } from './lib/optimizer'
 import { MAX_STOPS } from './lib/places'
 import { allReal, ensureLegs, ensureMatrix } from './lib/roads'
 import { isTyping, PHONE_QUERY, useMediaQuery, usePersistentState } from './lib/hooks'
 import { hm } from './lib/time'
 import { applyTheme, THEME_BY_ID, type ThemeId } from './lib/themes'
-import type { OptimiseResult, ProfileId, Stop } from './lib/types'
+import type { Depot, OptimiseResult, ProfileId, Stop } from './lib/types'
 
 type Phase = 'draft' | 'optimising' | 'optimised'
 
@@ -98,10 +99,12 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('draft')
   // the run's stops are kept across reloads; a shared link shows its own snapshot
   const [savedStops, setSavedStops] = usePersistentState<Stop[]>('coldroute.stops.v1', SAMPLE_STOPS)
+  const [savedDepot, setSavedDepot] = usePersistentState<Depot>('coldroute.depot.v1', DEPOT)
   const [snapshotStops, setSnapshotStops] = useState<Stop[]>(SAMPLE_STOPS)
   const stops = readOnly ? snapshotStops : validStops(savedStops) ? savedStops : SAMPLE_STOPS
+  const depot = readOnly ? DEPOT : validDepot(savedDepot, DEPOT) ? savedDepot : DEPOT
   const setStops = readOnly ? setSnapshotStops : setSavedStops
-  const isSample = useMemo(() => JSON.stringify(stops) === SAMPLE_JSON, [stops])
+  const isSample = useMemo(() => depot.id === DEPOT.id && JSON.stringify(stops) === SAMPLE_JSON, [depot, stops])
   const [departure, setDeparture] = useState(DEPARTURE)
   const [profile, setProfile] = useState<ProfileId>('pharma')
   const [result, setResult] = useState<OptimiseResult | null>(null)
@@ -165,21 +168,21 @@ export default function App() {
           ? ensureLive().then((f) => liveConditions(stops, f, sgMinutes(f.fetchedAt ?? Date.now()), departure))
           : Promise.resolve(recordedConditions(stops))
       // real drive times for stops outside the bundled snapshot (one OSRM call)
-      const read = Promise.all([conditions, ensureMatrix([DEPOT, ...stops])]).then(([c, roadsOk]): Conditions =>
+      const read = Promise.all([conditions, ensureMatrix([depot, ...stops])]).then(([c, roadsOk]): Conditions =>
         roadsOk ? c : { ...c, notes: [...c.notes, 'OSRM did not respond, so drive times between new stops are estimated.'] },
       )
       const finish = (c: Conditions) => {
         if (token !== runToken.current) return
-        const r = optimise(DEPOT, c.stops, departure, PROFILES[profile].weights, c.rain)
+        const r = optimise(depot, c.stops, departure, PROFILES[profile].weights, c.rain)
         setPlanCond(c)
         setResult(r)
         if (!instant) setView('coldroute')
         setPhase('optimised')
         if (c.mode === 'live' && c.source === 'recorded') setToast('Live data unavailable · planned with the recorded morning')
-        else if (!allReal([DEPOT, ...c.stops])) setToast('OSRM did not respond · drive times are estimated')
+        else if (!allReal([depot, ...c.stops])) setToast('OSRM did not respond · drive times are estimated')
         // road geometry for both plans' legs; the map redraws when it arrives
         const byId = Object.fromEntries(c.stops.map((s) => [s.id, s]))
-        void ensureLegs([r.recommended.order, r.baseline.order].map((o) => [DEPOT, ...o.map((id) => byId[id])]))
+        void ensureLegs([r.recommended.order, r.baseline.order].map((o) => [depot, ...o.map((id) => byId[id])]))
       }
       if (instant) {
         read.then(finish)
@@ -195,21 +198,22 @@ export default function App() {
       const shown = new Promise<void>((done) => timers.current.push(window.setTimeout(done, 340 * OPTIMISE_STEPS.length + 220)))
       Promise.all([read, shown]).then(([c]) => finish(c))
     },
-    [stops, departure, profile, dataMode],
+    [depot, stops, departure, profile, dataMode],
   )
 
   // fetch real drive times as stops are added, so the estimate and the
   // optimiser do not wait for them later
   useEffect(() => {
     if (readOnly) return
-    const t = window.setTimeout(() => void ensureMatrix([DEPOT, ...stops]), 400)
+    const t = window.setTimeout(() => void ensureMatrix([depot, ...stops]), 400)
     return () => window.clearTimeout(t)
-  }, [stops, readOnly])
+  }, [depot, stops, readOnly])
 
   const loadSample = () => {
     timers.current.forEach(clearTimeout)
     runToken.current++
     setStops(SAMPLE_STOPS)
+    setSavedDepot(DEPOT)
     setDeparture(DEPARTURE)
     setDataMode('recorded')
     setSelectedId(null)
@@ -298,6 +302,7 @@ export default function App() {
 
   const makeCopy = () => {
     setSavedStops(snapshotStops)
+    setSavedDepot(DEPOT)
     setReadOnly(false)
     const url = new URL(location.href)
     for (const k of ['share', 'view', 'stop']) url.searchParams.delete(k)
@@ -352,6 +357,7 @@ export default function App() {
   const left =
     phase === 'optimised' && result ? (
       <ResultsPanel
+        depot={depot}
         result={result}
         stops={stopById}
         stopList={shownCond.stops}
@@ -374,6 +380,8 @@ export default function App() {
       />
     ) : (
       <StopsEditor
+        depot={depot}
+        setDepot={setSavedDepot}
         stops={stops}
         setStops={setStops}
         departure={departure}
@@ -400,7 +408,7 @@ export default function App() {
         names={names}
         departure={departure}
         rain={shownCond.rain}
-        depotName={DEPOT.name}
+        depotName={depot.name}
         camera={liveCameras ? camerasNear(liveCameras, selectedStop, 3, 1)[0] : undefined}
         onViewCamera={setCameraView}
         onClose={() => setSelectedId(null)}
@@ -425,7 +433,7 @@ export default function App() {
   const map = (insetBottom: number) => (
     <MapView
       palette={theme.map}
-      depot={DEPOT}
+      depot={depot}
       stops={shownCond.stops}
       rain={shownCond.rain}
       result={phase === 'optimised' ? result : null}

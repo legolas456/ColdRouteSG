@@ -39,7 +39,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [ ] LTA cameras: shown in the Conditions panel and on the stop card, and enlarged in the app, but data.gov.sg serves only 8 cameras today (Woodlands and Tuas checkpoints, and Sentosa Gateway), so most stops have none nearby.
 - [x] OneMap search for addresses. Called from the browser without a token; a new stop gets its nearest NEA area and HDB carpark straight away.
 - [x] OSRM at runtime: one table call for the run's drive times as stops are added, one route call per plan for the road geometry. Falls back to an estimate (and says so) if OSRM is down. The sample run still uses the bundled snapshot.
-- [ ] Depot picker: the depot is fixed to Jurong Cold Store.
+- [x] Depot picker: choose a Singapore depot through OneMap search, keep it across reloads, and plan from its own OSRM road matrix; **Load sample** restores Jurong Cold Store.
 - [ ] Mark a stop delivered and re-plan the rest from there (the old console's "Set current location here").
 
 ### 4. Optimiser

@@ -15,18 +15,18 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react'
-import { DEPOT } from '../data/sample'
 import { areaName, rainFor, type Conditions } from '../lib/conditions'
 import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
 import { duration, hm, signed } from '../lib/time'
-import type { OptimiseResult, Plan, RainCell, Stop, StopResult } from '../lib/types'
+import type { Depot, OptimiseResult, Plan, RainCell, Stop, StopResult } from '../lib/types'
 import { distanceLabel } from './ConditionsPanel'
 import { Button, CargoTag, Segmented } from './ui'
 
 export type View = 'coldroute' | 'baseline' | 'compare'
 
 interface Props {
+  depot: Depot
   result: OptimiseResult
   stops: Record<string, Stop>
   stopList: Stop[]
@@ -50,7 +50,7 @@ const SOURCE_LABEL: Record<Conditions['source'], string> = {
 }
 
 export function ResultsPanel(props: Props) {
-  const { result, stops, stopList, view, setView, selectedId, onSelect, onEdit, onReoptimise, profileLabel, departure, data } = props
+  const { depot, result, stops, stopList, view, setView, selectedId, onSelect, onEdit, onReoptimise, profileLabel, departure, data } = props
   const { recommended: rec, baseline: base } = result
   const shown: Plan = view === 'baseline' ? base : rec
   const other: Plan = view === 'baseline' ? rec : base
@@ -58,7 +58,7 @@ export function ResultsPanel(props: Props) {
 
   const exposureDelta = ((shown.exposure - other.exposure) / other.exposure) * 100
   const last = stops[shown.order[shown.order.length - 1]]
-  const backAt = shown.end + (last ? travel(last, DEPOT).minutes : 0)
+  const backAt = shown.end + (last ? travel(last, depot).minutes : 0)
 
   return (
     <div className="@container scroll-thin min-h-0 md:h-full md:overflow-y-auto">
