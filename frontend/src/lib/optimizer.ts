@@ -2,6 +2,7 @@ import { CARGO_SENSITIVITY, RAIN_CELLS } from '../data/sample'
 import type { Depot, OptimiseResult, Plan, RainCell, Stop, StopResult, Weights } from './types'
 
 import { legGeometry, travel, type Point } from './roads'
+import { objectiveContribution, stopRawTerms } from './objective'
 
 // drive times and road geometry live in roads.ts (snapshot + runtime OSRM)
 export { legGeometry, travel }
@@ -51,23 +52,25 @@ export function simulate(order: string[], ctx: Context): Plan {
     const late = Math.max(0, start - s.windowEnd)
     const slack = s.windowEnd - start
     const cells = rain.filter((c) => c.area === s.area)
-    const inRain = cells.some((c) => start < c.end && start + s.service > c.start)
+    const overlappingRain = cells.filter((c) => start < c.end && start + s.service > c.start)
+    const inRain = overlappingRain.length > 0
+    const rainSeverity = overlappingRain.some((c) => c.heavy) ? 1 : inRain ? 0.5 : 0
     const park = s.parking.risk
     const sens = CARGO_SENSITIVITY[s.cargo]
-    const unload = s.service * (1 + 1.5 * park) * (inRain ? 1.4 : 1)
-    const onBoard = (start - departure) / 60
-
-    const c = {
-      weather: (inRain ? s.service * (1 + park) : 0) * weights.weather,
-      parking: park * s.service * weights.parking,
-      traffic: leg.minutes * (1 + s.trafficRisk * 0.3) * weights.drive,
-      cold: (sens * onBoard * 10 + sens * unload * 0.5) * weights.cold,
-      lateness: late * weights.late,
-    }
+    const raw = stopRawTerms({
+      driveMinutes: leg.minutes,
+      lateMinutes: late,
+      serviceMinutes: s.service,
+      rainSeverity,
+      parkingRisk: park,
+      cargoSensitivity: sens,
+      onBoardMinutes: start - departure,
+    })
+    const c = objectiveContribution(raw, order.length, weights)
 
     const nearRain = cells.some((c) => Math.abs(start - c.end) < 30)
     const risk = {
-      W: inRain ? 0.9 : nearRain ? 0.35 : 0.1,
+      W: inRain ? rainSeverity : nearRain ? 0.35 : 0.1,
       P: park,
       T: s.trafficRisk,
       C: Math.min(1, (sens * (start - departure)) / 200),
@@ -77,9 +80,9 @@ export function simulate(order: string[], ctx: Context): Plan {
 
     lateMinutes += late
     lateStops += late > 0 ? 1 : 0
-    exposure += unload
+    exposure += raw.cold
     rainStops += inRain ? 1 : 0
-    cost += c.weather + c.parking + c.traffic + c.cold + c.lateness
+    cost += c.drive + c.late + c.weather + c.parking + c.cold
 
     rows.push({
       id,
@@ -93,7 +96,7 @@ export function simulate(order: string[], ctx: Context): Plan {
       late,
       slack,
       inRain,
-      exposure: unload,
+      exposure: raw.cold,
       risk,
       riskScore,
       cost: c,
@@ -167,6 +170,10 @@ export function optimise(
   const t0 = performance.now()
   const stops = Object.fromEntries(stopList.map((s) => [s.id, s]))
   const ids = stopList.map((s) => s.id)
+  const weightTotal = weights.drive + weights.late + weights.weather + weights.parking + weights.cold
+  if (Object.values(weights).some((w) => !Number.isFinite(w) || w < 0) || Math.abs(weightTotal - 1) > 1e-9) {
+    throw new Error('Route weights must be non-negative and sum to one')
+  }
   const ctx: Context = { depot, stops, departure, weights, rain }
   const baseCtx: Context = { ...ctx, weights: { drive: 1, late: 0, weather: 0, parking: 0, cold: 0 } }
 
