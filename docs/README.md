@@ -12,6 +12,8 @@ Project knowledge for the ColdRoute SG group project (CS5224 Cloud Computing, Gr
 | [brand.md](brand.md) | Name, logo, colours, fonts and tone, for anything visual (slides, posters, images, videos) |
 | [roadmap.md](roadmap.md) | Status and to-dos, in priority order |
 | [deployment.md](deployment.md) | Where the live demo runs, where the AWS keys are (not in the repo), how to deploy, and the CI to-do |
+| [frontend-integration-decision.md](frontend-integration-decision.md) | Proposed canonical frontend, API integration sequence and verification gates |
+| [feature-inventory.md](feature-inventory.md) | Current versus branch-only features, TA feedback gaps and live-conditions proposal review |
 
 ## Where other knowledge lives
 
