@@ -1,0 +1,53 @@
+% Internal source and verification library for the final report.
+% This file is not included by main.tex and is not part of Final.pdf.
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=22mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+\begin{document}
+\begin{center}
+{\LARGE\bfseries ColdRoute SG --- Report Materials\par}
+\vspace{0.3em}
+{\large Source inventory and claim checks | 23 October 2026\par}
+\end{center}
+
+\noindent\textbf{Purpose.} This is an internal source library for \texttt{main.tex}. It records what the team's current Word draft says, how that compares with the repository, and what must be verified before a statement becomes a final-report claim. It is not a second report or a source of measured results.
+
+\section{Team draft and provenance}
+The team draft is \href{https://nusu.sharepoint.com/:w:/r/sites/CS5224CloudComputing_8dd51e/_layouts/15/Doc.aspx?sourcedoc=\%7BD59E63C5-AC56-43CE-9170-953C4CCA3FF4\%7D\&file=Final.docx\&action=default\&mobileredirect=true}{Final.docx on NUS SharePoint}. The observations below use the text snapshot supplied in the chat on 23 October 2026. The live SharePoint document was not independently opened; check it again before reconciling edits. The local repository and the team's Word draft may represent different branches or dates.
+
+\section{Useful material from the team draft}
+\begin{itemize}
+  \item \textbf{Background and competitors:} It names Onfleet, OptimoRoute, Routific and Samsara and describes different product strengths. Keep comparisons specific and sourced; claims that competing products lack a capability need a documented comparison.
+  \item \textbf{User journey and interface:} It lays out nine stages from opening the console to sharing or dispatching. This is useful for a compact workflow figure or evaluation tasks. It lists the current components, including StopsEditor, ConditionsPanel, MapView, ResultsPanel and Timeline.
+  \item \textbf{Data alignment:} It describes the NEA area/time join, HDB carpark ID/coordinate join, LTA camera context and OSRM matrix. This can support the method section after checking exact fallback and freshness behaviour in code.
+  \item \textbf{Algorithm description:} It explains exhaustive search for 1--8 stops and 2-opt above eight, a per-stop display risk score, and a cold-chain exposure proxy. These are useful implementation details, but the per-stop risk score does not normalise the five terms of the route objective requested by the TA.
+  \item \textbf{Evaluation tasks:} It proposes route-quality, performance, cost and user measures. Use them as a plan until results, sample sizes and acceptance criteria are recorded.
+\end{itemize}
+
+\section{Claims to resolve before copying into the report}
+\small
+\begin{center}
+\begin{tabular}{p{3.1cm}p{5.4cm}p{5.1cm}}
+\toprule
+Topic & Team draft / present conflict & Required check or decision \\
+\midrule
+Pricing & Team draft proposes free Pilot plus Starter S\$49 for 1--3 vehicles, Growth S\$149, Professional S\$299 and Enterprise from S\$599. \texttt{main.tex} instead models S\$49 per active vehicle per month. & Select one billing unit and tier definition. Keep all prices labelled hypothetical until customer and cost evidence exists. \\
+Cloud architecture & The Word draft describes the \texttt{main} browser app, local storage and mock account. Another unmerged branch contains Cognito, DynamoDB and admin code. & Verify which commit is deployed, token enforcement, persistence, ownership and monitoring before changing the architecture diagram. \\
+Traffic & Cameras are visual context; a traffic-risk proxy is used in scoring. & Do not call camera images measured traffic speed. Confirm whether LTA speed bands are implemented and how road legs are matched. \\
+Optimisation & The team draft describes the current frontend score and a separate normalised \emph{stop display} risk score. \texttt{main.tex} proposes a different normalised route objective. & Choose the canonical optimiser. Show exact implemented terms and scaling; freeze weights before evaluation. \\
+Costs & The Word draft gives a qualitative SaaS/on-premise table and several tiers. & Add a numerical, equivalent-workload cloud/on-premise comparison with assumptions and actual AWS usage. \\
+Evaluation & Both drafts have plans; neither supplies measured system or user results. & Run fixed scenarios and user tasks, then report outcomes, failures and sample sizes. \\
+References and AI & The supplied Word snapshot ends with empty References and has no AI-use declaration. & Add traceable sources and the course-required AI-use statement. \\
+Cover & The Word snapshot has only some matriculation numbers; our cover uses six NetIDs from the preliminary report. & Confirm the required identifier format and all six entries with the group before submission. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\normalsize
+
+\section{Frontend opportunities from the draft}
+The team's described workflow is mostly present on \texttt{main}. The clearest visible mismatch is its claim that the dispatcher can \emph{enter a depot}; \texttt{main} still shows a fixed Jurong depot. Other candidates are explicit unknown/stale-feed status, replacing mock dispatch, or integrating saved routes and authentication after the AWS branch is reviewed. Choose small changes that can be tested independently. Record implementation and screenshots in the feature branch, then update the report only after verification.
+
+\end{document}
