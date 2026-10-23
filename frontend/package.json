@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "data:osrm": "node scripts/fetch-osrm.mjs",
