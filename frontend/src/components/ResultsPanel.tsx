@@ -6,6 +6,7 @@ import {
   Check,
   Clock,
   CloudRain,
+  Download,
   Minus,
   PencilLine,
   RefreshCw,
@@ -19,6 +20,7 @@ import { DEPOT } from '../data/sample'
 import { areaName, rainFor, type Conditions } from '../lib/conditions'
 import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
+import { routeCsv } from '../lib/route-export'
 import { duration, hm, signed } from '../lib/time'
 import type { OptimiseResult, Plan, RainCell, Stop, StopResult } from '../lib/types'
 import { distanceLabel } from './ConditionsPanel'
@@ -60,6 +62,16 @@ export function ResultsPanel(props: Props) {
   const last = stops[shown.order[shown.order.length - 1]]
   const backAt = shown.end + (last ? travel(last, DEPOT).minutes : 0)
 
+  const exportRoute = () => {
+    const csv = routeCsv(result, stops, view, profileLabel, departure, data)
+    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `coldroute-${view}-route.csv`
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
   return (
     <div className="@container scroll-thin min-h-0 md:h-full md:overflow-y-auto">
       <div className="px-5 pt-5">
@@ -89,6 +101,9 @@ export function ResultsPanel(props: Props) {
             )}
           </div>
         )}
+        <Button size="sm" className="mt-2" icon={<Download size={14} strokeWidth={1.8} />} onClick={exportRoute}>
+          Export route CSV
+        </Button>
       </div>
       {/* same switch as the draft profile picker; stays reachable while the panel scrolls */}
       <div className="sticky top-0 z-10 bg-panel px-5 pt-3 pb-2">
