@@ -1,5 +1,6 @@
 import { parkingRisk } from '../lib/geo'
-import type { Depot, ProfileId, RainCell, Stop, Weights } from '../lib/types'
+import type { Depot, RainCell, Stop } from '../lib/types'
+export { PROFILES } from '../lib/profiles'
 
 /**
  * The recorded morning: a rainy Friday, read at 09:05. Recorded mode replays it
@@ -166,24 +167,6 @@ export const RAIN_LIGHT: RainCell = {
 export const RAIN_CELLS: RainCell[] = [RAIN, RAIN_LIGHT]
 
 export const DEPARTURE = 540
-
-export const PROFILES: Record<ProfileId, { label: string; hint: string; weights: Weights }> = {
-  pharma: {
-    label: 'Pharma',
-    hint: 'Protect windows and cold-chain first',
-    weights: { drive: 1, late: 6, weather: 4, parking: 0.6, cold: 0.8 },
-  },
-  balanced: {
-    label: 'Balanced',
-    hint: 'Trade a little time for lower risk',
-    weights: { drive: 1, late: 4, weather: 2, parking: 0.4, cold: 0.4 },
-  },
-  fastest: {
-    label: 'Fastest',
-    hint: 'Shortest drive, windows as soft limits',
-    weights: { drive: 1, late: 1, weather: 0, parking: 0, cold: 0 },
-  },
-}
 
 export const CARGO_SENSITIVITY = { PHARMA: 1, FROZEN: 0.8, CHILLED: 0.6 } as const
 
