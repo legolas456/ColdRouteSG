@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { CARGO_SENSITIVITY } from '../../data/sample'
+import { REFERENCE_MINUTES } from '../objective'
 import { optimise, simulate } from '../optimizer'
 import type { Depot, RainCell, Stop, Weights } from '../types'
 
@@ -16,8 +18,11 @@ vi.mock('../roads', () => ({
 }))
 
 const depot: Depot = { id: 'D', name: 'Test depot', address: 'Singapore', lng: 103.8, lat: 1.3 }
+// The optimiser only accepts non-negative weights that sum to one.
 const driveOnly: Weights = { drive: 1, late: 0, weather: 0, parking: 0, cold: 0 }
-const allWeights: Weights = { drive: 1, late: 6, weather: 4, parking: 0.6, cold: 0.8 }
+const allWeights: Weights = { drive: 0.2, late: 0.3, weather: 0.2, parking: 0.1, cold: 0.2 }
+const driveAnd = (term: Exclude<keyof Weights, 'drive'>, share = 0.5): Weights =>
+  ({ ...driveOnly, drive: 1 - share, [term]: share })
 const stop = (id: string, changes: Partial<Stop> = {}): Stop => ({
   id, name: id, short: id, address: 'Test address', lng: 103.81, lat: 1.31,
   windowStart: 540, windowEnd: 1000, service: 10, cargo: 'CHILLED',
@@ -25,8 +30,8 @@ const stop = (id: string, changes: Partial<Stop> = {}): Stop => ({
   parking: { name: 'Loading bay', lng: 103.81, lat: 1.31, distanceKm: 0, freePct: 100, risk: 0 },
   ...changes,
 })
-const rain = (start: number, end: number, area = 'City'): RainCell => ({
-  area, label: 'Test rain', start, end, center: [103.81, 1.31], radiusKm: 1, heavy: true,
+const rain = (start: number, end: number, area = 'City', heavy = true): RainCell => ({
+  area, label: 'Test rain', start, end, center: [103.81, 1.31], radiusKm: 1, heavy,
 })
 const context = (list: Stop[], weights = allWeights, cells: RainCell[] = []) => ({
   depot, stops: Object.fromEntries(list.map(s => [s.id, s])), departure: 540, weights, rain: cells,
@@ -42,11 +47,12 @@ describe('simulate: fixed scoring scenarios', () => {
     expect(plan.end).toBe(625)
   })
 
-  it('counts late deliveries and their weighted lateness cost', () => {
+  it('counts late deliveries and their normalised lateness cost', () => {
     const plan = simulate(['A'], context([stop('A', { windowEnd: 542 })]))
     expect(plan.lateStops).toBe(1)
     expect(plan.lateMinutes).toBe(3)
-    expect(plan.byId.A.cost.lateness).toBe(18)
+    // weight × late minutes / (reference minutes × stops in the run)
+    expect(plan.byId.A.cost.late).toBeCloseTo((allWeights.late * 3) / (REFERENCE_MINUTES.late * 1), 12)
   })
 
   it.each([
@@ -58,21 +64,36 @@ describe('simulate: fixed scoring scenarios', () => {
     const plan = simulate(['A'], context([stop('A')], allWeights, [rain(start, end, area)]))
     expect(plan.byId.A.inRain).toBe(expected)
     expect(plan.rainStops).toBe(expected ? 1 : 0)
-    expect(plan.byId.A.cost.weather).toBe(expected ? 40 : 0)
+    // heavy rain has severity 1 over the 10 unloading minutes
+    const heavyRainCost = (allWeights.weather * 1 * 10) / (REFERENCE_MINUTES.weather * 1)
+    expect(plan.byId.A.cost.weather).toBeCloseTo(expected ? heavyRainCost : 0, 12)
   })
 
-  it('raises the modelled exposure and parking cost during a parking crunch', () => {
+  it('counts light rain at half the severity of heavy rain', () => {
+    const light = simulate(['A'], context([stop('A')], allWeights, [rain(540, 560, 'City', false)]))
+    const heavy = simulate(['A'], context([stop('A')], allWeights, [rain(540, 560, 'City', true)]))
+    expect(light.byId.A.inRain).toBe(true)
+    expect(light.byId.A.risk.W).toBe(0.5)
+    expect(light.byId.A.cost.weather).toBeCloseTo(heavy.byId.A.cost.weather / 2, 12)
+  })
+
+  it('raises the parking cost, not the cold-chain exposure, during a parking crunch', () => {
     const clear = stop('A')
     const crowded = stop('A', { parking: { ...clear.parking, risk: 1, freePct: 0 } })
     const dry = simulate(['A'], context([clear]))
     const crunch = simulate(['A'], context([crowded]))
     const wetCrunch = simulate(['A'], context([crowded], allWeights, [rain(540, 560)]))
-    expect(crunch.byId.A.cost.parking).toBe(6)
-    expect(crunch.exposure).toBe(25)
+    // parking risk 1 over the 10 unloading minutes
+    expect(crunch.byId.A.cost.parking).toBeCloseTo((allWeights.parking * 1 * 10) / (REFERENCE_MINUTES.parking * 1), 12)
     expect(crunch.cost).toBeGreaterThan(dry.cost)
-    expect(wetCrunch.exposure).toBe(35)
-    expect(wetCrunch.byId.A.cost.weather).toBe(80)
-    // Exposure is a risk model, not measured temperature or added service time.
+    expect(wetCrunch.byId.A.cost.weather).toBeCloseTo((allWeights.weather * 1 * 10) / (REFERENCE_MINUTES.weather * 1), 12)
+    expect(wetCrunch.cost).toBeGreaterThan(crunch.cost)
+    // Exposure is cargo sensitivity × minutes on board before unloading. Rain and
+    // parking have their own terms, so they must not be counted in it again.
+    expect(crunch.exposure).toBeCloseTo(CARGO_SENSITIVITY.CHILLED * 5, 12)
+    expect(crunch.exposure).toBe(dry.exposure)
+    expect(wetCrunch.exposure).toBe(crunch.exposure)
+    // These are risk penalties, not measured temperature or added service time.
     expect(wetCrunch.end).toBe(crunch.end)
   })
 
@@ -108,7 +129,7 @@ describe('optimise: route decisions and invariants', () => {
   it('keeps the shortest-drive baseline separate from a tight pharma deadline', () => {
     roads.minutes = { 'D>A': 2, 'D>B': 4, 'A>B': 8, 'B>A': 8 }
     const list = [stop('A'), stop('B', { cargo: 'PHARMA', windowEnd: 550 })]
-    const result = optimise(depot, list, 540, { ...driveOnly, late: 10 }, [])
+    const result = optimise(depot, list, 540, driveAnd('late'), [])
     expect(result.baseline.order).toEqual(['A', 'B'])
     expect(result.baseline.drive).toBe(10)
     expect(result.baseline.lateStops).toBe(1)
@@ -120,7 +141,7 @@ describe('optimise: route decisions and invariants', () => {
 
   it('moves a rainy-area delivery later when weather is the only extra penalty', () => {
     const list = [stop('A'), stop('B', { area: 'Woodlands' })]
-    const result = optimise(depot, list, 540, { ...driveOnly, weather: 10 }, [rain(540, 555)])
+    const result = optimise(depot, list, 540, driveAnd('weather'), [rain(540, 555)])
     expect(result.baseline.order).toEqual(['A', 'B'])
     expect(result.baseline.rainStops).toBe(1)
     expect(result.recommended.order).toEqual(['B', 'A'])
@@ -129,10 +150,19 @@ describe('optimise: route decisions and invariants', () => {
 
   it('prioritises more sensitive cargo when drive times and windows are equal', () => {
     const list = [stop('A', { cargo: 'CHILLED' }), stop('B', { cargo: 'PHARMA' })]
-    const result = optimise(depot, list, 540, { ...driveOnly, cold: 10 }, [])
+    const result = optimise(depot, list, 540, driveAnd('cold'), [])
     expect(result.baseline.order).toEqual(['A', 'B'])
     expect(result.recommended.order).toEqual(['B', 'A'])
     expect(result.recommended.cost).toBeLessThan(result.baseline.cost)
+  })
+
+  it.each([
+    ['sum above one', { ...driveOnly, late: 0.5 }],
+    ['sum below one', { ...driveOnly, drive: 0.5 }],
+    ['a negative weight', { ...driveOnly, drive: 1.5, late: -0.5 }],
+    ['a non-finite weight', { ...driveOnly, late: Number.NaN }],
+  ])('rejects weights with %s', (_label, weights) => {
+    expect(() => optimise(depot, [stop('A')], 540, weights, [])).toThrow('sum to one')
   })
 
   it('does not mutate the input stops, rain or weights', () => {

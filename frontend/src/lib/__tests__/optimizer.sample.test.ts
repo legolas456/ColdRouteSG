@@ -9,7 +9,9 @@ it('keeps the recorded Pharma demo reproducible with real bundled OSRM times', (
   try {
     const result = optimise(DEPOT, SAMPLE_STOPS, DEPARTURE, PROFILES.pharma.weights, RAIN_CELLS)
     expect(result.evaluated).toBe(5040)
-    expect(result.recommended.order).toEqual(['NUH', 'HV', 'AMK', 'WHC', 'TAM', 'MBFC', 'TPG'])
+    // Exhaustive optimum under the normalised objective and the Pharma profile.
+    // Update it only when the objective, scales or profile weights change on purpose.
+    expect(result.recommended.order).toEqual(['HV', 'NUH', 'TPG', 'AMK', 'WHC', 'TAM', 'MBFC'])
     expect(result.recommended.lateStops).toBe(0)
     expect(result.recommended.rainStops).toBe(0)
     expect(result.baseline.lateStops).toBe(1)

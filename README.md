@@ -26,7 +26,7 @@ From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`;
 
 ## What is included
 
-- Current console: fixed Jurong depot and up to 15 editable stops (the backend accepts arbitrary depot coordinates)
+- Delivery planner with a selectable depot (OneMap search; **Load sample** restores Jurong Cold Store) and up to 15 editable stops
 - Cold-chain priority per stop
 - Delivery time-window end and service duration
 - Adjustable optimisation weights
@@ -36,7 +36,7 @@ From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`;
 - LTA traffic-camera images from data.gov.sg
 - Public OSRM route matrix and route geometry
 - OneMap public basemap tiles for map display
-- Route sequencing using travel time + weather + parking + traffic proxy + cold-chain + lateness penalties
+- Route sequencing in the browser on five normalised terms: drive time, lateness, rain, parking and cold-chain exposure (traffic is shown as an estimate but not scored)
 - FastAPI Swagger docs at `/docs`
 - Built-in fallback data so the app remains demo-able when an external public endpoint is temporarily unavailable
 
@@ -313,7 +313,7 @@ ALLOW_MOCK_FALLBACK=false
 
 # Testing
 
-From the repo root, `make test` runs backend pytest, frontend Vitest and TypeScript checks. `make test-frontend` runs only frontend tests; from `frontend/`, use `npm test` or `npm run test:watch`. The frontend tests use fixed scenarios and bundled roads, never live APIs. See [`docs/contributing.md`](docs/contributing.md#test-commands) for coverage and limits.
+From the repo root, `make test` runs backend pytest, the frontend tests (node:test in `frontend/tests/` and Vitest in `frontend/src/**/__tests__/`) and TypeScript checks. `make test-frontend` runs only frontend tests; from `frontend/`, use `npm test` or `npm run test:watch`. The frontend tests use fixed scenarios and bundled roads, never live APIs. See [`docs/contributing.md`](docs/contributing.md#test-commands) for coverage and limits.
 
 For backend tests alone, from `backend/`:
 

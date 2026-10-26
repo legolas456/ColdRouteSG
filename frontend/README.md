@@ -22,8 +22,8 @@ A single-screen dispatcher console for planning one cold-chain van run in Singap
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # deterministic optimiser tests (no live API calls)
-npm run test:watch # rerun tests while editing
+npm test           # deterministic tests: tests/ (node:test) and src/**/__tests__ (Vitest), no live API calls
+npm run test:watch # rerun the Vitest tests while editing
 npm run build      # type-check + production bundle in dist/
 npm run preview    # serve dist/ on http://localhost:4173
 ```
