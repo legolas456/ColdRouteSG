@@ -173,7 +173,7 @@ export default function App() {
       )
       const finish = (c: Conditions) => {
         if (token !== runToken.current) return
-        const r = optimise(depot, c.stops, departure, PROFILES[profile].weights, c.rain)
+        const r = optimise(depot, c.stops, departure, PROFILES[profile].weights, c.rain, c.traffic)
         setPlanCond(c)
         setResult(r)
         if (!instant) setView('coldroute')
@@ -397,6 +397,7 @@ export default function App() {
         onDepartNow={() => setDeparture(Math.min(23 * 60 + 55, Math.ceil(sgMinutes(Date.now()) / 5) * 5))}
         onLoadSample={loadSample}
         isSample={isSample}
+        trafficLive={nowCond.traffic !== null}
       />
     )
 
@@ -436,6 +437,7 @@ export default function App() {
       depot={depot}
       stops={shownCond.stops}
       rain={shownCond.rain}
+      traffic={phase === 'optimised' ? shownCond.traffic : null}
       result={phase === 'optimised' ? result : null}
       view={view}
       phase={phase}

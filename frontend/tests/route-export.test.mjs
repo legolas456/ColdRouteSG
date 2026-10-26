@@ -12,15 +12,16 @@ const { routeCsv } = await import(`data:text/javascript;base64,${Buffer.from(jav
 const stop = {
   id: 's1', name: '=SUM(1,2) "Clinic"', address: '10, Main St',
   lat: 1.31, lng: 103.8, cargo: 'PHARMA', windowStart: 540,
-  windowEnd: 600, service: 10, parking: { risk: 0.3 }, trafficRisk: 0.2,
+  windowEnd: 600, service: 10, parking: { risk: 0.3 },
 }
 const row = {
   id: 's1', seq: 1, arrival: 550, start: 550, finish: 560,
-  legMinutes: 10, late: 0, inRain: true, exposure: 18,
+  legMinutes: 10, trafficMinutes: 2.46, late: 0, inRain: true, exposure: 18,
 }
 const result = {
   recommended: { rows: [row] },
   baseline: { rows: [{ ...row, arrival: 580, start: 580, finish: 590 }] },
+  trafficAt: 542,
 }
 const args = [result, { s1: stop }, 'Balanced', 540, { source: 'recorded', at: 545 }]
 
@@ -31,7 +32,13 @@ test('exports only the selected plan with quoted and formula-safe user text', ()
   assert.match(lines[1], /^"ColdRoute","Balanced","recorded","09:05","09:00"/)
   assert.ok(lines[1].includes('"\'=SUM(1,2) ""Clinic"""'))
   assert.ok(lines[1].includes('"10, Main St"'))
-  assert.ok(lines[1].endsWith('"0.3","0.2","18"'))
+  assert.ok(lines[1].endsWith('"0.3","2.5","18","09:02"'))
+})
+
+test('a plan without live traffic exports no traffic time', () => {
+  const free = { ...result, recommended: { rows: [{ ...row, trafficMinutes: 0 }] }, trafficAt: null }
+  const line = routeCsv(free, args[1], 'coldroute', args[2], args[3], args[4]).trim().split('\r\n')[1]
+  assert.ok(line.endsWith('"0.3","0","18",""'))
 })
 
 test('compare exports both route orders while baseline exports only baseline', () => {

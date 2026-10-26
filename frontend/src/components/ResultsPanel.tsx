@@ -354,6 +354,9 @@ interface Watchout {
   value: number
 }
 
+/** A traffic delay shorter than this is within the noise of OSRM's estimate. */
+const SLOW_APPROACH_MIN = 3
+
 /**
  * What a dispatcher should know about a stop, in words. Only the factors that
  * actually need attention show up, worst first; the full five-factor breakdown
@@ -381,7 +384,15 @@ function watchouts(row: StopResult, s: Stop, departure: number, rain: RainCell[]
       text: `${distanceLabel(s.parking.distanceKm)} walk`,
       title: `Nearest carpark: ${s.parking.name}, ${distanceLabel(s.parking.distanceKm)} away, ${s.parking.freePct}% of lots free (${s.parking.live ? 'HDB live' : 'HDB · URA'})`,
     })
-  if (T >= 0.4) out.push({ key: 'T', Icon: Car, value: T, text: 'Heavy traffic', title: `Slow approach: about ${Math.round(row.legMinutes)} min on congested roads (estimated)` })
+  // only measured delays: without live road speeds trafficMinutes is 0
+  if (row.trafficMinutes >= SLOW_APPROACH_MIN)
+    out.push({
+      key: 'T',
+      Icon: Car,
+      value: T,
+      text: `+${Math.round(row.trafficMinutes)} min traffic`,
+      title: `LTA road speeds: the approach takes about ${Math.round(row.legMinutes)} min, ${Math.round(row.trafficMinutes)} more than in free-flowing traffic`,
+    })
   if (C >= 0.4)
     out.push({
       key: 'C',

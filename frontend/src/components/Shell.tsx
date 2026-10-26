@@ -108,12 +108,12 @@ export function DataPill({
   open,
   onClick,
 }: {
-  conditions: Pick<Conditions, 'mode' | 'source' | 'at'>
+  conditions: Pick<Conditions, 'mode' | 'source' | 'at' | 'traffic'>
   loading: boolean
   open: boolean
   onClick: () => void
 }) {
-  const { mode, source, at } = conditions
+  const { mode, source, at, traffic } = conditions
   const live = mode === 'live'
   const label = !live ? 'Recorded' : loading && source === 'recorded' ? 'Live' : source === 'recorded' ? 'Live unavailable' : source === 'mixed' ? 'Live · partial' : 'Live'
   const ok = live && source === 'live'
@@ -123,7 +123,11 @@ export function DataPill({
       aria-expanded={open}
       aria-label={`${label} data${source !== 'recorded' || !live ? ` from ${hm(at)}` : ''}. Open conditions`}
       onClick={onClick}
-      title={live ? 'Planning with live NEA and HDB data. Open the live feeds.' : 'Planning with the recorded rainy morning (sample data). Open the live feeds.'}
+      title={
+        live
+          ? `Planning with live NEA and HDB data${traffic ? ' and LTA road speeds' : ''}. Open the live feeds.`
+          : 'Planning with the recorded rainy morning (sample data). Open the live feeds.'
+      }
       className={clsx(
         // phones: just the status dot, so the run title keeps its room
         'flex h-[26px] shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] max-md:w-[26px] max-md:justify-center max-md:px-0',
@@ -139,8 +143,8 @@ export function DataPill({
         </span>
       )}
       <span className="max-md:hidden">{label}</span>
-      {/* what the plan reads; LTA cameras are shown but do not feed the plan */}
-      {ok && <span className="max-xl:hidden">· NEA · HDB</span>}
+      {/* what the plan reads: LTA only when its road speeds were used (cameras never feed the plan) */}
+      {ok && <span className="max-xl:hidden">· NEA · HDB{traffic ? ' · LTA' : ''}</span>}
       {(!live || source !== 'recorded') && <span className="num max-md:hidden">{hm(at)}</span>}
     </button>
   )

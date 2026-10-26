@@ -2,13 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import data, routes
+from app.routers import data, routes, traffic
 
 settings = get_settings()
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="Local-first ColdRoute SG prototype. No AWS integration and no API keys required for configured public endpoints.",
+    description=(
+        "Local-first ColdRoute SG prototype. The public data endpoints need no API key; "
+        "/api/traffic/grid needs an LTA DataMall AccountKey (LTA_ACCOUNT_KEY)."
+    ),
 )
 
 app.add_middleware(
@@ -21,6 +24,7 @@ app.add_middleware(
 
 app.include_router(data.router)
 app.include_router(routes.router)
+app.include_router(traffic.router)
 
 
 @app.get("/")

@@ -3,9 +3,30 @@ import type { Depot, OptimiseResult, Plan, RainCell, Stop, StopResult, Weights }
 
 import { legGeometry, travel, type Point } from './roads'
 import { objectiveContribution, stopRawTerms } from './objective'
+import { legFactor, type TrafficGrid } from './traffic'
 
 // drive times and road geometry live in roads.ts (snapshot + runtime OSRM)
 export { legGeometry, travel }
+
+// one optimisation asks for the same leg thousands of times
+const factorCache = new WeakMap<TrafficGrid, Map<string, number>>()
+
+/**
+ * How many times longer than OSRM's free-flow time a leg takes in live traffic;
+ * 1 without traffic data. Keyed by coordinates, since a stop id can be reused.
+ */
+export function trafficFactor(a: Point, b: Point, traffic?: TrafficGrid | null) {
+  if (!traffic) return 1
+  let cache = factorCache.get(traffic)
+  if (!cache) factorCache.set(traffic, (cache = new Map()))
+  const key = `${a.lng},${a.lat}>${b.lng},${b.lat}`
+  let f = cache.get(key)
+  if (f === undefined) cache.set(key, (f = legFactor(a, b, traffic)))
+  return f
+}
+
+/** A delay this long on an approach is the full traffic risk for that stop. */
+const FULL_TRAFFIC_RISK_MIN = 15
 
 export function pathFor(depot: Depot, order: string[], stops: Record<string, Stop>) {
   const coords: [number, number][] = []
@@ -26,10 +47,15 @@ interface Context {
   weights: Weights
   /** every rain cell in play; a stop is only affected by the one over its area */
   rain: RainCell[]
+  /**
+   * Live road speeds, applied to every leg. One reading stands for the whole
+   * run, so drive times do not depend on the time of day.
+   */
+  traffic?: TrafficGrid | null
 }
 
 export function simulate(order: string[], ctx: Context): Plan {
-  const { depot, stops, departure, weights, rain } = ctx
+  const { depot, stops, departure, weights, rain, traffic } = ctx
   let t = departure
   let prev: Point = depot
   let drive = 0
@@ -44,8 +70,9 @@ export function simulate(order: string[], ctx: Context): Plan {
   order.forEach((id, i) => {
     const s = stops[id]
     const leg = travel(prev, s)
-    t += leg.minutes
-    drive += leg.minutes
+    const minutes = leg.minutes * trafficFactor(prev, s, traffic)
+    t += minutes
+    drive += minutes
     km += leg.km
     const arrival = t
     const start = Math.max(t, s.windowStart)
@@ -58,7 +85,7 @@ export function simulate(order: string[], ctx: Context): Plan {
     const park = s.parking.risk
     const sens = CARGO_SENSITIVITY[s.cargo]
     const raw = stopRawTerms({
-      driveMinutes: leg.minutes,
+      driveMinutes: minutes,
       lateMinutes: late,
       serviceMinutes: s.service,
       rainSeverity,
@@ -72,7 +99,7 @@ export function simulate(order: string[], ctx: Context): Plan {
     const risk = {
       W: inRain ? rainSeverity : nearRain ? 0.35 : 0.1,
       P: park,
-      T: s.trafficRisk,
+      T: Math.min(1, (minutes - leg.minutes) / FULL_TRAFFIC_RISK_MIN),
       C: Math.min(1, (sens * (start - departure)) / 200),
       L: late > 0 ? 1 : slack < 15 ? 0.6 : slack < 30 ? 0.3 : 0,
     }
@@ -87,7 +114,8 @@ export function simulate(order: string[], ctx: Context): Plan {
     rows.push({
       id,
       seq: i + 1,
-      legMinutes: leg.minutes,
+      legMinutes: minutes,
+      trafficMinutes: minutes - leg.minutes,
       legKm: leg.km,
       arrival,
       start,
@@ -192,18 +220,22 @@ function bestOf(starts: string[][], score: (o: string[]) => number) {
 /** Covers MAX_STOPS in places.ts; 2^15 subsets × 15 end stops is about 0.5 M states. */
 const EXACT_DRIVE_STOPS = 15
 
+/** A leg's drive time as simulate() counts it, so the searches agree with the plan. */
+const driveMinutes = (a: Point, b: Point, traffic?: TrafficGrid | null) => travel(a, b).minutes * trafficFactor(a, b, traffic)
+
 /**
  * The exact shortest-drive order (Held–Karp). Drive time does not depend on the
- * time of day, so unlike the full cost it can be solved exactly over subsets of
- * stops. This keeps the shortest-route comparison honest above eight stops.
+ * time of day (one traffic reading covers the run), so unlike the full cost it
+ * can be solved exactly over subsets of stops. This keeps the shortest-route
+ * comparison honest above eight stops.
  */
-function shortestDriveOrder(depot: Depot, stopList: Stop[]) {
+function shortestDriveOrder(depot: Depot, stopList: Stop[], traffic?: TrafficGrid | null) {
   const n = stopList.length
   const full = (1 << n) - 1
-  const legs = stopList.map((a) => stopList.map((b) => travel(a, b).minutes))
+  const legs = stopList.map((a) => stopList.map((b) => driveMinutes(a, b, traffic)))
   const best = new Float64Array((full + 1) * n).fill(Infinity)
   const from = new Int8Array((full + 1) * n).fill(-1)
-  stopList.forEach((s, j) => (best[(1 << j) * n + j] = travel(depot, s).minutes))
+  stopList.forEach((s, j) => (best[(1 << j) * n + j] = driveMinutes(depot, s, traffic)))
   for (let mask = 1; mask <= full; mask++) {
     for (let j = 0; j < n; j++) {
       const here = best[mask * n + j]
@@ -231,7 +263,7 @@ function shortestDriveOrder(depot: Depot, stopList: Stop[]) {
 }
 
 /** Starting orders besides the entered one: earliest deadline first, and nearest stop next. */
-function startingOrders(depot: Depot, stopList: Stop[]) {
+function startingOrders(depot: Depot, stopList: Stop[], traffic?: TrafficGrid | null) {
   const byDeadline = stopList
     .slice()
     .sort((a, b) => a.windowEnd - b.windowEnd || a.windowStart - b.windowStart)
@@ -242,7 +274,7 @@ function startingOrders(depot: Depot, stopList: Stop[]) {
   while (left.length) {
     let next = 0
     for (let i = 1; i < left.length; i++) {
-      if (travel(at, left[i]).minutes < travel(at, left[next]).minutes) next = i
+      if (driveMinutes(at, left[i], traffic) < driveMinutes(at, left[next], traffic)) next = i
     }
     at = left[next]
     nearest.push(left[next].id)
@@ -257,6 +289,8 @@ export function optimise(
   departure: number,
   weights: Weights,
   rain: RainCell[] = RAIN_CELLS,
+  /** live road speeds; leave out to plan with OSRM's free-flow drive times */
+  traffic: TrafficGrid | null = null,
 ): OptimiseResult {
   const t0 = performance.now()
   const stops = Object.fromEntries(stopList.map((s) => [s.id, s]))
@@ -265,7 +299,7 @@ export function optimise(
   if (Object.values(weights).some((w) => !Number.isFinite(w) || w < 0) || Math.abs(weightTotal - 1) > 1e-9) {
     throw new Error('Route weights must be non-negative and sum to one')
   }
-  const ctx: Context = { depot, stops, departure, weights, rain }
+  const ctx: Context = { depot, stops, departure, weights, rain, traffic }
   const baseCtx: Context = { ...ctx, weights: { drive: 1, late: 0, weather: 0, parking: 0, cold: 0 } }
 
   let baseline: Plan | null = null
@@ -283,10 +317,10 @@ export function optimise(
     // 9 stops already have 362,880 orders, so search locally from several starts.
     // src/lib/__tests__/optimizer.search.test.ts checks fixed 9-stop runs against
     // exhaustive search.
-    const { byDeadline, nearest } = startingOrders(depot, stopList)
+    const { byDeadline, nearest } = startingOrders(depot, stopList, traffic)
     const b =
       ids.length <= EXACT_DRIVE_STOPS
-        ? shortestDriveOrder(depot, stopList)
+        ? shortestDriveOrder(depot, stopList, traffic)
         : bestOf([ids, nearest], (o) => (evaluated++, simulate(o, baseCtx).drive))
     // Starting from the baseline too means the plan never scores worse than it.
     const r = bestOf([b, ids, byDeadline, nearest], (o) => (evaluated++, simulate(o, ctx).cost))
@@ -303,5 +337,6 @@ export function optimise(
     evaluated,
     elapsedMs: performance.now() - t0,
     highestRiskId,
+    trafficAt: traffic ? traffic.at : null,
   }
 }

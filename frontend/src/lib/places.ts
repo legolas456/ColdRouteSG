@@ -6,7 +6,7 @@
 import neaAreas from '../data/nea-areas.json'
 import { RAIN_CELLS } from '../data/sample'
 import { MAX_WALK_KM } from './conditions'
-import { kmBetween, nearest, parkingRisk } from './geo'
+import { nearest, parkingRisk } from './geo'
 import { loadHdb } from './live'
 import { hm } from './time'
 import type { Carpark, Stop } from './types'
@@ -94,10 +94,6 @@ export function shortName(name: string) {
   return out
 }
 
-// Rough traffic proxy until LTA speed bands are wired in: the CBD and its
-// approaches are slow at most hours, everywhere else is moderate.
-const CBD = { lng: 103.851, lat: 1.284 }
-const trafficGuess = (p: { lng: number; lat: number }) => (kmBetween(p, CBD) < 2.5 ? 0.5 : 0.3)
 
 /**
  * A new stop at a OneMap place. The window opens at the departure (to the half
@@ -144,6 +140,5 @@ export async function stopFromPlace(place: Place, departure: number, taken: stri
     area,
     forecast: cell ? `${cell.label} ${hm(cell.start)}–${hm(cell.end)}` : 'Partly cloudy',
     parking,
-    trafficRisk: trafficGuess(place),
   }
 }

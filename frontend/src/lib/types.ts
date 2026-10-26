@@ -33,8 +33,6 @@ export interface Stop {
   area: string
   forecast: string
   parking: Carpark
-  /** 0–1 proxy from LTA speed bands on the approach */
-  trafficRisk: number
   review?: { query: string; candidates: string[] }
 }
 
@@ -69,6 +67,7 @@ export interface Weights {
 export interface RiskFactors {
   W: number
   P: number
+  /** 0–1 from the live-traffic delay on the approach; 0 when traffic is not measured */
   T: number
   C: number
   L: number
@@ -77,7 +76,10 @@ export interface RiskFactors {
 export interface StopResult {
   id: string
   seq: number
+  /** drive time of the approach, with live traffic when the plan has it */
   legMinutes: number
+  /** minutes live traffic adds to the approach; 0 when traffic is not measured */
+  trafficMinutes: number
   legKm: number
   arrival: number
   start: number
@@ -113,4 +115,6 @@ export interface OptimiseResult {
   evaluated: number
   elapsedMs: number
   highestRiskId: string
+  /** minutes after midnight of the LTA road speeds the plan used; null when it used none */
+  trafficAt: number | null
 }

@@ -30,7 +30,6 @@ function randomRun(seed: number, n: number): Stop[] {
       service: 5 + Math.floor(rand() * 16), cargo: CARGOS[Math.floor(rand() * 3)],
       area: AREAS[Math.floor(rand() * AREAS.length)], forecast: 'Test',
       parking: { name: 'Test bay', lng, lat, distanceKm, freePct, risk: parkingRisk(distanceKm, freePct) },
-      trafficRisk: 0.3,
     }
   })
 }
