@@ -3,6 +3,7 @@
 ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation in Singapore** using public weather, parking and traffic-camera data. The frontend is **React + TypeScript + Vite + Tailwind CSS + MapLibre**, a single-screen dispatcher console. See [`frontend/README.md`](frontend/README.md); UI conventions are in [`frontend/AGENTS.md`](frontend/AGENTS.md). The backend is **Python + FastAPI**.
 
 Project background, the preliminary proposal, product design, brand and to-dos are in [`docs/`](docs/README.md).
+New to the team? Start with [`docs/contributing.md`](docs/contributing.md): which demo to use, what's real or mocked, local setup and a safe first PR.
 
 **Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify; GitHub Actions redeploys it on every merge to `main`, see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. **Live data** (top bar) plans with the live NEA forecast and HDB carpark availability from data.gov.sg; the default **Recorded** mode replays a rainy sample morning. Stops come from a real OneMap address search, with OSRM drive times and roads. Traffic is estimated, accounts are mocked, and the optimiser runs in the browser.
 
@@ -10,14 +11,14 @@ The app does **not require any API key or registration** to run locally.
 
 ## Quick start
 
-From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`):
+From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`; Python 3.11 and Node 22 match CI):
 
 | Command | What it does |
 | --- | --- |
 | `make setup` | Creates `backend/.venv`, installs backend and frontend dependencies, creates local env files |
 | `make dev` | Backend on http://localhost:8000 and frontend on http://localhost:5173 together |
 | `make frontend` / `make backend` | Just one of them (the console works without the backend) |
-| `make test` | Backend `pytest` plus the frontend type check |
+| `make test` | Backend `pytest`, frontend optimiser unit tests and TypeScript check |
 | `make build` / `make preview` | Production build into `frontend/dist`, and serve it on http://localhost:4173 |
 | `make deploy` | Deploy by hand (CI normally does this on merge). Needs the `coldroute` AWS profile, see [`docs/deployment.md`](docs/deployment.md) |
 
@@ -25,7 +26,7 @@ From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`)
 
 ## What is included
 
-- Delivery planner with editable depot and up to 15 stops
+- Current console: fixed Jurong depot and up to 15 editable stops (the backend accepts arbitrary depot coordinates)
 - Cold-chain priority per stop
 - Delivery time-window end and service duration
 - Adjustable optimisation weights
@@ -312,7 +313,9 @@ ALLOW_MOCK_FALLBACK=false
 
 # Testing
 
-From the repo root, `make test`. Or from `backend/`:
+From the repo root, `make test` runs backend pytest, frontend Vitest and TypeScript checks. `make test-frontend` runs only frontend tests; from `frontend/`, use `npm test` or `npm run test:watch`. The frontend tests use fixed scenarios and bundled roads, never live APIs. See [`docs/contributing.md`](docs/contributing.md#test-commands) for coverage and limits.
+
+For backend tests alone, from `backend/`:
 
 ```bash
 pytest

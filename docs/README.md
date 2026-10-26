@@ -6,6 +6,7 @@ Project knowledge for the ColdRoute SG group project (CS5224 Cloud Computing, Gr
 
 | File | Read it for |
 | --- | --- |
+| [contributing.md](contributing.md) | Joining the team: current vs old demo, local setup, real vs mocked features, tests and the branch/PR workflow |
 | [project-brief.md](project-brief.md) | One-page summary: problem, users, what the product does, what is built today |
 | [preliminary-proposal.md](preliminary-proposal.md) | The preliminary report we submitted (28 Sep 2026): business case, AWS architecture, cost function, evaluation plan |
 | [product-design.md](product-design.md) | Product definition and UX: the dispatcher flow, key screens, explanations, and the wider ideas we may still build |
