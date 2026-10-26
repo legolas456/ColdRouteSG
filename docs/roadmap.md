@@ -44,7 +44,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 
 ### 4. Optimiser
 
-- [ ] Today: exhaustive search up to 8 stops, 2-opt from the input order above that. Seed 2-opt with earliest-deadline or nearest-neighbour (as in the proposal) and check results at 10 and 15 stops.
+- [x] Search above 8 stops: the shortest route is exact (Held–Karp), and the ColdRoute plan uses 2-opt, Or-opt and swap moves from the shortest-route, entered, earliest-deadline and nearest-neighbour orders. Against exhaustive search on 80 random 9-stop runs (Balanced and Pharma) it found the optimum in 78 (worst 3.4% above, never more late stops) and on all 10 random 10-stop runs; 2-opt from the entered order found 29 of the 80 (worst 47%). About 50 ms for 15 stops on a dev machine. Real-data scenario evaluation is still separate work.
 - [x] Unit tests on fixed scenarios: rain, parking crunch, tight pharma window, checked against the normalised objective. Vitest also covers window waits, rain interval boundaries, light vs heavy rain, cargo sensitivity, weight validation, empty/single runs, 8-stop exhaustive search, 10/15-stop integrity and the recorded sample; the node:test suite covers the objective scales, profiles, depot picker and CSV export. `make test` and GitHub Checks run both. Performance and optimality evaluation are still separate work.
 - [ ] Explanations generated from cost differences, checked against the position change.
 

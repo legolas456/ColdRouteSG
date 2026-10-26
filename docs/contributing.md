@@ -12,7 +12,7 @@ The [older site with `production` in its address](https://production.d3afn54umnn
 
 The frontend searches Singapore addresses through OneMap and gets road times and geometry through OSRM. Live mode reads NEA weather, HDB parking availability and LTA camera images through data.gov.sg. Recorded mode uses a curated sample morning and bundled road data, making the demo repeatable.
 
-The optimiser currently runs **in the browser**: exhaustive search through eight stops, then 2-opt local search for larger runs. The FastAPI backend has separate optimisation and data endpoints but is not connected to this redesigned UI yet. The depot can be any Singapore address found through OneMap; **Load sample** restores Jurong Cold Store.
+The optimiser currently runs **in the browser**: exhaustive search through eight stops; above that, an exact shortest route and a local search (2-opt, Or-opt and swap moves) for the ColdRoute plan. The FastAPI backend has separate optimisation and data endpoints but is not connected to this redesigned UI yet. The depot can be any Singapore address found through OneMap; **Load sample** restores Jurong Cold Store.
 
 Traffic risk is an estimate, not measured traffic speed. Camera images do not calculate speed. Exposure is a modelled risk indicator, not a temperature measurement. Sign-in and dispatch are browser-local demonstrations, not real accounts or messages sent to drivers. A share link is not a production access-control system.
 
