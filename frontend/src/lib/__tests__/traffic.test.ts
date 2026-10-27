@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 // The grid backend/tests/test_traffic.py builds from its LTA fixture; both sides
 // read this one file, so the Python builder and this parser cannot drift apart.
 import BACKEND_GRID from '../../../../backend/tests/fixtures/traffic_grid_expected.json'
-import { areaFactor, legFactor, MAX_FACTOR, parseTrafficGrid, slowStretches, type TrafficGrid } from '../traffic'
+import { areaFactor, HEAVY_FACTOR, heavyStretches, legFactor, MAX_FACTOR, parseTrafficGrid, type TrafficGrid } from '../traffic'
 
 const ORIGIN: [number, number] = [103.55, 1.15]
 const CELL = 0.01
@@ -57,6 +57,15 @@ describe('parseTrafficGrid', () => {
   it('converts the reading time to Singapore minutes whatever the offset', () => {
     expect(parseTrafficGrid({ ...BACKEND_GRID, fetchedAt: '2026-10-27T00:30:00Z' }).at).toBe(8 * 60 + 30)
     expect(parseTrafficGrid({ ...BACKEND_GRID, fetchedAt: '2026-10-27T16:10:00Z' }).at).toBe(10)
+  })
+
+  it("prefers LTA's own measurement time to when the backend read it", () => {
+    const g = parseTrafficGrid({ ...BACKEND_GRID, fetchedAt: '2026-10-27T10:31:00+08:00', measuredAt: '2026-10-27T10:25:00+08:00' })
+    expect(g.at).toBe(10 * 60 + 25)
+    expect(g.fetchedAt).toBe('2026-10-27T10:31:00+08:00')
+    // the backend leaves it out (null) when LTA sends no usable time
+    expect(parseTrafficGrid({ ...BACKEND_GRID, fetchedAt: '2026-10-27T10:31:00+08:00', measuredAt: null }).at).toBe(10 * 60 + 31)
+    expect(parseTrafficGrid({ ...BACKEND_GRID, fetchedAt: '2026-10-27T10:31:00+08:00', measuredAt: 'soon' }).at).toBe(10 * 60 + 31)
   })
 
   it.each([
@@ -133,16 +142,16 @@ describe('legFactor', () => {
   })
 })
 
-describe('slowStretches', () => {
+describe('heavyStretches', () => {
   const road: [number, number][] = [
     [103.80, 1.30],
     [103.90, 1.30],
   ]
-  // a jam in the two cells from 103.84 to 103.86, on the road's row of cells
+  // a jam in the two cells from 103.84 to 103.86; with the neighbouring cells it reaches twice free-flow time there only
   const slowMiddle = () => cover((lng) => (lng > 103.84 && lng < 103.86 ? 3 : 1))
 
-  it('finds the slow run between two road vertices', () => {
-    const out = slowStretches(road, slowMiddle())
+  it('finds the heavy run between two road vertices', () => {
+    const out = heavyStretches(road, slowMiddle())
     expect(out).toHaveLength(1)
     const [s] = out
     // inside the jam, with blur from the neighbouring cells
@@ -153,11 +162,20 @@ describe('slowStretches', () => {
   })
 
   it('finds nothing on free-flowing roads or without data', () => {
-    expect(slowStretches(road, uniform(1))).toEqual([])
-    expect(slowStretches(road, grid([]))).toEqual([])
+    expect(heavyStretches(road, uniform(1))).toEqual([])
+    expect(heavyStretches(road, grid([]))).toEqual([])
+  })
+
+  it('draws from twice free-flow time, not from merely slow', () => {
+    // 1.6 times is slow (it gets a chip on a long enough approach) but not heavy
+    expect(heavyStretches(road, uniform(1.6))).toEqual([])
+    const all = heavyStretches(road, uniform(HEAVY_FACTOR))
+    expect(all).toHaveLength(1)
+    expect(all[0].coords[0]).toEqual(road[0])
+    expect(all[0].coords.at(-1)).toEqual(road[1])
   })
 
   it('skips runs shorter than the minimum', () => {
-    expect(slowStretches(road, slowMiddle(), 50)).toEqual([])
+    expect(heavyStretches(road, slowMiddle(), 50)).toEqual([])
   })
 })

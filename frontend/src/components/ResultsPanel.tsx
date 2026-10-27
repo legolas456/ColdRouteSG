@@ -21,6 +21,7 @@ import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
 import { routeCsv } from '../lib/route-export'
 import { duration, hm, signed } from '../lib/time'
+import { SLOW_FACTOR } from '../lib/traffic'
 import type { Depot, OptimiseResult, Plan, RainCell, Stop, StopResult } from '../lib/types'
 import { distanceLabel } from './ConditionsPanel'
 import { Button, CargoTag, Segmented } from './ui'
@@ -384,8 +385,10 @@ function watchouts(row: StopResult, s: Stop, departure: number, rain: RainCell[]
       text: `${distanceLabel(s.parking.distanceKm)} walk`,
       title: `Nearest carpark: ${s.parking.name}, ${distanceLabel(s.parking.distanceKm)} away, ${s.parking.freePct}% of lots free (${s.parking.live ? 'HDB live' : 'HDB · URA'})`,
     })
-  // only measured delays: without live road speeds trafficMinutes is 0
-  if (row.trafficMinutes >= SLOW_APPROACH_MIN)
+  // Only measured delays (without live road speeds trafficMinutes is 0), and only
+  // a notably slow approach: in the daytime most legs run a little slower than free flow.
+  const freeFlow = row.legMinutes - row.trafficMinutes
+  if (row.trafficMinutes >= SLOW_APPROACH_MIN && row.legMinutes >= SLOW_FACTOR * freeFlow)
     out.push({
       key: 'T',
       Icon: Car,

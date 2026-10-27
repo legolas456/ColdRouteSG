@@ -67,7 +67,7 @@ Live road speeds need an LTA DataMall AccountKey, which must never reach the bro
 | Environment | `LTA_ACCOUNT_KEY`, `TRAFFIC_BUCKET`, optionally `TRAFFIC_KEY` (default `traffic/speed-grid.json`) | `LTA_ACCOUNT_KEY` |
 | Permissions | `s3:PutObject` on the grid's key | none beyond the function's own |
 | Console reads | the S3 object (public read, or through CloudFront), with bucket CORS allowing the console's origin | the API route, which must not need a sign-in token (it is public data) and must allow the console's origin in CORS |
-| Timeout | 60 s (it reads about a hundred LTA pages, eight at a time) | 30 s at API Gateway; the first request after a cold start does the same reading |
+| Timeout | 60 s (it reads 288 LTA pages, 16 at a time with retries: 3–6 s on 27 Oct 2026, up to 30 s seen with 8 at a time) | 30 s at API Gateway; the first request after a cold start does the same reading, so a slow LTA can time it out |
 
 Then set `VITE_TRAFFIC_URL` for the production build (in `frontend/.env.production`, or as a variable in `deploy.yml`) and redeploy the console. Until it is set, the console plans with free-flowing drive times and shows the Road speeds section as "Off".
 

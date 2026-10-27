@@ -19,7 +19,7 @@ export interface TrafficCell {
 export interface TrafficGrid {
   /** when the backend read LTA, ISO time with the Singapore offset */
   fetchedAt: string
-  /** the same, as minutes after midnight in Singapore */
+  /** when LTA measured the speeds (its lastUpdatedTime), or else when they were read: minutes after midnight in Singapore */
   at: number
   /** south-west corner of cell 0,0: [lng, lat] */
   origin: [number, number]
@@ -34,6 +34,12 @@ export interface TrafficGrid {
 
 /** A stretch counts as slow from 1.5 times its free-flow travel time, as in the backend. */
 export const SLOW_FACTOR = 1.5
+/**
+ * The map draws heavy traffic from twice free-flow time (under half the free-flow
+ * speed). In the daytime the typical road already runs about 1.45 times slower
+ * (LTA, 27 Oct 2026), so SLOW_FACTOR would paint half the route.
+ */
+export const HEAVY_FACTOR = 2
 export const MAX_FACTOR = 3
 /** Spacing of the samples along a leg. */
 const SAMPLE_KM = 0.5
@@ -56,7 +62,7 @@ export function parseTrafficGrid(raw: unknown): TrafficGrid {
   const fail = (what: string) => new Error(`Unexpected road-speed grid (${what})`)
   if (!raw || typeof raw !== 'object') throw fail('not an object')
   const g = raw as Record<string, unknown>
-  const { origin, cellDeg, cells, fetchedAt } = g
+  const { origin, cellDeg, cells, fetchedAt, measuredAt } = g
   if (!Array.isArray(origin) || origin.length !== 2 || !isNum(origin[0]) || !isNum(origin[1])) throw fail('origin')
   if (!isNum(cellDeg) || cellDeg <= 0) throw fail('cellDeg')
   if (typeof fetchedAt !== 'string' || Number.isNaN(Date.parse(fetchedAt))) throw fail('fetchedAt')
@@ -68,9 +74,10 @@ export function parseTrafficGrid(raw: unknown): TrafficGrid {
     if (!Number.isInteger(i) || !Number.isInteger(j) || !isNum(factor) || factor < 1 || !isNum(km) || km <= 0) throw fail('cell values')
     map.set(`${i},${j}`, { factor: Math.min(MAX_FACTOR, factor), km })
   }
+  const measured = typeof measuredAt === 'string' && !Number.isNaN(Date.parse(measuredAt)) ? measuredAt : fetchedAt
   return {
     fetchedAt,
-    at: minutesInSingapore(fetchedAt),
+    at: minutesInSingapore(measured),
     origin: [origin[0], origin[1]],
     cellDeg,
     stretches: isNum(g.stretches) ? g.stretches : 0,
@@ -128,8 +135,8 @@ function densify(path: [number, number][], stepKm = 0.2) {
   return out
 }
 
-/** The slow runs along a road path, for the map: each with its length and a midpoint for a tag. */
-export function slowStretches(path: [number, number][], grid: TrafficGrid, minKm = 0.3) {
+/** The heavy-traffic runs along a road path, for the map: each with its length and a midpoint for a tag. */
+export function heavyStretches(path: [number, number][], grid: TrafficGrid, minKm = 0.3) {
   const out: Array<{ coords: [number, number][]; mid: [number, number]; km: number }> = []
   let run: [number, number][] = []
   const flush = () => {
@@ -139,7 +146,7 @@ export function slowStretches(path: [number, number][], grid: TrafficGrid, minKm
     run = []
   }
   for (const p of densify(path)) {
-    if (areaFactor(grid, { lng: p[0], lat: p[1] }) >= SLOW_FACTOR) run.push(p)
+    if (areaFactor(grid, { lng: p[0], lat: p[1] }) >= HEAVY_FACTOR) run.push(p)
     else flush()
   }
   flush()

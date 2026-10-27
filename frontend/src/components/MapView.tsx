@@ -7,7 +7,7 @@ import sgMask from '../data/sg-mask.json'
 import { legGeometry, pathFor } from '../lib/optimizer'
 import { useRoadsVersion } from '../lib/roads'
 import { hm } from '../lib/time'
-import { slowStretches, type TrafficGrid } from '../lib/traffic'
+import { heavyStretches, type TrafficGrid } from '../lib/traffic'
 import type { Depot, OptimiseResult, RainCell, Stop } from '../lib/types'
 import type { MapPalette } from '../lib/themes'
 import type { View } from './ResultsPanel'
@@ -484,7 +484,7 @@ export function MapView(props: Props) {
     let prev: { id: string; lng: number; lat: number } = depot
     for (const id of primaryPlan.order) {
       const s = stopById[id]
-      for (const stretch of slowStretches(legGeometry(prev, s), traffic)) out.push({ id, ...stretch })
+      for (const stretch of heavyStretches(legGeometry(prev, s), traffic)) out.push({ id, ...stretch })
       prev = s
     }
     return out

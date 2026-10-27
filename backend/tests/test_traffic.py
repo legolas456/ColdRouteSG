@@ -32,9 +32,15 @@ ROWS = json.loads((FIXTURES / "lta_speed_bands_sample.json").read_text())
 FETCHED_AT = datetime(2026, 10, 27, 8, 30, tzinfo=SGT)
 
 
+@pytest.fixture(autouse=True)
+def no_retry_wait(monkeypatch):
+    monkeypatch.setattr(traffic, "RETRY_SECONDS", 0)
+
+
 # ---- parsing and delay factors ----------------------------------------------
 
-# (row index in the fixture, expected factor; None when the row is rejected)
+# (row index in the fixture, expected factor; None when the row is rejected,
+# "skip" when it parses but is not a road whose band tracks traffic)
 # factor = free-flow km/h for the road category / middle of the band's range, capped at 3
 EXPECTED = [
     (0, 1.0),  # expressway at 70+ km/h: free flow
@@ -43,13 +49,13 @@ EXPECTED = [
     (3, 3.0),  # major arterial at 10-19 km/h: 55 / 15 = 3.67, capped
     (4, 1.0),  # major arterial at 50-59 km/h
     (5, 3.0),  # the sample record in LTA's guide: arterial at 10-19 km/h
-    (6, 45 / 35),  # minor arterial at 30-39 km/h
-    (7, 1.0),  # small road at 30-39 km/h is its normal speed
-    (8, 1.0),  # slip road at 40-49 km/h
-    (9, 1.0),  # short tunnel at 60-69 km/h
+    (6, "skip"),  # minor arterial: stop-start between junctions, not traffic
+    (7, "skip"),  # small road: likewise
+    (8, 55 / 45),  # slip road at 40-49 km/h
+    (9, 1.0),  # short tunnel at 60-69 km/h, above its 45 km/h free flow
     (10, 75 / 35),  # numbers sent as strings
     (11, 75 / 35),  # older letter category "A" is an expressway
-    (12, 45 / 25),  # unknown category "G" uses the default free-flow speed
+    (12, "skip"),  # unknown category "G"
     (13, None),  # missing EndLat
     (14, None),  # band 0 is not a band
     (15, None),  # 0,0 coordinates
@@ -62,9 +68,26 @@ def test_parse_stretch_and_factor(index, factor):
     stretch = parse_stretch(ROWS[index])
     if factor is None:
         assert stretch is None
+    elif factor == "skip":
+        assert stretch is not None and not stretch.for_routing
     else:
-        assert stretch is not None
+        assert stretch is not None and stretch.for_routing
         assert stretch.factor == pytest.approx(factor)
+
+
+def test_only_roads_whose_bands_track_traffic_feed_the_grid():
+    grid = grid_from_rows(ROWS, FETCHED_AT)
+    assert grid["stretches"] == sum(1 for _, f in EXPECTED if f not in (None, "skip"))
+    cells = {(i, j): factor for i, j, factor, _ in grid["cells"]}
+    # the minor arterial and the unknown road had cells of their own; now they have none
+    assert cell_of(*parse_stretch(ROWS[6]).mid) not in cells
+    assert cell_of(*parse_stretch(ROWS[12]).mid) not in cells
+    # the small road shares its cell with the PIE and its slip road, which still count
+    small_road_cell = cell_of(*parse_stretch(ROWS[7]).mid)
+    assert small_road_cell == cell_of(*parse_stretch(ROWS[0]).mid)
+    assert small_road_cell in cells
+    with pytest.raises(TrafficUnavailable, match="no usable"):
+        grid_from_rows([ROWS[6], ROWS[7], ROWS[12]], FETCHED_AT)
 
 
 def test_every_fixture_row_is_covered():
@@ -137,8 +160,12 @@ def test_no_usable_rows_is_unavailable():
 # ---- fetching -----------------------------------------------------------------
 
 
-def _lta(total: int, seen: list[httpx.Request] | None = None, status: int = 200, body=None):
-    """A fake LTA that serves `total` records in pages of PAGE_SIZE."""
+def _lta(total: int, seen: list[httpx.Request] | None = None, status: int = 200, body=None, updated=None, failures=None):
+    """A fake LTA that serves `total` records in pages of PAGE_SIZE.
+
+    `failures` maps a $skip to the statuses (or exceptions) its first attempts get.
+    """
+    failures = {skip: list(answers) for skip, answers in (failures or {}).items()}
 
     def handle(request: httpx.Request) -> httpx.Response:
         if seen is not None:
@@ -148,16 +175,65 @@ def _lta(total: int, seen: list[httpx.Request] | None = None, status: int = 200,
         if body is not None:
             return httpx.Response(200, json=body)
         skip = int(request.url.params["$skip"])
+        if failures.get(skip):
+            answer = failures[skip].pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            return httpx.Response(answer, json={"fault": "test"})
         rows = [{"LinkID": str(n)} for n in range(skip, min(skip + PAGE_SIZE, total))]
-        return httpx.Response(200, json={"odata.metadata": "test", "value": rows})
+        payload = {"odata.metadata": "test", "value": rows}
+        if updated is not None:
+            payload["lastUpdatedTime"] = updated
+        return httpx.Response(200, json=payload)
 
     return httpx.AsyncClient(transport=httpx.MockTransport(handle))
 
 
-@pytest.mark.parametrize("total", [0, 1, 499, 500, 1234, 4000, 4500, 9001])
+@pytest.mark.parametrize("total", [0, 1, 499, 500, 1234, 4000, 4500, 9001, 16 * PAGE_SIZE + 1])
 def test_fetch_reads_every_record_exactly_once(total):
-    rows = asyncio.run(fetch_speed_bands("key", _lta(total)))
-    assert [r["LinkID"] for r in rows] == [str(n) for n in range(total)]
+    reading = asyncio.run(fetch_speed_bands("key", _lta(total)))
+    assert [r["LinkID"] for r in reading.rows] == [str(n) for n in range(total)]
+
+
+def test_measured_time_comes_from_lta():
+    reading = asyncio.run(fetch_speed_bands("key", _lta(1234, updated="2026-10-27 10:25:00")))
+    assert reading.measured_at == datetime(2026, 10, 27, 10, 25, tzinfo=SGT)
+    grid = build_grid([parse_stretch(ROWS[0])], FETCHED_AT, reading.measured_at)
+    assert grid["measuredAt"] == "2026-10-27T10:25:00+08:00"
+    assert grid["fetchedAt"] == "2026-10-27T08:30:00+08:00"
+
+
+@pytest.mark.parametrize("updated", [None, "", "yesterday", "2026-10-27T10:25:00Z"])
+def test_missing_or_unexpected_lta_time_is_left_out(updated):
+    assert asyncio.run(fetch_speed_bands("key", _lta(10, updated=updated))).measured_at is None
+    assert build_grid([parse_stretch(ROWS[0])], FETCHED_AT)["measuredAt"] is None
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [[500], [500, 500], [502, 503, 504], [429], [httpx.ConnectError("dropped")], [httpx.ReadTimeout("slow")]],
+)
+def test_a_page_that_fails_for_a_moment_is_retried(answers):
+    seen: list[httpx.Request] = []
+    reading = asyncio.run(fetch_speed_bands("key", _lta(1234, seen, failures={500: answers})))
+    assert [r["LinkID"] for r in reading.rows] == [str(n) for n in range(1234)]
+    assert sum(1 for r in seen if r.url.params["$skip"] == "500") == len(answers) + 1
+
+
+def test_a_page_that_keeps_failing_gives_up_after_every_attempt():
+    seen: list[httpx.Request] = []
+    failing = {500: [500] * traffic.PAGE_ATTEMPTS}
+    with pytest.raises(TrafficUnavailable, match="did not respond"):
+        asyncio.run(read_live_grid("key", client=_lta(1234, seen, failures=failing)))
+    assert sum(1 for r in seen if r.url.params["$skip"] == "500") == traffic.PAGE_ATTEMPTS
+
+
+@pytest.mark.parametrize("status", [400, 404])
+def test_a_client_error_is_not_retried(status):
+    seen: list[httpx.Request] = []
+    with pytest.raises(TrafficUnavailable, match="did not respond"):
+        asyncio.run(read_live_grid("key", client=_lta(1234, seen, failures={500: [status]})))
+    assert sum(1 for r in seen if r.url.params["$skip"] == "500") == 1
 
 
 def test_fetch_sends_the_key_and_a_literal_skip():

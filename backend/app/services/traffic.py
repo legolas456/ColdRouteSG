@@ -18,7 +18,7 @@ import math
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, NamedTuple, Optional
 
 import httpx
 
@@ -28,9 +28,13 @@ from app.services.geo import haversine_km
 SPEED_BANDS_URL = "https://datamall2.mytransport.sg/ltaodataservice/v4/TrafficSpeedBands"
 # LTA returns at most 500 records per call; $skip pages through the rest.
 PAGE_SIZE = 500
-PAGES_PER_BATCH = 8
-# 200,000 records, far more than LTA has; only stops a runaway loop.
-MAX_PAGES = 400
+PAGES_PER_BATCH = 16
+# 300,000 records, about twice what LTA has (143,787 on 27 Oct 2026); only stops a runaway loop.
+MAX_PAGES = 600
+# LTA sometimes answers one page with a 500 when many are asked for at once.
+# Retry that page with backoff rather than lose the whole reading.
+PAGE_ATTEMPTS = 4
+RETRY_SECONDS = 0.5
 
 SGT = timezone(timedelta(hours=8))
 # Cells are 0.01 degree (about 1.1 km) from a corner south-west of Tuas.
@@ -42,10 +46,14 @@ LAT_RANGE = (1.15, 1.50)
 # Speed bands are 10 km/h ranges: 1 is under 10 km/h, 8 is 70 km/h or more.
 # Each band stands for the middle of its range.
 BAND_KMH = {1: 5.0, 2: 15.0, 3: 25.0, 4: 35.0, 5: 45.0, 6: 55.0, 7: 65.0, 8: 75.0}
-# Free-flow speed by LTA road category: 1 expressways, 2 major arterial,
-# 3 arterial, 4 minor arterial, 5 small roads, 6 slip roads, 8 short tunnels.
-FREE_FLOW_KMH = {1: 75.0, 2: 55.0, 3: 45.0, 4: 45.0, 5: 35.0, 6: 45.0, 8: 65.0}
-DEFAULT_FREE_FLOW_KMH = 45.0
+# Free-flow speed for the road categories whose bands track traffic:
+# 1 expressways, 2 major arterial, 3 arterial, 6 slip roads, 8 short tunnels.
+# Each is the 85th-percentile band speed of its category in two daytime
+# readings (27 Oct 2026, 07:16 and 10:33); a night reading would be a better
+# base. Minor arterials (4) and small roads (5) are left out: their bands were
+# the same at both times (a third of small roads under 10 km/h), so they show
+# stop-start between junctions, which OSRM's times already include, not traffic.
+FREE_FLOW_KMH = {1: 75.0, 2: 55.0, 3: 45.0, 6: 55.0, 8: 45.0}
 # Older API versions used letters for the road category.
 LETTER_CATEGORY = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6}
 # A crawl at 5 km/h would read as 15 times free flow; cap it so a single
@@ -78,9 +86,12 @@ class Stretch:
         return ((self.start[0] + self.end[0]) / 2, (self.start[1] + self.end[1]) / 2)
 
     @property
+    def for_routing(self) -> bool:
+        return self.category in FREE_FLOW_KMH
+
+    @property
     def factor(self) -> float:
-        free = FREE_FLOW_KMH.get(self.category, DEFAULT_FREE_FLOW_KMH)
-        return min(MAX_FACTOR, max(1.0, free / BAND_KMH[self.band]))
+        return min(MAX_FACTOR, max(1.0, FREE_FLOW_KMH[self.category] / BAND_KMH[self.band]))
 
 
 def _category(value: Any) -> int:
@@ -120,7 +131,15 @@ def cell_of(lng: float, lat: float) -> tuple[int, int]:
     return math.floor((lng - GRID_ORIGIN[0]) / CELL_DEG), math.floor((lat - GRID_ORIGIN[1]) / CELL_DEG)
 
 
-def build_grid(stretches: list[Stretch], fetched_at: datetime) -> dict[str, Any]:
+def lta_time(value: Any) -> Optional[datetime]:
+    """LTA's lastUpdatedTime, e.g. '2026-10-27 10:25:00', which is Singapore time."""
+    try:
+        return datetime.strptime(str(value), "%Y-%m-%d %H:%M:%S").replace(tzinfo=SGT)
+    except ValueError:
+        return None
+
+
+def build_grid(stretches: list[Stretch], fetched_at: datetime, measured_at: Optional[datetime] = None) -> dict[str, Any]:
     """Length-weighted mean delay factor per cell, keyed by each stretch's midpoint."""
     sums: dict[tuple[int, int], list[float]] = {}
     total_km = slow_km = 0.0
@@ -137,6 +156,8 @@ def build_grid(stretches: list[Stretch], fetched_at: datetime) -> dict[str, Any]
         "version": 1,
         "source": "LTA DataMall Traffic Speed Bands v4",
         "fetchedAt": fetched_at.astimezone(SGT).isoformat(timespec="seconds"),
+        # when LTA measured these speeds; the console prefers it to fetchedAt
+        "measuredAt": measured_at.astimezone(SGT).isoformat(timespec="seconds") if measured_at else None,
         "origin": list(GRID_ORIGIN),
         "cellDeg": CELL_DEG,
         "stretches": len(stretches),
@@ -148,22 +169,42 @@ def build_grid(stretches: list[Stretch], fetched_at: datetime) -> dict[str, Any]
     }
 
 
-async def fetch_speed_bands(account_key: str, client: httpx.AsyncClient) -> list[dict[str, Any]]:
+class Reading(NamedTuple):
+    rows: list[dict[str, Any]]
+    # LTA's own time for the speeds, from the first page, if it sent one
+    measured_at: Optional[datetime]
+
+
+async def fetch_speed_bands(account_key: str, client: httpx.AsyncClient) -> Reading:
     """Every record, a batch of pages at a time, until a page comes back short."""
     if not account_key:
         raise TrafficUnavailable("No LTA DataMall AccountKey is configured (set LTA_ACCOUNT_KEY).")
     headers = {"AccountKey": account_key, "accept": "application/json"}
+    measured_at: Optional[datetime] = None
 
     async def page(skip: int) -> list[dict[str, Any]]:
-        # LTA's examples use a literal "$skip"; keep it out of params so it is not encoded
-        response = await client.get(f"{SPEED_BANDS_URL}?$skip={skip}", headers=headers)
-        if response.status_code in (401, 403):
-            raise TrafficUnavailable("LTA DataMall rejected the AccountKey.")
-        response.raise_for_status()
-        rows = response.json().get("value")
-        if not isinstance(rows, list):
-            raise TrafficUnavailable("LTA DataMall returned an unexpected response.")
-        return rows
+        nonlocal measured_at
+        for attempt in range(1, PAGE_ATTEMPTS + 1):
+            try:
+                # LTA's examples use a literal "$skip"; keep it out of params so it is not encoded
+                response = await client.get(f"{SPEED_BANDS_URL}?$skip={skip}", headers=headers)
+                if response.status_code in (401, 403):
+                    raise TrafficUnavailable("LTA DataMall rejected the AccountKey.")
+                response.raise_for_status()
+            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+                transient = isinstance(exc, httpx.TransportError) or exc.response.status_code in (429, 500, 502, 503, 504)
+                if not transient or attempt == PAGE_ATTEMPTS:
+                    raise
+                await asyncio.sleep(RETRY_SECONDS * 2 ** (attempt - 1))
+                continue
+            body = response.json()
+            rows = body.get("value")
+            if not isinstance(rows, list):
+                raise TrafficUnavailable("LTA DataMall returned an unexpected response.")
+            if skip == 0:
+                measured_at = lta_time(body.get("lastUpdatedTime"))
+            return rows
+        raise AssertionError("unreachable: the last attempt returns or raises")
 
     rows: list[dict[str, Any]] = []
     for first in range(0, MAX_PAGES, PAGES_PER_BATCH):
@@ -171,7 +212,7 @@ async def fetch_speed_bands(account_key: str, client: httpx.AsyncClient) -> list
         for rows_on_page in pages:
             rows.extend(rows_on_page)
         if any(len(rows_on_page) < PAGE_SIZE for rows_on_page in pages):
-            return rows
+            return Reading(rows, measured_at)
     raise TrafficUnavailable("LTA DataMall kept returning full pages, so the fetch was stopped.")
 
 
@@ -185,20 +226,20 @@ async def read_live_grid(
     if client is None:
         client = httpx.AsyncClient(timeout=get_settings().request_timeout_seconds)
     try:
-        rows = await fetch_speed_bands(account_key, client)
+        reading = await fetch_speed_bands(account_key, client)
     except httpx.HTTPError as exc:
         raise TrafficUnavailable(f"LTA DataMall did not respond ({exc.__class__.__name__}).") from exc
     finally:
         if owned:
             await client.aclose()
-    return grid_from_rows(rows, now or datetime.now(timezone.utc))
+    return grid_from_rows(reading.rows, now or datetime.now(timezone.utc), reading.measured_at)
 
 
-def grid_from_rows(rows: list[dict[str, Any]], fetched_at: datetime) -> dict[str, Any]:
-    stretches = [s for s in map(parse_stretch, rows) if s]
+def grid_from_rows(rows: list[dict[str, Any]], fetched_at: datetime, measured_at: Optional[datetime] = None) -> dict[str, Any]:
+    stretches = [s for s in map(parse_stretch, rows) if s and s.for_routing]
     if not stretches:
         raise TrafficUnavailable("LTA DataMall returned no usable road speeds.")
-    return build_grid(stretches, fetched_at)
+    return build_grid(stretches, fetched_at, measured_at)
 
 
 def read_published_grid(settings: Settings, s3: Any = None) -> dict[str, Any]:
@@ -240,18 +281,21 @@ def main() -> None:
     args = parser.parse_args()
     settings = get_settings()
 
-    async def fetch() -> list[dict[str, Any]]:
+    async def fetch() -> Reading:
         async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
             return await fetch_speed_bands(settings.lta_account_key, client)
 
-    rows = asyncio.run(fetch())
+    reading = asyncio.run(fetch())
     if args.raw:
         with open(args.raw, "w", encoding="utf-8") as f:
-            json.dump(rows, f)
-    grid = grid_from_rows(rows, datetime.now(timezone.utc))
+            json.dump(reading.rows, f)
+    grid = grid_from_rows(reading.rows, datetime.now(timezone.utc), reading.measured_at)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(grid, f, separators=(",", ":"))
-    print(f"{len(rows)} records, {grid['stretches']} usable, {len(grid['cells'])} cells, {grid['slowShare']:.1%} slow, at {grid['fetchedAt']}")
+    print(
+        f"{len(reading.rows)} records, {grid['stretches']} on routing roads, {len(grid['cells'])} cells, "
+        f"{grid['slowShare']:.1%} slow, measured {grid['measuredAt']}"
+    )
 
 
 if __name__ == "__main__":
