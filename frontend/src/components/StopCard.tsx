@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Maximize2, PencilLine, X } from 'lucide-react'
-import { rainFor } from '../lib/conditions'
+import { lotsLabel, parkingSource, rainFor } from '../lib/conditions'
 import { explainStop } from '../lib/explain'
 import type { Camera } from '../lib/live'
 import { duration, hm } from '../lib/time'
@@ -51,8 +51,8 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
     {
       key: 'P' as const,
       label: 'Parking',
-      source: park.live ? 'HDB live' : park.estimated ? 'Estimate' : 'Recorded',
-      now: `${distanceLabel(park.distanceKm)} walk · ${park.freePct}% free`,
+      source: parkingSource(park),
+      now: `${distanceLabel(park.distanceKm)} walk · ${lotsLabel(park)}`,
       was: park.code ? `Carpark ${park.code}` : park.name,
     },
     {
@@ -147,20 +147,14 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
             )}
             <span className="text-fg-3"> · {stop.area}</span>
           </Detail>
-          <Detail label="Parking" source={park.live ? 'HDB live' : park.estimated ? 'Estimate' : 'Recorded'}>
+          <Detail label="Parking" source={parkingSource(park)}>
             <span className="block truncate" title={park.name}>
               {park.code && <span className="num mr-1 text-fg-3">{park.code}</span>}
               {park.name}
             </span>
             <span className="text-fg-3">
               {distanceLabel(park.distanceKm)} away ·{' '}
-              {park.live ? (
-                <span className="num">
-                  {park.live.free}/{park.live.total} lots free
-                </span>
-              ) : (
-                `${park.freePct}% free${park.estimated ? ' (assumed)' : ''}`
-              )}
+              {park.live ? <span className="num">{lotsLabel(park)}</span> : lotsLabel(park)}
             </span>
           </Detail>
           {camera && (

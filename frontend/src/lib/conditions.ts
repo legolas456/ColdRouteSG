@@ -1,6 +1,6 @@
 import { RAIN_CELLS, RECORDED_AT } from '../data/sample'
 import { kmBetween, nearest, parkingRisk } from './geo'
-import type { Camera, LiveFeeds, LiveCarpark, WeatherArea } from './live'
+import type { Camera, LiveCarpark, LiveFeeds, LtaCarpark, WeatherArea } from './live'
 import { hm } from './time'
 import type { TrafficGrid } from './traffic'
 import type { Carpark, RainCell, Stop } from './types'
@@ -66,9 +66,17 @@ type Point = { lng: number; lat: number }
 const rainLabel = (a: WeatherArea) =>
   a.rain === 2 ? (/thunder/i.test(a.forecast) ? 'Thundery showers' : 'Heavy rain') : /shower/i.test(a.forecast) ? 'Showers' : 'Light rain'
 
-function liveCarpark(c: LiveCarpark, stop: Point): Carpark {
+/**
+ * URA and mall carparks (LTA) report free lots but not their size. A van needs
+ * one lot, so their risk counts this many free lots as plenty (100% free) and
+ * fewer in proportion: 25 free reads as 50%.
+ */
+export const PLENTY_LOTS = 50
+
+function liveCarpark(c: LiveCarpark | LtaCarpark, stop: Point): Carpark {
   const distanceKm = Math.max(0.05, Math.round(kmBetween(c, stop) * 20) / 20)
-  const freePct = Math.round((c.free / c.total) * 100)
+  const sized = 'total' in c
+  const freePct = sized ? Math.round((c.free / c.total) * 100) : Math.min(100, Math.round((c.free / PLENTY_LOTS) * 100))
   return {
     name: c.address,
     code: c.no,
@@ -77,7 +85,8 @@ function liveCarpark(c: LiveCarpark, stop: Point): Carpark {
     distanceKm,
     freePct,
     risk: parkingRisk(distanceKm, freePct),
-    live: { free: c.free, total: c.total },
+    live: sized ? { free: c.free, total: c.total } : { free: c.free },
+    ...(!sized && { agency: c.agency }),
   }
 }
 
@@ -120,7 +129,8 @@ export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, dep
       radiusKm: a.rain === 2 ? 2.5 : 2,
       heavy: a.rain === 2,
     }))
-  const parks = feeds.carparks.data?.carparks ?? []
+  // HDB carparks (data.gov.sg) and URA and mall carparks (LTA): the nearest counts
+  const parks: (LiveCarpark | LtaCarpark)[] = [...(feeds.carparks.data?.carparks ?? []), ...(feeds.ltaCarparks?.data?.carparks ?? [])]
   const out = stops.map((s) => {
     const area = nearest(w.areas, s)?.item
     const park = nearest(parks, s)
@@ -182,3 +192,13 @@ export function camerasNear(cameras: Camera[], p: Point, maxKm = 3, limit = 1) {
     .sort((a, b) => a.km - b.km)
     .slice(0, limit)
 }
+
+/** A carpark's free lots in words: "120/400 lots free" (HDB), "230 lots free" (URA, malls) or "62% free". */
+export function lotsLabel(p: Carpark) {
+  if (p.live?.total) return `${p.live.free}/${p.live.total} lots free`
+  if (p.live) return `${p.live.free} lots free`
+  return `${p.freePct}% free${p.estimated ? ' (assumed)' : ''}`
+}
+
+/** Where a stop's parking figures come from. */
+export const parkingSource = (p: Carpark) => (p.agency ? `${p.agency} live` : p.live ? 'HDB live' : p.estimated ? 'Estimate' : 'Recorded')

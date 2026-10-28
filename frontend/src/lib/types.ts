@@ -12,8 +12,10 @@ export interface Carpark {
   freePct: number
   /** 0–1, derived from walking distance and live availability */
   risk: number
-  /** set when the free lots come from the HDB live feed */
-  live?: { free: number; total: number }
+  /** set when the free lots are live; URA and mall carparks (LTA) report no total */
+  live?: { free: number; total?: number }
+  /** set for URA and mall carparks from LTA DataMall; HDB carparks have none */
+  agency?: 'URA' | 'LTA'
   /** a stop added by search, before live data: free lots are assumed */
   estimated?: boolean
 }

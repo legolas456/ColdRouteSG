@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SAMPLE_STOPS } from '../../data/sample'
 import TYPICAL_GRID from '../../../../backend/tests/fixtures/typical_grid_expected.json'
-import { liveConditions, recordedConditions, TRAFFIC_HORIZON_MIN, TRAFFIC_MAX_AGE_MIN, trafficFor, wantsTypical } from '../conditions'
+import { liveConditions, lotsLabel, parkingSource, PLENTY_LOTS, recordedConditions, TRAFFIC_HORIZON_MIN, TRAFFIC_MAX_AGE_MIN, trafficFor, wantsTypical } from '../conditions'
 import type { LiveFeeds } from '../live'
 import { parseTrafficGrid } from '../traffic'
 
@@ -124,5 +124,44 @@ describe('typical traffic stands in when no live reading does', () => {
     expect(wantsTypical(ok, READ + 2, 13 * 60)).toBe(true)
     expect(wantsTypical(ok, READ + TRAFFIC_MAX_AGE_MIN + 1, READ + 30)).toBe(true)
     expect(wantsTypical({ status: 'error', error: 'Timed out' }, READ, READ)).toBe(true)
+  })
+})
+
+describe('URA and mall carparks join the HDB ones', () => {
+  const nuh = SAMPLE_STOPS.find((x) => x.id === 'NUH')!
+  // an HDB carpark about 440 m away and a URA one about 110 m away
+  const hdb = { no: 'HE12', address: 'BLK 1 HDB', lng: nuh.lng + 0.004, lat: nuh.lat, free: 30, total: 120 }
+  const ura = { no: 'URA-A0007', address: 'KENT RIDGE OFF ST', lng: nuh.lng + 0.001, lat: nuh.lat, free: 25, agency: 'URA' as const }
+  const withParking = (hdbParks: (typeof hdb)[], lta: (typeof ura)[]): LiveFeeds => ({
+    ...feeds({ status: 'idle' }),
+    carparks: { status: 'ok', data: { updated: READ, carparks: hdbParks, reporting: hdbParks.length, totalLots: 120, freeLots: 30 } },
+    ltaCarparks: { status: 'ok', data: { updated: READ, carparks: lta } },
+  })
+  const parkingAt = (f: LiveFeeds) => liveConditions([nuh], f, READ, READ + 15).stops[0].parking
+
+  it('a stop takes the nearest carpark, whichever feed it is in', () => {
+    const p = parkingAt(withParking([hdb], [ura]))
+    expect(p).toMatchObject({ code: 'URA-A0007', agency: 'URA', live: { free: 25 } })
+    expect(p.live?.total).toBeUndefined()
+    const far = parkingAt(withParking([hdb], [{ ...ura, lng: nuh.lng + 0.008 }]))
+    expect(far).toMatchObject({ code: 'HE12', live: { free: 30, total: 120 }, freePct: 25 })
+    expect(far.agency).toBeUndefined()
+  })
+
+  it(`counts ${PLENTY_LOTS} free lots as plenty when a carpark reports no size`, () => {
+    expect(parkingAt(withParking([], [ura])).freePct).toBe(50)
+    expect(parkingAt(withParking([], [{ ...ura, free: 80 }])).freePct).toBe(100)
+    expect(parkingAt(withParking([], [{ ...ura, free: 0 }])).freePct).toBe(0)
+    // and the risk follows: a nearby carpark with plenty of lots is low risk
+    expect(parkingAt(withParking([], [{ ...ura, free: 80 }])).risk).toBeLessThan(0.1)
+  })
+
+  it('says how many lots are free, and where the figure comes from', () => {
+    const lta = parkingAt(withParking([], [{ ...ura, free: 230 }]))
+    const sized = parkingAt(withParking([hdb], []))
+    expect([lotsLabel(lta), parkingSource(lta)]).toEqual(['230 lots free', 'URA live'])
+    expect([lotsLabel(sized), parkingSource(sized)]).toEqual(['30/120 lots free', 'HDB live'])
+    const assumed = { ...sized, live: undefined, estimated: true, freePct: 50 }
+    expect([lotsLabel(assumed), parkingSource(assumed)]).toEqual(['50% free (assumed)', 'Estimate'])
   })
 })

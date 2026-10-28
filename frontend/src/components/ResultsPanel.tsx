@@ -16,7 +16,7 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react'
-import { areaName, rainFor, type Conditions } from '../lib/conditions'
+import { areaName, lotsLabel, parkingSource, rainFor, type Conditions } from '../lib/conditions'
 import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
 import { routeCsv } from '../lib/route-export'
@@ -383,7 +383,7 @@ function watchouts(row: StopResult, s: Stop, departure: number, rain: RainCell[]
       Icon: SquareParking,
       value: P,
       text: `${distanceLabel(s.parking.distanceKm)} walk`,
-      title: `Nearest carpark: ${s.parking.name}, ${distanceLabel(s.parking.distanceKm)} away, ${s.parking.freePct}% of lots free (${s.parking.live ? 'HDB live' : 'HDB · URA'})`,
+      title: `Nearest carpark: ${s.parking.name}, ${distanceLabel(s.parking.distanceKm)} away, ${lotsLabel(s.parking)} (${parkingSource(s.parking)})`,
     })
   // Only measured delays (without live road speeds trafficMinutes is 0), and only
   // a notably slow approach: in the daytime most legs run a little slower than free flow.

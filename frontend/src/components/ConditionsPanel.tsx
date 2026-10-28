@@ -143,7 +143,7 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
       )}
       <div className="space-y-2 px-3 pb-3">
         <WeatherSection feed={feeds.weather} stops={stops} />
-        <ParkingSection feed={feeds.carparks} stops={stops} />
+        <ParkingSection feed={feeds.carparks} lta={feeds.ltaCarparks} stops={stops} />
         <RoadSpeedSection feed={feeds.traffic} usedByPlan={conditions.traffic !== null} />
         <CameraSection feed={feeds.cameras} stops={stops} onView={onViewCamera} />
       </div>
@@ -277,7 +277,7 @@ function WeatherSection({ feed, stops }: { feed: LiveFeeds['weather']; stops: St
   )
 }
 
-function ParkingSection({ feed, stops }: { feed: LiveFeeds['carparks']; stops: Stop[] }) {
+function ParkingSection({ feed, lta, stops }: { feed: LiveFeeds['carparks']; lta: LiveFeeds['ltaCarparks']; stops: Stop[] }) {
   const c = feed.data
   const atStops = useMemo(() => (c ? stops.map((s) => ({ stop: s, ...nearest(c.carparks, s)! })).filter((r) => r.item) : []), [c, stops])
   return (
@@ -289,6 +289,13 @@ function ParkingSection({ feed, stops }: { feed: LiveFeeds['carparks']; stops: S
             <Stat label="Free lots" value={fmt(c.freeLots)} />
             <Stat label="Free" value={`${((c.freeLots / c.totalLots) * 100).toFixed(1)}%`} />
           </dl>
+          {lta?.data && lta.data.carparks.length > 0 && (
+            <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
+              Plus <span className="num">{fmt(lta.data.carparks.length)}</span> URA and mall carparks with{' '}
+              <span className="num">{fmt(lta.data.carparks.reduce((sum, p) => sum + p.free, 0))}</span> free lots (LTA). A stop uses whichever
+              carpark is nearest.
+            </p>
+          )}
           {atStops.length > 0 && (
             <>
               <div className="mt-2 text-[11px] text-fg-3">Nearest HDB carpark to each stop</div>

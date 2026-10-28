@@ -8,6 +8,7 @@ import { legGeometry, pathFor } from '../lib/optimizer'
 import { useRoadsVersion } from '../lib/roads'
 import { hm } from '../lib/time'
 import { heavyStretches, type TrafficGrid } from '../lib/traffic'
+import { lotsLabel } from '../lib/conditions'
 import type { Depot, OptimiseResult, RainCell, Stop } from '../lib/types'
 import type { MapPalette } from '../lib/themes'
 import type { View } from './ResultsPanel'
@@ -654,11 +655,11 @@ export function MapView(props: Props) {
       for (const s of stops) {
         const risky = s.parking.risk >= 0.7
         const p = s.parking
-        const tip = `${p.code ? `${p.code} · ` : ''}${p.name} · ${p.live ? `${p.live.free}/${p.live.total} lots free` : `${p.freePct}% free`} · ${p.distanceKm} km from ${s.short}`
+        const tip = `${p.code ? `${p.code} · ` : ''}${p.name} · ${lotsLabel(p)} · ${p.distanceKm} km from ${s.short}`
         add(
           markerEl(
             `<div title="${tip.replace(/"/g, '&quot;')}" class="relative flex size-[18px] items-center justify-center rounded-[5px] bg-panel num text-[9.5px] font-bold text-fg-2 shadow-[inset_0_0_0_1.5px_var(--text-3)]">P
-              ${risky ? `<div class="absolute left-[24px] top-1/2 -translate-y-1/2 whitespace-nowrap rounded-[5px] bg-panel px-1.5 py-0.5 text-[10.5px] text-fg-2 shadow-card"><span class="num">${s.parking.distanceKm} km</span> walk · <span class="num">${s.parking.freePct}%</span> free</div>` : ''}
+              ${risky ? `<div class="absolute left-[24px] top-1/2 -translate-y-1/2 whitespace-nowrap rounded-[5px] bg-panel px-1.5 py-0.5 text-[10.5px] text-fg-2 shadow-card"><span class="num">${s.parking.distanceKm} km</span> walk · <span class="num">${lotsLabel(s.parking)}</span></div>` : ''}
             </div>`,
           ),
           [s.parking.lng, s.parking.lat],
