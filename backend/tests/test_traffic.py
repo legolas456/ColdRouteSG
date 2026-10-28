@@ -342,6 +342,22 @@ def test_a_page_that_keeps_failing_gives_up_after_every_attempt():
     assert sum(1 for r in seen if r.url.params["$skip"] == "500") == traffic.PAGE_ATTEMPTS
 
 
+def test_a_used_up_quota_is_said_and_not_retried():
+    # LTA's answer once the AccountKey's call quota is used up (seen 29 Oct 2026)
+    fault = {"fault": {"faultstring": "Rate limit quota violation. Quota limit  exceeded.", "detail": {"errorcode": "policies.ratelimit.QuotaViolation"}}}
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(500, json=fault)
+
+    with pytest.raises(TrafficUnavailable, match="quota"):
+        asyncio.run(read_live_grid("key", client=httpx.AsyncClient(transport=httpx.MockTransport(handle))))
+    # one call per page of the batch, none of them repeated
+    skips = [r.url.params["$skip"] for r in seen]
+    assert len(skips) == len(set(skips)) <= traffic.PAGES_PER_BATCH
+
+
 @pytest.mark.parametrize("status", [400, 404])
 def test_a_client_error_is_not_retried(status):
     seen: list[httpx.Request] = []

@@ -230,6 +230,9 @@ async def fetch_speed_bands(account_key: str, client: httpx.AsyncClient) -> Read
                 response = await client.get(f"{SPEED_BANDS_URL}?$skip={skip}", headers=headers)
                 if response.status_code in (401, 403):
                     raise TrafficUnavailable("LTA DataMall rejected the AccountKey.")
+                # a used-up quota comes back as a 500; retrying it only spends more of the quota
+                if response.status_code >= 400 and b"QuotaViolation" in response.content:
+                    raise TrafficUnavailable("LTA DataMall's call quota for this AccountKey is used up; road speeds return when it resets.")
                 response.raise_for_status()
             except (httpx.TransportError, httpx.HTTPStatusError) as exc:
                 transient = isinstance(exc, httpx.TransportError) or exc.response.status_code in (429, 500, 502, 503, 504)
