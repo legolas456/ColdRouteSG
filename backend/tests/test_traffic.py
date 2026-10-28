@@ -540,6 +540,8 @@ def test_refresh_keeps_the_reading(monkeypatch):
     index = json.loads(s3.objects[record["index"]]["Body"])
     assert record["index"].startswith(traffic.HISTORY_INDEX_PREFIX)
     assert record["measuredAt"] == "2026-10-27T08:25:00+08:00"
+    # the reading's own grid cells, which typical traffic is built from
+    assert record["cells"] == json.loads(s3.objects["traffic/grid.json"]["Body"])["cells"]
     # one band digit per routing stretch, in the index's LinkID order, with where each one is
     routing = [s for s in map(parse_stretch, ROWS) if s and s.for_routing]
     assert index["links"] == sorted(s.link_id for s in routing)

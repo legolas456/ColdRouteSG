@@ -35,5 +35,5 @@ def handler(event: Any = None, context: Any = None, s3: Any = None) -> dict[str,
         # browsers and CDNs may reuse it for a minute; the next run replaces it
         CacheControl="public, max-age=60",
     )
-    kept = keep_reading(s3, settings.traffic_bucket, reading, fetched_at)
+    kept = keep_reading(s3, settings.traffic_bucket, reading, fetched_at, grid["cells"])
     return {"fetchedAt": grid["fetchedAt"], "stretches": grid["stretches"], "cells": len(grid["cells"]), "kept": kept}

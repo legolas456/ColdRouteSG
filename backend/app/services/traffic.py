@@ -331,11 +331,19 @@ def history_index_key(index: dict[str, Any]) -> str:
 
 
 def history_record(
-    stretches: list[Stretch], index: dict[str, Any], index_key: str, fetched_at: datetime, measured_at: Optional[datetime]
+    stretches: list[Stretch],
+    index: dict[str, Any],
+    index_key: str,
+    fetched_at: datetime,
+    measured_at: Optional[datetime],
+    cells: Optional[list[list[float]]] = None,
 ) -> tuple[str, dict[str, Any]]:
     """Where a reading is kept, and the reading: its bands as digits, "0" for a stretch it lacks.
 
     Keyed by LTA's own time, so a reading the refresh sees twice is kept once.
+    `cells` is the live grid's [i, j, factor, km] for that reading: typical
+    traffic is built from these, and the bands allow building it again if the
+    night baseline changes.
     """
     at = (measured_at or fetched_at).astimezone(SGT)
     position = {link: n for n, link in enumerate(index["links"])}
@@ -350,12 +358,13 @@ def history_record(
         "fetchedAt": fetched_at.astimezone(SGT).isoformat(timespec="seconds"),
         "index": index_key,
         "bands": bands.decode("ascii"),
+        "cells": cells or [],
     }
     return f"{HISTORY_PREFIX}{at:%Y/%m/%d/%H%M}.json.gz", record
 
 
-def keep_reading(s3: Any, bucket: str, reading: Reading, fetched_at: datetime) -> str:
-    """Store one reading in the history (and its index if it is new); returns its key."""
+def keep_reading(s3: Any, bucket: str, reading: Reading, fetched_at: datetime, cells: Optional[list[list[float]]] = None) -> str:
+    """Store one reading in the history (and its index if it is new), with its grid's cells; returns its key."""
     from botocore.exceptions import ClientError  # with boto3: in the Lambda runtime and requirements.txt
 
     stretches = routing_stretches(reading.rows, baseline={})
@@ -373,7 +382,7 @@ def keep_reading(s3: Any, bucket: str, reading: Reading, fetched_at: datetime) -
     except ClientError as exc:
         if exc.response.get("Error", {}).get("Code") not in ("PreconditionFailed", "ConditionalRequestConflict"):
             raise
-    key, record = history_record(stretches, index, index_key, fetched_at, reading.measured_at)
+    key, record = history_record(stretches, index, index_key, fetched_at, reading.measured_at, cells)
     s3.put_object(
         Bucket=bucket,
         Key=key,
