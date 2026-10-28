@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SAMPLE_STOPS } from '../../data/sample'
-import { liveConditions, recordedConditions, TRAFFIC_HORIZON_MIN, TRAFFIC_MAX_AGE_MIN, trafficFor } from '../conditions'
+import TYPICAL_GRID from '../../../../backend/tests/fixtures/typical_grid_expected.json'
+import { liveConditions, recordedConditions, TRAFFIC_HORIZON_MIN, TRAFFIC_MAX_AGE_MIN, trafficFor, wantsTypical } from '../conditions'
 import type { LiveFeeds } from '../live'
 import { parseTrafficGrid } from '../traffic'
 
@@ -60,17 +61,17 @@ describe('trafficFor: when live road speeds may stand in for a run', () => {
   })
 })
 
-describe('conditions carry the reading to the plan', () => {
-  const feeds = (traffic: LiveFeeds['traffic']): LiveFeeds => ({
-    weather: {
-      status: 'ok',
-      data: { updated: READ, validFrom: READ, validTo: READ + 120, areas: [{ area: 'Queenstown', forecast: 'Fair', lng: 103.78, lat: 1.29, rain: 0 }] },
-    },
-    carparks: { status: 'ok', data: { updated: READ, carparks: [], reporting: 0, totalLots: 0, freeLots: 0 } },
-    cameras: { status: 'idle' },
-    traffic,
-  })
+const feeds = (traffic: LiveFeeds['traffic']): LiveFeeds => ({
+  weather: {
+    status: 'ok',
+    data: { updated: READ, validFrom: READ, validTo: READ + 120, areas: [{ area: 'Queenstown', forecast: 'Fair', lng: 103.78, lat: 1.29, rain: 0 }] },
+  },
+  carparks: { status: 'ok', data: { updated: READ, carparks: [], reporting: 0, totalLots: 0, freeLots: 0 } },
+  cameras: { status: 'idle' },
+  traffic,
+})
 
+describe('conditions carry the reading to the plan', () => {
   it('live mode passes a usable reading through', () => {
     const c = liveConditions(SAMPLE_STOPS, feeds(ok), READ + 2, READ + 15)
     expect(c.traffic).toBe(at0830)
@@ -85,5 +86,43 @@ describe('conditions carry the reading to the plan', () => {
 
   it('the recorded morning never uses live road speeds', () => {
     expect(recordedConditions(SAMPLE_STOPS).traffic).toBeNull()
+  })
+})
+
+describe('typical traffic stands in when no live reading does', () => {
+  const typical0845 = parseTrafficGrid(TYPICAL_GRID)
+
+  it('a later run uses the typical traffic of its slot, and says so', () => {
+    const c = liveConditions(SAMPLE_STOPS, feeds(ok), READ + 2, 13 * 60, { grid: typical0845 })
+    expect(c.traffic).toBe(typical0845)
+    const notes = c.notes.join(' ')
+    expect(notes).toContain('typical weekday traffic at 08:45')
+    expect(notes).toContain('the median of 3 kept readings over 3 days')
+    expect(notes).not.toContain('free-flowing')
+  })
+
+  it('a live reading that covers the departure wins', () => {
+    expect(liveConditions(SAMPLE_STOPS, feeds(ok), READ + 2, READ + 15, { grid: typical0845 }).traffic).toBe(at0830)
+  })
+
+  it('also stands in when the live feed failed', () => {
+    const c = liveConditions(SAMPLE_STOPS, feeds({ status: 'error', error: 'Timed out' }), READ, READ + 10, { grid: typical0845 })
+    expect(c.traffic).toBe(typical0845)
+  })
+
+  it('without a typical grid the run is free-flowing, with both reasons', () => {
+    const reason = 'No typical traffic for a weekday at 13:00 yet: it needs at least 3 kept readings in that slot.'
+    const c = liveConditions(SAMPLE_STOPS, feeds(ok), READ + 2, 13 * 60, { grid: null, reason })
+    expect(c.traffic).toBeNull()
+    const notes = c.notes.join(' ')
+    expect(notes).toContain('LTA road speeds show traffic at 08:30')
+    expect(notes).toContain(reason)
+  })
+
+  it('asks for typical traffic only when no live reading stands for the departure', () => {
+    expect(wantsTypical(ok, READ + 2, READ + 15)).toBe(false)
+    expect(wantsTypical(ok, READ + 2, 13 * 60)).toBe(true)
+    expect(wantsTypical(ok, READ + TRAFFIC_MAX_AGE_MIN + 1, READ + 30)).toBe(true)
+    expect(wantsTypical({ status: 'error', error: 'Timed out' }, READ, READ)).toBe(true)
   })
 })

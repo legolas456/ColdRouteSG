@@ -99,7 +99,7 @@ export const MAX_WALK_KM = 0.6
  * that carpark is within MAX_WALK_KM.
  * Without the forecast there is no live plan, so it falls back to recorded.
  */
-export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, departure?: number): Conditions {
+export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, departure?: number, typical?: TypicalTraffic): Conditions {
   const w = feeds.weather.data
   if (!w) {
     const failed = feeds.weather.status === 'error'
@@ -139,9 +139,32 @@ export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, dep
       `NEA forecasts ${hm(w.validFrom)}–${hm(w.validTo)} only. A run leaving at ${hm(departure)} is planned without rain; use Now to plan from the current time.`,
     )
   }
-  const { traffic, note } = trafficFor(feeds.traffic, now, departure)
+  const live = trafficFor(feeds.traffic, now, departure)
+  const { traffic, note } = live.traffic || !typical ? live : withTypical(live.note, typical)
   if (note) notes.push(note)
   return { mode: 'live', source: parks.length ? 'live' : 'mixed', at: now, rain, stops: out, traffic, notes }
+}
+
+/** Typical traffic for a departure (backend /api/traffic/typical), or why there is none. */
+export interface TypicalTraffic {
+  grid: TrafficGrid | null
+  reason?: string
+}
+
+/** Whether a plan should ask for typical traffic: no live reading stands for its departure. */
+export const wantsTypical = (feed: LiveFeeds['traffic'], now: number, departure?: number) => trafficFor(feed, now, departure).traffic === null
+
+/** When no live reading stands for the departure, the typical traffic of its slot does, if there is one. */
+function withTypical(liveNote: string | undefined, typical: TypicalTraffic): { traffic: TrafficGrid | null; note?: string } {
+  const g = typical.grid
+  if (g?.typical) {
+    const { dayType, readings, days } = g.typical
+    return {
+      traffic: g,
+      note: `No live LTA reading covers this departure, so the plan uses typical ${dayType} traffic at ${hm(g.at)}: the median of ${readings} kept readings over ${days} day${days === 1 ? '' : 's'}.`,
+    }
+  }
+  return { traffic: null, note: [liveNote, typical.reason].filter(Boolean).join(' ') || undefined }
 }
 
 

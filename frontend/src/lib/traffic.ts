@@ -30,6 +30,12 @@ export interface TrafficGrid {
   slowShare: number
   /** keyed "i,j" */
   cells: Map<string, TrafficCell>
+  /**
+   * Set for typical traffic (backend/app/services/typical.py): the median of the
+   * kept readings in one weekday or weekend slot, rather than one live reading.
+   * Its `at` is the slot's start.
+   */
+  typical?: { dayType: 'weekday' | 'weekend'; slot: string; readings: number; days: number }
 }
 
 /** A stretch counts as slow from 1.5 times its free-flow travel time, as in the backend. */
@@ -75,14 +81,20 @@ export function parseTrafficGrid(raw: unknown): TrafficGrid {
     map.set(`${i},${j}`, { factor: Math.min(MAX_FACTOR, factor), km })
   }
   const measured = typeof measuredAt === 'string' && !Number.isNaN(Date.parse(measuredAt)) ? measuredAt : fetchedAt
+  const { dayType, slot } = g
+  const typical: TrafficGrid['typical'] =
+    (dayType === 'weekday' || dayType === 'weekend') && typeof slot === 'string' && /^([01]\d|2[0-3])[0-5]\d$/.test(slot)
+      ? { dayType, slot, readings: isNum(g.readings) ? g.readings : 0, days: isNum(g.days) ? g.days : 0 }
+      : undefined
   return {
     fetchedAt,
-    at: minutesInSingapore(measured),
+    at: typical ? Number(typical.slot.slice(0, 2)) * 60 + Number(typical.slot.slice(2)) : minutesInSingapore(measured),
     origin: [origin[0], origin[1]],
     cellDeg,
     stretches: isNum(g.stretches) ? g.stretches : 0,
     slowShare: isNum(g.slowShare) ? g.slowShare : 0,
     cells: map,
+    ...(typical && { typical }),
   }
 }
 

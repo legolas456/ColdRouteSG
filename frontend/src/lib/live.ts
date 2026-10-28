@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
+import type { TypicalTraffic } from './conditions'
 import { parseTrafficGrid, type TrafficGrid } from './traffic'
 
 /**
@@ -15,6 +16,8 @@ const BASE = 'https://api.data.gov.sg/v1'
  * console does not measure traffic, and says so.
  */
 export const TRAFFIC_URL: string | undefined = import.meta.env.VITE_TRAFFIC_URL || undefined
+/** Typical traffic for a departure lives next to the live grid: /api/traffic/typical?at=… */
+export const TYPICAL_TRAFFIC_URL = TRAFFIC_URL?.replace(/\/grid$/, '/typical')
 export const FEED_URLS = {
   weather: `${BASE}/environment/2-hour-weather-forecast`,
   carparks: `${BASE}/transport/carpark-availability`,
@@ -194,7 +197,7 @@ export function parseCameras(raw: Json): CameraFeed {
 
 async function getJson(url: string, ms = 12_000): Promise<Json> {
   const ctl = new AbortController()
-  const timer = window.setTimeout(() => ctl.abort(), ms)
+  const timer = setTimeout(() => ctl.abort(), ms)
   try {
     const res = await fetch(url, { signal: ctl.signal })
     if (!res.ok) {
@@ -291,3 +294,30 @@ export function useLiveFeeds(active: boolean) {
 
 export const isLoading = (f: LiveFeeds) =>
   f.weather.status === 'loading' || f.carparks.status === 'loading' || f.cameras.status === 'loading' || f.traffic.status === 'loading'
+
+const typicalCache = new Map<string, Promise<TypicalTraffic>>()
+
+/**
+ * Typical traffic for a run leaving at `departure` (minutes after midnight)
+ * today in Singapore, or the backend's reason there is none. Asked once per
+ * departure; the backend rebuilds the grids each night.
+ */
+export function typicalTraffic(departure: number, now = Date.now()): Promise<TypicalTraffic> {
+  if (!TYPICAL_TRAFFIC_URL) return Promise.resolve({ grid: null })
+  const at = singaporeTime(departure, now)
+  let hit = typicalCache.get(at)
+  if (!hit) {
+    hit = getJson(`${TYPICAL_TRAFFIC_URL}?at=${encodeURIComponent(at)}`, 15_000)
+      .then((raw) => ({ grid: parseTrafficGrid(raw) }))
+      .catch((e: unknown) => ({ grid: null, reason: e instanceof Error ? e.message : String(e) }))
+    typicalCache.set(at, hit)
+  }
+  return hit
+}
+
+/** Today's date in Singapore at `minutes` after midnight, as ISO with the +08:00 offset. */
+export function singaporeTime(minutes: number, now = Date.now()) {
+  const date = new Date(now + 8 * 3600_000).toISOString().slice(0, 10)
+  const m = Math.max(0, Math.min(24 * 60 - 1, Math.round(minutes)))
+  return `${date}T${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00+08:00`
+}

@@ -131,7 +131,8 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
             <span className="text-fg-3"> from {from}</span>
             {live && rec.trafficMinutes >= 1 && (
               <span className="block text-fg-3">
-                Includes <span className="num">{Math.round(rec.trafficMinutes)}</span> min of traffic (LTA road speeds at{' '}
+                Includes <span className="num">{Math.round(rec.trafficMinutes)}</span> min of traffic (
+                {result.trafficKind === 'typical' ? 'typical traffic at ' : 'LTA road speeds at '}
                 <span className="num">{hm(result.trafficAt ?? 0)}</span>)
               </span>
             )}

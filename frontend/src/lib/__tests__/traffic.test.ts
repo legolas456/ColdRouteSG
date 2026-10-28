@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 // The grid backend/tests/test_traffic.py builds from its LTA fixture; both sides
 // read this one file, so the Python builder and this parser cannot drift apart.
 import BACKEND_GRID from '../../../../backend/tests/fixtures/traffic_grid_expected.json'
+// typical traffic as backend/tests/test_typical.py builds it
+import TYPICAL_GRID from '../../../../backend/tests/fixtures/typical_grid_expected.json'
 import { areaFactor, HEAVY_FACTOR, heavyStretches, legFactor, MAX_FACTOR, parseTrafficGrid, type TrafficGrid } from '../traffic'
 
 const ORIGIN: [number, number] = [103.55, 1.15]
@@ -45,6 +47,17 @@ describe('parseTrafficGrid', () => {
     expect(g.at).toBe(8 * 60 + 30)
     // Orchard Road's cell: one jammed and one clear stretch, their speeds weighted by length
     expect(g.cells.get('28,15')).toEqual({ factor: 1.62, km: 0.55 })
+  })
+
+  it('reads typical traffic the backend builds, timed at its slot', () => {
+    const g = parseTrafficGrid(TYPICAL_GRID)
+    expect(g.typical).toEqual({ dayType: 'weekday', slot: '0845', readings: 3, days: 3 })
+    // the slot's start, not when the grid was built (02:30)
+    expect(g.at).toBe(8 * 60 + 45)
+    expect(g.cells.get('30,15')).toEqual({ factor: 1.8, km: 1 })
+    // a live grid is not typical
+    expect(parseTrafficGrid(BACKEND_GRID).typical).toBeUndefined()
+    expect(parseTrafficGrid({ ...TYPICAL_GRID, slot: '2575' }).typical).toBeUndefined()
   })
 
   it('agrees with the backend on which cell a point falls in', () => {
