@@ -119,6 +119,12 @@ data "aws_iam_policy_document" "traffic" {
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.traffic.arn}/${var.traffic_key}"]
   }
+  statement {
+    # every reading, and the index of stretches the readings refer to
+    sid       = "KeepReadings"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.traffic.arn}/traffic/history/*", "${aws_s3_bucket.traffic.arn}/traffic/history-index/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "traffic" {

@@ -41,6 +41,12 @@ variable "traffic_key" {
   default     = "traffic/speed-grid.json"
 }
 
+variable "traffic_history_days" {
+  description = "How long the kept LTA readings (the typical-traffic history) stay in S3."
+  type        = number
+  default     = 180
+}
+
 variable "extra_origins" {
   description = "Origins besides the Amplify console that may call the API, e.g. a local dev server."
   type        = list(string)

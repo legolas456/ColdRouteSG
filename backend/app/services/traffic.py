@@ -17,6 +17,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import functools
+import gzip
+import hashlib
 import json
 import math
 import time
@@ -254,23 +256,34 @@ async def fetch_speed_bands(account_key: str, client: httpx.AsyncClient) -> Read
     raise TrafficUnavailable("LTA DataMall kept returning full pages, so the fetch was stopped.")
 
 
+async def read_live(account_key: str, *, client: Optional[httpx.AsyncClient] = None) -> Reading:
+    """Every record LTA has now; a network or server failure becomes TrafficUnavailable."""
+    owned = client is None
+    if client is None:
+        client = httpx.AsyncClient(timeout=get_settings().request_timeout_seconds)
+    try:
+        return await fetch_speed_bands(account_key, client)
+    except httpx.HTTPError as exc:
+        raise TrafficUnavailable(f"LTA DataMall did not respond ({exc.__class__.__name__}).") from exc
+    finally:
+        if owned:
+            await client.aclose()
+
+
 async def read_live_grid(
     account_key: str,
     *,
     client: Optional[httpx.AsyncClient] = None,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    owned = client is None
-    if client is None:
-        client = httpx.AsyncClient(timeout=get_settings().request_timeout_seconds)
-    try:
-        reading = await fetch_speed_bands(account_key, client)
-    except httpx.HTTPError as exc:
-        raise TrafficUnavailable(f"LTA DataMall did not respond ({exc.__class__.__name__}).") from exc
-    finally:
-        if owned:
-            await client.aclose()
+    reading = await read_live(account_key, client=client)
     return grid_from_rows(reading.rows, now or datetime.now(timezone.utc), reading.measured_at)
+
+
+def routing_stretches(rows: list[dict[str, Any]], baseline: Optional[dict[str, int]] = None) -> list[Stretch]:
+    """The stretches whose bands track traffic, with their night band from `baseline` (the shipped one if None)."""
+    night = load_baseline() if baseline is None else baseline
+    return [replace(s, night_band=night.get(s.link_id)) for s in map(parse_stretch, rows) if s and s.for_routing]
 
 
 def grid_from_rows(
@@ -280,11 +293,91 @@ def grid_from_rows(
     baseline: Optional[dict[str, int]] = None,
 ) -> dict[str, Any]:
     """The grid for one reading, against `baseline` (LinkID to night band; the shipped one if None)."""
-    night = load_baseline() if baseline is None else baseline
-    stretches = [replace(s, night_band=night.get(s.link_id)) for s in map(parse_stretch, rows) if s and s.for_routing]
+    stretches = routing_stretches(rows, baseline)
     if not stretches:
         raise TrafficUnavailable("LTA DataMall returned no usable road speeds.")
     return build_grid(stretches, fetched_at, measured_at)
+
+
+# ---- history ----------------------------------------------------------------------
+
+# The scheduled refresh also keeps every reading, so typical traffic for any
+# time of the week can be built from weeks of them. A reading is one band digit
+# per stretch, in the order of an index that says which stretch, which cell and
+# how long; the index only changes when LTA adds or drops stretches.
+HISTORY_PREFIX = "traffic/history/"
+# outside HISTORY_PREFIX, which expires: newer readings still point at an old index
+HISTORY_INDEX_PREFIX = "traffic/history-index/"
+
+
+def history_index(stretches: list[Stretch]) -> dict[str, Any]:
+    """The stretches a reading's bands refer to, in LinkID order, with where each one is."""
+    ordered = sorted(stretches, key=lambda s: s.link_id)
+    return {
+        "version": 1,
+        "links": [s.link_id for s in ordered],
+        "category": [s.category for s in ordered],
+        "cell": [list(cell_of(*s.mid)) for s in ordered],
+        "km": [round(max(s.km, 0.01), 3) for s in ordered],
+    }
+
+
+def history_index_key(index: dict[str, Any]) -> str:
+    digest = hashlib.sha1("\n".join(index["links"]).encode("utf-8")).hexdigest()[:12]
+    return f"{HISTORY_INDEX_PREFIX}{digest}.json"
+
+
+def history_record(
+    stretches: list[Stretch], index: dict[str, Any], index_key: str, fetched_at: datetime, measured_at: Optional[datetime]
+) -> tuple[str, dict[str, Any]]:
+    """Where a reading is kept, and the reading: its bands as digits, "0" for a stretch it lacks.
+
+    Keyed by LTA's own time, so a reading the refresh sees twice is kept once.
+    """
+    at = (measured_at or fetched_at).astimezone(SGT)
+    position = {link: n for n, link in enumerate(index["links"])}
+    bands = bytearray(b"0" * len(position))
+    for s in stretches:
+        n = position.get(s.link_id)
+        if n is not None:
+            bands[n] = ord(str(s.band))
+    record = {
+        "version": 1,
+        "measuredAt": measured_at.astimezone(SGT).isoformat(timespec="seconds") if measured_at else None,
+        "fetchedAt": fetched_at.astimezone(SGT).isoformat(timespec="seconds"),
+        "index": index_key,
+        "bands": bands.decode("ascii"),
+    }
+    return f"{HISTORY_PREFIX}{at:%Y/%m/%d/%H%M}.json.gz", record
+
+
+def keep_reading(s3: Any, bucket: str, reading: Reading, fetched_at: datetime) -> str:
+    """Store one reading in the history (and its index if it is new); returns its key."""
+    from botocore.exceptions import ClientError  # with boto3: in the Lambda runtime and requirements.txt
+
+    stretches = routing_stretches(reading.rows, baseline={})
+    index = history_index(stretches)
+    index_key = history_index_key(index)
+    try:
+        # written once: If-None-Match makes S3 refuse to replace an index that exists
+        s3.put_object(
+            Bucket=bucket,
+            Key=index_key,
+            Body=json.dumps(index, separators=(",", ":")).encode("utf-8"),
+            ContentType="application/json",
+            IfNoneMatch="*",
+        )
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") not in ("PreconditionFailed", "ConditionalRequestConflict"):
+            raise
+    key, record = history_record(stretches, index, index_key, fetched_at, reading.measured_at)
+    s3.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=gzip.compress(json.dumps(record, separators=(",", ":")).encode("utf-8")),
+        ContentType="application/gzip",
+    )
+    return key
 
 
 def build_baseline(readings: list[list[dict[str, Any]]]) -> dict[str, int]:

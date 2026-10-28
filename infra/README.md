@@ -8,7 +8,7 @@ The whole AWS stack as code, so anyone can create it in their own account, and t
 | Sign-in | Cognito user pool (email sign-in, an admin creates users), console app client without a secret, `admin` group |
 | API | API Gateway HTTP API. `GET/POST/DELETE /api/routes/*` and `GET /api/admin/*` need a Cognito token, which API Gateway checks before Lambda runs; everything else (public data, `/api/traffic/grid`, `/api/health`) is open. All of it goes to the FastAPI Lambda `coldroute-api` (Python 3.12). CORS allows the console and `extra_origins`. |
 | Route history | DynamoDB `coldroute-route-history`, key `user_id` + `route_id`, on demand |
-| Live traffic | EventBridge every 5 minutes, then Lambda `coldroute-traffic-refresh`, which reads LTA and writes the road-speed grid to the private S3 bucket `coldroute-traffic-<account>`. The API serves it at `/api/traffic/grid`. Only created when an LTA key is given. |
+| Live traffic | EventBridge every 5 minutes, then Lambda `coldroute-traffic-refresh`, which reads LTA and writes the road-speed grid to the private S3 bucket `coldroute-traffic-<account>`. The API serves it at `/api/traffic/grid`. Every reading is also kept in `traffic/history/` (expires after `traffic_history_days`, default 180) for typical traffic. Only created when an LTA key is given. |
 | Monitoring | Log groups with 14-day retention (both functions, API access log), CloudWatch dashboard `coldroute` (API latency p50/p95, requests, errors, the traffic refresh), optional monthly budget alert |
 
 Each function's role allows only what it uses: the API reads and writes route history, lists users for the admin dashboard and reads the grid; the refresh writes the grid.
