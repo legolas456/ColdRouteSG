@@ -53,3 +53,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "traffic" {
     }
   }
 }
+
+# Drive times between pairs of places as Amazon Location Service measured them
+# (planner/src/roads.ts), keyed by both positions. Location Service bills every
+# pair, so the planner asks for each at most once a month; DynamoDB deletes
+# expired ones. A cache: nothing here needs protecting or backing up.
+resource "aws_dynamodb_table" "drive_times" {
+  name         = "${local.name}-drive-times"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pair"
+
+  attribute {
+    name = "pair"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expires"
+    enabled        = true
+  }
+}

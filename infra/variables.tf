@@ -47,6 +47,12 @@ variable "traffic_profile_schedule" {
   default     = "cron(30 18 * * ? *)"
 }
 
+variable "routing_region" {
+  description = "Region the planner calls Amazon Location Service in. Its routing data differs by region: Sydney's is HERE's, while Singapore's own region uses GrabMaps, which on 29 Oct 2026 could not route to or from NUH and takes no traffic options."
+  type        = string
+  default     = "ap-southeast-2"
+}
+
 variable "traffic_key" {
   description = "S3 key of the published road-speed grid."
   type        = string

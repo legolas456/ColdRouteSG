@@ -5,6 +5,13 @@
  */
 import type { TrafficGrid } from './traffic'
 
+const BASE = 'https://api.data.gov.sg/v1'
+export const FEED_URLS = {
+  weather: `${BASE}/environment/2-hour-weather-forecast`,
+  carparks: `${BASE}/transport/carpark-availability`,
+  cameras: `${BASE}/transport/traffic-images`,
+} as const
+
 export type RainLevel = 0 | 1 | 2
 
 export interface WeatherArea {

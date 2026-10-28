@@ -1,4 +1,4 @@
-# One HTTP API in front of the FastAPI function. API Gateway checks the Cognito
+# One HTTP API in front of the FastAPI function and the planner. API Gateway checks the Cognito
 # token before a signed-in route reaches Lambda; the backend reads the verified
 # claims from the request context (backend/app/services/auth.py on the Cognito
 # branch). Everything else, public data and the traffic grid, needs no token.
@@ -48,6 +48,23 @@ resource "aws_apigatewayv2_route" "signed_in" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = each.value
   target             = "integrations/${aws_apigatewayv2_integration.api.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# Planning a run in the cloud (planner.tf): for signed-in users, since each new
+# pair of stops is a Location Service call.
+resource "aws_apigatewayv2_integration" "planner" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.planner.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "plan" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "POST /api/plan"
+  target             = "integrations/${aws_apigatewayv2_integration.planner.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }

@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 import type { TypicalTraffic } from './conditions'
 import {
   type Feed,
+  FEED_URLS,
   type Json,
   type LiveFeeds,
   type LtaCarparkFeed,
@@ -20,7 +21,6 @@ export * from './feeds'
  * needs no backend for them. The backend's /api/data/* routes read the same
  * feeds; once our own API is deployed this file is the one place to switch.
  */
-const BASE = 'https://api.data.gov.sg/v1'
 
 /**
  * Live road speeds come from our own backend, because LTA's AccountKey must
@@ -37,11 +37,6 @@ export const TYPICAL_TRAFFIC_URL = TRAFFIC_URL?.replace(/\/grid$/, '/typical')
  */
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || undefined
 export const PARKING_URL = API_BASE ? `${API_BASE}/api/parking/carparks` : undefined
-export const FEED_URLS = {
-  weather: `${BASE}/environment/2-hour-weather-forecast`,
-  carparks: `${BASE}/transport/carpark-availability`,
-  cameras: `${BASE}/transport/traffic-images`,
-} as const
 
 /** How often Live mode refetches while the tab is open. */
 export const REFRESH_MS = 5 * 60_000
