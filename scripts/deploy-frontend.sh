@@ -23,11 +23,13 @@ AMPLIFY_BRANCH="${AMPLIFY_BRANCH:-main}"
 AMPLIFY_APP_ID="${AMPLIFY_APP_ID:-}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 export AWS_REGION AWS_PAGER=""
-# Keys in the environment (CI) win; otherwise use the local profile.
+# Keys in the environment (CI) win; then AWS_PROFILE (terraform apply passes
+# its own); then a "coldroute" profile if this machine has one; else the AWS
+# CLI's usual chain (the default profile, SSO, instance roles).
 if [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
   unset AWS_PROFILE
-else
-  export AWS_PROFILE="${AWS_PROFILE:-coldroute}"
+elif [ -z "${AWS_PROFILE:-}" ] && aws configure list-profiles 2>/dev/null | grep -qx coldroute; then
+  export AWS_PROFILE=coldroute
 fi
 
 command -v aws >/dev/null || { echo "AWS CLI v2 not found. See docs/deployment.md." >&2; exit 1; }

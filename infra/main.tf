@@ -12,5 +12,6 @@ locals {
   origins = concat([local.console_url], var.extra_origins)
   # whether a key is set is not secret, only the key
   traffic_enabled = nonsensitive(var.lta_account_key != "")
-  lambda_zip      = abspath("${path.module}/${var.lambda_zip}")
+  # written by build-lambda.sh, which apply runs (build.tf)
+  lambda_zip = abspath("${path.module}/build/backend.zip")
 }

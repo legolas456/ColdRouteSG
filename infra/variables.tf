@@ -16,10 +16,10 @@ variable "prefix" {
   default     = "coldroute"
 }
 
-variable "lambda_zip" {
-  description = "The backend package built by build-lambda.sh, relative to this folder."
-  type        = string
-  default     = "build/backend.zip"
+variable "deploy_console" {
+  description = "Build the console and upload it to Amplify as part of apply. Off: deploy it another way (scripts/deploy-frontend.sh, CI)."
+  type        = bool
+  default     = true
 }
 
 variable "lta_account_key" {

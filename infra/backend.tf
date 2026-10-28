@@ -66,12 +66,13 @@ resource "aws_iam_role_policy" "api" {
 }
 
 resource "aws_lambda_function" "api" {
-  function_name    = "${local.name}-api"
-  role             = aws_iam_role.api.arn
-  runtime          = "python3.12"
-  handler          = "lambda_handler.handler"
-  filename         = local.lambda_zip
-  source_code_hash = fileexists(local.lambda_zip) ? filebase64sha256(local.lambda_zip) : null
+  function_name = "${local.name}-api"
+  role          = aws_iam_role.api.arn
+  runtime       = "python3.12"
+  handler       = "lambda_handler.handler"
+  filename      = local.lambda_zip
+  # changes when the package's sources do; the package is built during apply (build.tf)
+  source_code_hash = local.backend_package_hash
   memory_size      = 512
   # API Gateway gives up at 30 s
   timeout = 29
@@ -86,14 +87,7 @@ resource "aws_lambda_function" "api" {
     }
   }
 
-  lifecycle {
-    precondition {
-      condition     = fileexists(local.lambda_zip)
-      error_message = "No Lambda package at ${local.lambda_zip}. Run ./build-lambda.sh first."
-    }
-  }
-
-  depends_on = [aws_cloudwatch_log_group.api_fn, aws_iam_role_policy.api]
+  depends_on = [terraform_data.backend_package, aws_cloudwatch_log_group.api_fn, aws_iam_role_policy.api]
 }
 
 resource "aws_lambda_permission" "api_gateway" {
@@ -146,13 +140,14 @@ resource "aws_iam_role_policy" "traffic" {
 }
 
 resource "aws_lambda_function" "traffic" {
-  count            = local.traffic_enabled ? 1 : 0
-  function_name    = "${local.name}-traffic-refresh"
-  role             = aws_iam_role.traffic[0].arn
-  runtime          = "python3.12"
-  handler          = "traffic_refresh.handler"
-  filename         = local.lambda_zip
-  source_code_hash = fileexists(local.lambda_zip) ? filebase64sha256(local.lambda_zip) : null
+  count         = local.traffic_enabled ? 1 : 0
+  function_name = "${local.name}-traffic-refresh"
+  role          = aws_iam_role.traffic[0].arn
+  runtime       = "python3.12"
+  handler       = "traffic_refresh.handler"
+  filename      = local.lambda_zip
+  # changes when the package's sources do; the package is built during apply (build.tf)
+  source_code_hash = local.backend_package_hash
   # 288 LTA pages, 16 at a time, then about 140,000 records to parse
   memory_size = 1024
   timeout     = 90
@@ -165,7 +160,7 @@ resource "aws_lambda_function" "traffic" {
     }
   }
 
-  depends_on = [aws_cloudwatch_log_group.traffic_fn, aws_iam_role_policy.traffic]
+  depends_on = [terraform_data.backend_package, aws_cloudwatch_log_group.traffic_fn, aws_iam_role_policy.traffic]
 }
 
 # A reading that failed is stale by the next run, so never retry it.
@@ -254,13 +249,14 @@ resource "aws_iam_role_policy" "profile" {
 }
 
 resource "aws_lambda_function" "profile" {
-  count            = local.traffic_enabled ? 1 : 0
-  function_name    = "${local.name}-traffic-profile"
-  role             = aws_iam_role.profile[0].arn
-  runtime          = "python3.12"
-  handler          = "traffic_profile.handler"
-  filename         = local.lambda_zip
-  source_code_hash = fileexists(local.lambda_zip) ? filebase64sha256(local.lambda_zip) : null
+  count         = local.traffic_enabled ? 1 : 0
+  function_name = "${local.name}-traffic-profile"
+  role          = aws_iam_role.profile[0].arn
+  runtime       = "python3.12"
+  handler       = "traffic_profile.handler"
+  filename      = local.lambda_zip
+  # changes when the package's sources do; the package is built during apply (build.tf)
+  source_code_hash = local.backend_package_hash
   # four weeks of readings: about 8,000 small files, read 16 at a time
   memory_size = 1024
   timeout     = 600
@@ -271,7 +267,7 @@ resource "aws_lambda_function" "profile" {
     }
   }
 
-  depends_on = [aws_cloudwatch_log_group.profile_fn, aws_iam_role_policy.profile]
+  depends_on = [terraform_data.backend_package, aws_cloudwatch_log_group.profile_fn, aws_iam_role_policy.profile]
 }
 
 resource "aws_cloudwatch_event_rule" "profile" {
