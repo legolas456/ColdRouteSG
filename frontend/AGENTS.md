@@ -94,7 +94,7 @@ Serif is only for titles and big numbers. Don't add new sizes for one-off cases.
 ### Mock vs real
 
 - Mocks live in `src/data/`. Keep them realistic: real places, plausible times. Where a real system would differ, say so in the UI (e.g. the note in the sign-in dialog).
-- Runtime calls go only to public, keyless services, straight from the browser: OneMap (search and tiles), OSRM (drive times and roads) and data.gov.sg (live feeds). The one exception is our own backend's road-speed grid (`VITE_TRAFFIC_URL`), because LTA's key must stay on a server; the browser never holds a key. Each one has a fallback, and the UI says when it is used. The sample run makes no calls apart from tiles.
+- Runtime calls go to public, keyless services straight from the browser: OneMap (search and tiles), OSRM (drive times and roads) and data.gov.sg (live feeds). Anything that needs a key or an account goes through our own API instead (`VITE_API_BASE_URL`, `VITE_TRAFFIC_URL`): LTA road speeds and typical traffic, URA and mall carparks, saved runs, and Cognito sign-in. The browser never holds a key. Each call has a fallback, and the UI says when it is used. The sample run makes no calls apart from tiles.
 - Saved UI preferences use `usePersistentState` with `coldroute.*` keys.
 
 ## Code
