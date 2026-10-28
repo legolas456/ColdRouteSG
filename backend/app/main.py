@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import admin, data, routes, traffic
+from app.routers import admin, data, parking, routes, traffic
 
 settings = get_settings()
 app = FastAPI(
@@ -25,6 +25,7 @@ app.add_middleware(
 app.include_router(data.router)
 app.include_router(routes.router)
 app.include_router(traffic.router)
+app.include_router(parking.router)
 app.include_router(admin.router)
 
 

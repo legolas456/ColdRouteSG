@@ -44,7 +44,7 @@ data "aws_iam_policy_document" "api" {
   statement {
     sid       = "TrafficGrid"
     actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.traffic.arn}/${var.traffic_key}", "${aws_s3_bucket.traffic.arn}/traffic/typical/*"]
+    resources = ["${aws_s3_bucket.traffic.arn}/${var.traffic_key}", "${aws_s3_bucket.traffic.arn}/traffic/typical/*", "${aws_s3_bucket.traffic.arn}/parking/carparks.json"]
   }
   statement {
     # so a slot with no typical grid yet reads as missing (404), not forbidden
@@ -120,9 +120,10 @@ data "aws_iam_policy_document" "traffic" {
     resources = ["${aws_cloudwatch_log_group.traffic_fn[0].arn}:*"]
   }
   statement {
+    # the grid, and LTA's free lots in URA and mall carparks
     sid       = "PublishGrid"
     actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.traffic.arn}/${var.traffic_key}"]
+    resources = ["${aws_s3_bucket.traffic.arn}/${var.traffic_key}", "${aws_s3_bucket.traffic.arn}/parking/carparks.json"]
   }
   statement {
     # every reading, and the index of stretches the readings refer to
