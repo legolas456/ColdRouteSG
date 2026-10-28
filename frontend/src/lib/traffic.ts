@@ -3,9 +3,9 @@ import { kmBetween } from './geo'
 /**
  * Live road speeds: LTA DataMall Traffic Speed Bands, summarised by our backend
  * (backend/app/services/traffic.py) as delay factors on cells of about 1 km. A
- * factor is free-flow speed over current speed: 1 when traffic flows freely, 2
- * when the roads there take twice as long. LTA's AccountKey stays on the
- * server; the browser only reads the grid.
+ * factor is the roads' speed at night over their speed now: 1 when traffic
+ * flows freely, 2 when the roads there take twice as long. LTA's AccountKey
+ * stays on the server; the browser only reads the grid.
  */
 
 type Point = { lng: number; lat: number }

@@ -43,8 +43,8 @@ describe('parseTrafficGrid', () => {
     expect(g.origin).toEqual(ORIGIN)
     // 08:30 in Singapore
     expect(g.at).toBe(8 * 60 + 30)
-    // Orchard Road's cell: one jammed and one clear stretch, weighted by length
-    expect(g.cells.get('28,15')).toEqual({ factor: 2.06, km: 0.55 })
+    // Orchard Road's cell: one jammed and one clear stretch, their speeds weighted by length
+    expect(g.cells.get('28,15')).toEqual({ factor: 1.62, km: 0.55 })
   })
 
   it('agrees with the backend on which cell a point falls in', () => {

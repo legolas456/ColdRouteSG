@@ -2,22 +2,27 @@
 
 LTA publishes a speed band for every stretch of expressway and arterial road
 every 5 minutes. The console cannot read it directly: the API needs an
-AccountKey, which must stay on the server. This module fetches every page,
-turns each stretch into a delay factor (its free-flow speed over its current
-speed) and averages the factors onto cells of about 1 km. The browser scales
-each planned leg by the cells along its corridor (frontend/src/lib/traffic.ts).
+AccountKey, which must stay on the server. This module fetches every page and,
+for each cell of about 1 km, compares how fast its roads ran at night with how
+fast they run now: the cell's delay factor. The browser scales each planned
+leg by the cells along its corridor (frontend/src/lib/traffic.ts).
 
-Run `python -m app.services.traffic --out grid.json` to save a snapshot.
+Run `python -m app.services.traffic --out grid.json` to save a snapshot, and
+`python -m app.services.traffic --baseline night1.json night2.json --out
+app/data/speed_baseline.json` to rebuild the night baseline from raw readings
+saved with --raw.
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
+import functools
 import json
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, NamedTuple, Optional
 
 import httpx
@@ -46,20 +51,32 @@ LAT_RANGE = (1.15, 1.50)
 # Speed bands are 10 km/h ranges: 1 is under 10 km/h, 8 is 70 km/h or more.
 # Each band stands for the middle of its range.
 BAND_KMH = {1: 5.0, 2: 15.0, 3: 25.0, 4: 35.0, 5: 45.0, 6: 55.0, 7: 65.0, 8: 75.0}
-# Free-flow speed for the road categories whose bands track traffic:
-# 1 expressways, 2 major arterial, 3 arterial, 6 slip roads, 8 short tunnels.
-# Each is the 85th-percentile band speed of its category in two daytime
-# readings (27 Oct 2026, 07:16 and 10:33); a night reading would be a better
-# base. Minor arterials (4) and small roads (5) are left out: their bands were
-# the same at both times (a third of small roads under 10 km/h), so they show
-# stop-start between junctions, which OSRM's times already include, not traffic.
+# A stretch's free-flow speed is its own band at night (BASELINE_PATH): the
+# lower quartile of readings taken while the roads are empty, five on 29 Oct
+# 2026 from 02:50 to 04:20, so one slow moment does not set it. One speed per
+# road category does not work: at 02:50, with the roads empty, a quarter of
+# arterial and slip-road km still read 1.5 times slower than their category's
+# speed (junctions and bends, not traffic), adding 31% to the sample run.
+# Night bands flicker (all five agreed on 28% of road km); against the median
+# they leave 4% of phantom slowdown, against the lower quartile 0.4%, at the
+# cost of daytime slowdowns reading about 5% smaller.
+NIGHT_QUANTILE = 0.25
+BASELINE_PATH = Path(__file__).resolve().parent.parent / "data" / "speed_baseline.json"
+# The road categories whose bands track traffic: 1 expressways, 2 major
+# arterial, 3 arterial, 6 slip roads, 8 short tunnels, each with the free-flow
+# speed for a stretch the night baseline does not know (a road opened since):
+# the category's 85th-percentile band speed in two daytime readings (27 Oct
+# 2026, 07:16 and 10:33). Minor arterials (4) and small roads (5) are left
+# out: their bands were the same at both times (a third of small roads under
+# 10 km/h), so they show stop-start between junctions, which OSRM's times
+# already include, not traffic.
 FREE_FLOW_KMH = {1: 75.0, 2: 55.0, 3: 45.0, 6: 55.0, 8: 45.0}
 # Older API versions used letters for the road category.
 LETTER_CATEGORY = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6}
-# A crawl at 5 km/h would read as 15 times free flow; cap it so a single
-# jammed stretch cannot dominate a cell.
+# A crawl at 5 km/h would read as 15 times free flow; cap it so one jam cannot
+# stretch a leg without limit.
 MAX_FACTOR = 3.0
-# A stretch counts as slow from 1.5 times its free-flow travel time.
+# Road counts as slow from 1.5 times its free-flow travel time.
 SLOW_FACTOR = 1.5
 CACHE_SECONDS = 300
 
@@ -76,6 +93,8 @@ class Stretch:
     band: int
     start: tuple[float, float]  # lng, lat
     end: tuple[float, float]
+    # its band in the night baseline, if the baseline has it
+    night_band: Optional[int] = None
 
     @property
     def km(self) -> float:
@@ -90,8 +109,13 @@ class Stretch:
         return self.category in FREE_FLOW_KMH
 
     @property
+    def free_flow_kmh(self) -> float:
+        return BAND_KMH[self.night_band] if self.night_band is not None else FREE_FLOW_KMH[self.category]
+
+    @property
     def factor(self) -> float:
-        return min(MAX_FACTOR, max(1.0, FREE_FLOW_KMH[self.category] / BAND_KMH[self.band]))
+        """This stretch's own slowdown: the factor of a cell with no other stretch."""
+        return min(MAX_FACTOR, max(1.0, self.free_flow_kmh / BAND_KMH[self.band]))
 
 
 def _category(value: Any) -> int:
@@ -140,18 +164,29 @@ def lta_time(value: Any) -> Optional[datetime]:
 
 
 def build_grid(stretches: list[Stretch], fetched_at: datetime, measured_at: Optional[datetime] = None) -> dict[str, Any]:
-    """Length-weighted mean delay factor per cell, keyed by each stretch's midpoint."""
+    """Per cell, its roads' length-weighted free-flow speed over their speed now.
+
+    Keyed by each stretch's midpoint. Averaging speeds rather than each
+    stretch's own factor matters: bands flicker a step up or down between
+    readings, and a stretch's factor counts a slower step as traffic but
+    cannot go below 1 for a faster one, so on empty roads cells read 6% slow;
+    with averaged speeds the steps cancel (0.4%).
+    """
+    # per cell: free-flow speed x km, speed now x km, km
     sums: dict[tuple[int, int], list[float]] = {}
-    total_km = slow_km = 0.0
+    night_km = 0.0
     for s in stretches:
         # a zero-length stretch still reports a speed; give it a token length
         km = max(s.km, 0.01)
-        acc = sums.setdefault(cell_of(*s.mid), [0.0, 0.0])
-        acc[0] += s.factor * km
-        acc[1] += km
-        total_km += km
-        if s.factor >= SLOW_FACTOR:
-            slow_km += km
+        acc = sums.setdefault(cell_of(*s.mid), [0.0, 0.0, 0.0])
+        acc[0] += s.free_flow_kmh * km
+        acc[1] += BAND_KMH[s.band] * km
+        acc[2] += km
+        if s.night_band is not None:
+            night_km += km
+    cells = [(i, j, min(MAX_FACTOR, max(1.0, free / now)), km) for (i, j), (free, now, km) in sorted(sums.items())]
+    total_km = sum(km for *_, km in cells)
+    slow_km = sum(km for _, _, factor, km in cells if factor >= SLOW_FACTOR)
     return {
         "version": 1,
         "source": "LTA DataMall Traffic Speed Bands v4",
@@ -162,10 +197,13 @@ def build_grid(stretches: list[Stretch], fetched_at: datetime, measured_at: Opti
         "cellDeg": CELL_DEG,
         "stretches": len(stretches),
         "roadKm": round(total_km, 1),
+        # share of road km in cells running at SLOW_FACTOR or worse
         "slowShare": round(slow_km / total_km, 3) if total_km else 0.0,
+        # share of road km measured against its own night speed; the rest uses freeFlowKmh
+        "nightShare": round(night_km / total_km, 3) if total_km else 0.0,
         "freeFlowKmh": {str(k): v for k, v in FREE_FLOW_KMH.items()},
         # [i, j, factor, road km]
-        "cells": [[i, j, round(f / km, 2), round(km, 2)] for (i, j), (f, km) in sorted(sums.items())],
+        "cells": [[i, j, round(factor, 2), round(km, 2)] for i, j, factor, km in cells],
     }
 
 
@@ -235,11 +273,44 @@ async def read_live_grid(
     return grid_from_rows(reading.rows, now or datetime.now(timezone.utc), reading.measured_at)
 
 
-def grid_from_rows(rows: list[dict[str, Any]], fetched_at: datetime, measured_at: Optional[datetime] = None) -> dict[str, Any]:
-    stretches = [s for s in map(parse_stretch, rows) if s and s.for_routing]
+def grid_from_rows(
+    rows: list[dict[str, Any]],
+    fetched_at: datetime,
+    measured_at: Optional[datetime] = None,
+    baseline: Optional[dict[str, int]] = None,
+) -> dict[str, Any]:
+    """The grid for one reading, against `baseline` (LinkID to night band; the shipped one if None)."""
+    night = load_baseline() if baseline is None else baseline
+    stretches = [replace(s, night_band=night.get(s.link_id)) for s in map(parse_stretch, rows) if s and s.for_routing]
     if not stretches:
         raise TrafficUnavailable("LTA DataMall returned no usable road speeds.")
     return build_grid(stretches, fetched_at, measured_at)
+
+
+def build_baseline(readings: list[list[dict[str, Any]]]) -> dict[str, int]:
+    """Each routing stretch's lower-quartile band over night readings (NIGHT_QUANTILE)."""
+    bands: dict[str, list[int]] = {}
+    for rows in readings:
+        for s in map(parse_stretch, rows):
+            if s and s.for_routing and s.link_id:
+                bands.setdefault(s.link_id, []).append(s.band)
+    return {link: _quantile(seen, NIGHT_QUANTILE) for link, seen in sorted(bands.items())}
+
+
+def _quantile(bands: list[int], q: float) -> int:
+    """The band at quantile q, nearest rank: of five readings, the lower quartile is the second slowest."""
+    ordered = sorted(bands)
+    return ordered[round(q * (len(ordered) - 1))]
+
+
+@functools.lru_cache(maxsize=1)
+def load_baseline(path: Path = BASELINE_PATH) -> dict[str, int]:
+    """The night baseline; empty without the file, so every stretch falls back to its category."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    return {str(link): int(band) for link, band in data["bands"].items() if int(band) in BAND_KMH}
 
 
 def read_published_grid(settings: Settings, s3: Any = None) -> dict[str, Any]:
@@ -275,10 +346,23 @@ async def traffic_grid() -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Save the current LTA road-speed grid as JSON.")
-    parser.add_argument("--out", required=True, help="where to write the grid")
+    parser = argparse.ArgumentParser(description="Save the current LTA road-speed grid as JSON, or build the night baseline.")
+    parser.add_argument("--out", required=True, help="where to write the grid (or the baseline)")
     parser.add_argument("--raw", help="also save the raw LTA records here")
+    parser.add_argument(
+        "--baseline",
+        nargs="+",
+        metavar="RAW",
+        help="instead, build the night baseline from raw readings saved with --raw while the roads are empty (2 to 5 am)",
+    )
     args = parser.parse_args()
+    if args.baseline:
+        readings = [json.loads(Path(p).read_text(encoding="utf-8")) for p in args.baseline]
+        bands = build_baseline(readings)
+        baseline = {"version": 1, "source": "LTA DataMall Traffic Speed Bands v4", "readings": len(readings), "bands": bands}
+        Path(args.out).write_text(json.dumps(baseline, separators=(",", ":")), encoding="utf-8")
+        print(f"{len(bands)} stretches from {len(readings)} readings")
+        return
     settings = get_settings()
 
     async def fetch() -> Reading:

@@ -69,6 +69,8 @@ Live road speeds need an LTA DataMall AccountKey, which must never reach the bro
 | Console reads | the S3 object (public read, or through CloudFront), with bucket CORS allowing the console's origin | the API route, which must not need a sign-in token (it is public data) and must allow the console's origin in CORS |
 | Timeout | 60 s (it reads 288 LTA pages, 16 at a time with retries: 3–6 s on 27 Oct 2026, up to 30 s seen with 8 at a time) | 30 s at API Gateway; the first request after a cold start does the same reading, so a slow LTA can time it out |
 
+Both need `backend/app/data/speed_baseline.json` in the package: each road stretch's speed at night, which the delay factors are measured against. Without it every stretch falls back to one speed per road category, which reads junctions and bends as traffic; the grid then reports `"nightShare": 0`. To rebuild it, save a few raw readings between 2 and 5 am (`python -m app.services.traffic --out grid.json --raw night1.json`, from `backend/`, 20 minutes apart), then run `python -m app.services.traffic --baseline night*.json --out app/data/speed_baseline.json`.
+
 Then set `VITE_TRAFFIC_URL` for the production build (in `frontend/.env.production`, or as a variable in `deploy.yml`) and redeploy the console. Until it is set, the console plans with free-flowing drive times and shows the Road speeds section as "Off".
 
 Cost: the LTA API is free; the schedule is about 8,600 short Lambda runs and S3 writes a month.

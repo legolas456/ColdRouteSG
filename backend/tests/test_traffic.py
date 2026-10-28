@@ -1,5 +1,7 @@
 import asyncio
 import json
+import sys
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -14,14 +16,17 @@ from app.routers import traffic as traffic_router
 from app.services import traffic
 from app.services.geo import haversine_km
 from app.services.traffic import (
+    BAND_KMH,
     PAGE_SIZE,
     SGT,
     Stretch,
     TrafficUnavailable,
+    build_baseline,
     build_grid,
     cell_of,
     fetch_speed_bands,
     grid_from_rows,
+    load_baseline,
     parse_stretch,
     read_live_grid,
     read_published_grid,
@@ -30,6 +35,10 @@ from app.services.traffic import (
 FIXTURES = Path(__file__).parent / "fixtures"
 ROWS = json.loads((FIXTURES / "lta_speed_bands_sample.json").read_text())
 FETCHED_AT = datetime(2026, 10, 27, 8, 30, tzinfo=SGT)
+# Night bands for the reviewed snapshot, away from the cells the frontend test checks:
+# the PIE at 20-29 km/h now and at night, Fort Canning Tunnel at 70+ at night, and
+# Jalan Besar, a minor arterial, which stays out of the grid whatever its night speed.
+FIXTURE_BASELINE = {"103000001": 3, "103000060": 8, "103000030": 2}
 
 
 @pytest.fixture(autouse=True)
@@ -115,17 +124,39 @@ def _stretch(lng: float, lat: float, length_deg: float, category: int, band: int
     return Stretch("x", "TEST ROAD", category, band, (lng, lat), (lng + length_deg, lat))
 
 
-def test_cell_factor_is_the_length_weighted_mean():
-    # both midpoints fall in the same cell; the long jammed stretch weighs three times the short clear one
-    jammed = _stretch(103.8510, 1.3010, 0.0027, 1, 3)  # factor 3
-    clear = _stretch(103.8540, 1.3010, 0.0009, 1, 8)  # factor 1
+def test_cell_factor_compares_length_weighted_speeds():
+    # both midpoints fall in the same cell: a long expressway stretch at 20-29 km/h and a short
+    # one at 70+, both 75 km/h in free flow; the long one weighs three times the short one
+    jammed = _stretch(103.8510, 1.3010, 0.0027, 1, 3)
+    clear = _stretch(103.8540, 1.3010, 0.0009, 1, 8)
     assert cell_of(*jammed.mid) == cell_of(*clear.mid)
     grid = build_grid([jammed, clear], FETCHED_AT)
     [[i, j, factor, km]] = grid["cells"]
     assert (i, j) == cell_of(*jammed.mid)
-    expected = (3 * jammed.km + 1 * clear.km) / (jammed.km + clear.km)
+    expected = (75 * jammed.km + 75 * clear.km) / (25 * jammed.km + 75 * clear.km)
     assert factor == pytest.approx(expected, abs=0.005)
     assert km == pytest.approx(jammed.km + clear.km, abs=0.005)
+
+
+def test_night_flicker_cancels_within_a_cell():
+    # two stretches that ran at 50-59 km/h at night, one reading a band slower now and one a band
+    # faster: their own factors would call the cell 11% slow; their speeds average out
+    slower = replace(_stretch(103.8510, 1.3010, 0.0020, 2, 5), night_band=6)
+    faster = replace(_stretch(103.8540, 1.3010, 0.0020, 2, 7), night_band=6)
+    assert (slower.factor + faster.factor) / 2 == pytest.approx((55 / 45 + 1) / 2)
+    grid = build_grid([slower, faster], FETCHED_AT)
+    [[_, _, factor, _]] = grid["cells"]
+    assert factor == 1.0
+    assert grid["slowShare"] == 0.0
+
+
+def test_a_jam_still_shows_capped_at_three_times_free_flow():
+    # three stretches in one cell, 70+ km/h at night and under 10 km/h now: 75 / 5 = 15
+    jam = [replace(_stretch(103.8510 + 0.001 * n, 1.3010, 0.0005, 2, 1), night_band=8) for n in range(3)]
+    grid = build_grid(jam, FETCHED_AT)
+    [[_, _, factor, _]] = grid["cells"]
+    assert factor == 3.0
+    assert grid["slowShare"] == 1.0
 
 
 def test_grid_summary_counts_slow_road_km():
@@ -149,12 +180,92 @@ def test_fixture_grid_matches_the_reviewed_snapshot():
     # frontend/src/lib/__tests__/traffic.test.ts reads the same file, so this pins the
     # contract between the Python builder and the browser parser
     expected = json.loads((FIXTURES / "traffic_grid_expected.json").read_text())
-    assert grid_from_rows(ROWS, FETCHED_AT) == expected
+    assert grid_from_rows(ROWS, FETCHED_AT, baseline=FIXTURE_BASELINE) == expected
 
 
 def test_no_usable_rows_is_unavailable():
     with pytest.raises(TrafficUnavailable, match="no usable"):
         grid_from_rows(ROWS[13:], FETCHED_AT)
+
+
+# ---- night baseline -------------------------------------------------------------
+
+# (row index in the fixture, its band at night, expected factor)
+# factor = middle of the night band's range / middle of the current band's, capped at 3
+NIGHT = [
+    (1, 3, 1.0),  # expressway at 20-29 km/h, as at night: a bend or a junction, not traffic
+    (1, 5, 45 / 25),  # the same stretch, at 40-49 km/h at night
+    (5, 3, 25 / 15),  # arterial at 10-19 km/h, 20-29 at night
+    (3, 8, 3.0),  # major arterial at 10-19 km/h, 70+ at night: 75 / 15 = 5, capped
+    (4, 3, 1.0),  # faster now than at night is still free flow
+    (9, 8, 75 / 65),  # short tunnel at 60-69 km/h, faster at night than its category's 45
+]
+
+
+@pytest.mark.parametrize("index,night_band,factor", NIGHT)
+def test_free_flow_is_the_stretchs_own_night_speed(index, night_band, factor):
+    stretch = replace(parse_stretch(ROWS[index]), night_band=night_band)
+    assert stretch.factor == pytest.approx(factor)
+
+
+def test_a_stretch_the_baseline_does_not_know_uses_its_category():
+    grid = grid_from_rows(ROWS, FETCHED_AT, baseline={})
+    assert grid["nightShare"] == 0.0
+    assert grid["slowShare"] > grid_from_rows(ROWS, FETCHED_AT, baseline=FIXTURE_BASELINE)["slowShare"]
+
+
+def test_a_night_reading_against_its_own_baseline_is_free_flow():
+    grid = grid_from_rows(ROWS, FETCHED_AT, baseline=build_baseline([ROWS]))
+    assert grid["nightShare"] == 1.0
+    assert grid["slowShare"] == 0.0
+    assert {factor for _, _, factor, _ in grid["cells"]} == {1.0}
+
+
+def test_baseline_takes_each_stretchs_lower_quartile_night_band():
+    pie, serangoon, minor = ROWS[0], ROWS[5], ROWS[6]
+    readings = [
+        [{**pie, "SpeedBand": 8}, serangoon, minor],
+        [{**pie, "SpeedBand": 3}, minor],  # one slow moment does not set the baseline
+        [{**pie, "SpeedBand": 7}, {**serangoon, "SpeedBand": 4}],
+        [{**pie, "SpeedBand": 8}],
+        [{**pie, "SpeedBand": 8}, ROWS[13], ROWS[14]],  # rejected rows add nothing
+    ]
+    # PIE: 3, 7, 8, 8, 8 -> the second slowest, 7. Serangoon Road: 2 and 4 -> 2. Minor roads stay out.
+    assert build_baseline(readings) == {"103000000": 7, "1": 2}
+
+
+@pytest.mark.parametrize(
+    "bands,expected",
+    [([5], 5), ([6, 4], 4), ([8, 3, 7], 3), ([8, 3, 7, 8], 7), ([8, 3, 7, 8, 8], 7), ([1, 2, 3, 4, 5, 6, 7, 8, 8], 3)],
+)
+def test_lower_quartile_by_nearest_rank(bands, expected):
+    assert traffic._quantile(bands, traffic.NIGHT_QUANTILE) == expected
+
+
+def test_baseline_command_writes_what_the_grid_reads(tmp_path, monkeypatch):
+    raw = []
+    for n, band in enumerate((8, 3, 7, 8, 8)):
+        raw.append(tmp_path / f"night{n}.json")
+        raw[-1].write_text(json.dumps([{**ROWS[0], "SpeedBand": band}, ROWS[5]]))
+    out = tmp_path / "speed_baseline.json"
+    monkeypatch.setattr(sys, "argv", ["traffic", "--baseline", *map(str, raw), "--out", str(out)])
+    traffic.main()
+    assert json.loads(out.read_text())["readings"] == 5
+    assert load_baseline(out) == {"103000000": 7, "1": 2}
+
+
+def test_baseline_file_is_optional_and_checked(tmp_path):
+    assert load_baseline(tmp_path / "missing.json") == {}
+    path = tmp_path / "baseline.json"
+    path.write_text(json.dumps({"bands": {"1": 3, "2": 0, "3": 9, "4": "8"}}))
+    assert load_baseline(path) == {"1": 3, "4": 8}
+
+
+def test_shipped_baseline_covers_the_routing_roads():
+    shipped = load_baseline()
+    # 42,904 routing stretches on 29 Oct 2026
+    assert len(shipped) > 40_000
+    assert set(shipped.values()) <= set(BAND_KMH)
 
 
 # ---- fetching -----------------------------------------------------------------

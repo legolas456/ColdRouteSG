@@ -429,7 +429,7 @@ function RoadSpeedSection({ feed, usedByPlan }: { feed: LiveFeeds['traffic']; us
           </dl>
           <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
             {usedByPlan
-              ? 'The plan stretches each drive by how slow the roads along it are now.'
+              ? 'The plan stretches each drive by how much slower the roads along it are now than at night.'
               : 'Not used for this plan: see the note above.'}
           </p>
         </>
