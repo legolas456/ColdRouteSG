@@ -18,7 +18,7 @@ Traffic comes from LTA road speeds when the traffic service runs (backend with a
 
 ## Set up a fresh working copy
 
-You need repository access, Git, Node **22** (matching `frontend/.nvmrc`), npm, Python **3.11** (matching CI), and `make` on macOS/Linux. Prefer those versions rather than the newest Python or an old Node 20 release: pinned Python packages may lack wheels on a new interpreter, and Vite needs Node >=20.19 or a compatible Node 22 release.
+You need repository access, Git, Node **22** (matching `frontend/.nvmrc`), npm, Python **3.11** (matching CI), and `make` on macOS/Linux. Prefer those versions rather than the newest Python or an old Node 20 release: pinned Python packages may lack wheels on a new interpreter, and Vite needs Node >=20.19 or a compatible Node 22 release. Change `frontend/package-lock.json` (`npm install <package>`) with Node 22 in particular: npm 11, which comes with Node 24, leaves out optional entries that CI's npm 10 requires, and the Checks then fail at `npm ci`.
 
 ```bash
 git clone https://github.com/legolas456/ColdRouteSG.git
