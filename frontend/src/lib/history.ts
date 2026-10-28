@@ -1,5 +1,6 @@
 import { DEPOT, SAMPLE_STOPS } from '../data/sample'
-import { AUTH_ENABLED, idToken } from './auth'
+import { API_URL, api } from './api'
+import { AUTH_ENABLED } from './auth'
 import { depotFromPlace } from './depot'
 import { stopFromPlace } from './places'
 import { hm, parseHm } from './time'
@@ -8,10 +9,9 @@ import type { Depot, OptimiseResult, Plan, ProfileId, Stop } from './types'
 /**
  * Saved runs: each plan a signed-in user makes is stored in their route history
  * (DynamoDB, through the API in infra/), so they can reopen it later and an
- * admin sees the team's activity. The plan itself is made in the browser.
+ * admin sees the team's activity. The plan itself is made by the console, in
+ * the browser or by the cloud planner (planner.ts).
  */
-const API_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '')
-
 export const HISTORY_ENABLED = Boolean(API_URL) && AUTH_ENABLED
 
 interface PlanTotals {
@@ -128,44 +128,6 @@ export async function reopenRun(saved: SavedRun): Promise<{ depot: Depot; stops:
     }),
   )
   return { depot, stops, departure, profile: r.profile }
-}
-
-/** An API error in words: the backend's own detail when it sends one. */
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message)
-    this.name = 'ApiError'
-  }
-}
-
-async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!API_URL) throw new ApiError('The ColdRoute API is not set up for this console.', 0)
-  const token = await idToken()
-  if (!token) throw new ApiError('Sign in again to use your saved runs.', 401)
-  const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), 15000)
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      ...init,
-      signal: ctl.signal,
-      headers: { ...(init.body ? { 'content-type': 'application/json' } : {}), authorization: `Bearer ${token}` },
-    })
-    if (res.status === 204) return undefined as T
-    const body = await res.json().catch(() => null)
-    if (!res.ok) {
-      const detail = body && typeof body.detail === 'string' ? body.detail : null
-      throw new ApiError(detail ?? (res.status === 401 ? 'Sign in again to use your saved runs.' : `The ColdRoute API answered ${res.status}.`), res.status)
-    }
-    return body as T
-  } catch (e) {
-    if (e instanceof ApiError) throw e
-    throw new ApiError(ctl.signal.aborted ? 'The ColdRoute API did not answer in time.' : 'Could not reach the ColdRoute API.', 0)
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
 export const saveRun = (run: PlannedRun) =>

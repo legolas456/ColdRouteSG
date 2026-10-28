@@ -19,6 +19,7 @@ import { DEPARTURE, DEPOT, PROFILES, RECORDED_AT, SAMPLE_STOPS } from './data/sa
 import { AUTH_ENABLED, currentUser, signOutUser } from './lib/auth'
 import { camerasNear, liveConditions, recordedConditions, wantsTypical, type Conditions, type DataMode } from './lib/conditions'
 import { HISTORY_ENABLED, plannedRun, reopenRun, saveRun, type SavedRun } from './lib/history'
+import { CLOUD_PLANNING, planInCloud } from './lib/planner'
 import { ensureLive, isLoading, refreshLive, sgMinutes, typicalTraffic, useLiveFeeds } from './lib/live'
 import { validDepot } from './lib/depot'
 import { optimise } from './lib/optimizer'
@@ -30,6 +31,8 @@ import { applyTheme, THEME_BY_ID, type ThemeId } from './lib/themes'
 import type { Depot, OptimiseResult, ProfileId, Stop } from './lib/types'
 
 type Phase = 'draft' | 'optimising' | 'optimised'
+/** what a plan read, and the plan when the cloud planner made it (the browser makes it in finish() otherwise) */
+type Planned = { c: Conditions; r?: OptimiseResult; cloudFailed?: boolean }
 
 // ---- URL contract -------------------------------------------------------
 // ?share=<token>[&view=compare][&stop=<id>]  a teammate's read-only link
@@ -183,22 +186,37 @@ export default function App() {
       const token = ++runToken.current
       timers.current.forEach(clearTimeout)
       timers.current = []
-      const conditions: Promise<Conditions> =
-        dataMode === 'live'
-          ? ensureLive().then(async (f) => {
-              const now = sgMinutes(f.fetchedAt ?? Date.now())
-              // no live reading stands for this departure: the typical traffic of its slot may
-              const typical = wantsTypical(f.traffic, now, departure) ? await typicalTraffic(departure) : undefined
-              return liveConditions(stops, f, now, departure, typical)
-            })
-          : Promise.resolve(recordedConditions(stops))
-      // real drive times for stops outside the bundled snapshot (one OSRM call)
-      const read = Promise.all([conditions, ensureMatrix([depot, ...stops])]).then(([c, roadsOk]): Conditions =>
-        roadsOk ? c : { ...c, notes: [...c.notes, 'OSRM did not respond, so drive times between new stops are estimated.'] },
-      )
-      const finish = (c: Conditions) => {
+      // in the browser: the conditions, then the optimiser in finish()
+      const inBrowser = (): Promise<Planned> => {
+        const conditions: Promise<Conditions> =
+          dataMode === 'live'
+            ? ensureLive().then(async (f) => {
+                const now = sgMinutes(f.fetchedAt ?? Date.now())
+                // no live reading stands for this departure: the typical traffic of its slot may
+                const typical = wantsTypical(f.traffic, now, departure) ? await typicalTraffic(departure) : undefined
+                return liveConditions(stops, f, now, departure, typical)
+              })
+            : Promise.resolve(recordedConditions(stops))
+        // real drive times for stops outside the bundled snapshot (one OSRM call)
+        return Promise.all([conditions, ensureMatrix([depot, ...stops])]).then(([c, roadsOk]) => ({
+          c: roadsOk ? c : { ...c, notes: [...c.notes, 'OSRM did not respond, so drive times between new stops are estimated.'] },
+        }))
+      }
+      // signed in on live data, the cloud planner plans the run; the browser does if it cannot
+      const read: Promise<Planned> =
+        dataMode === 'live' && CLOUD_PLANNING && userRef.current?.account === 'cognito'
+          ? planInCloud({ depot, stops, departure, profile }).then(
+              ({ result, conditions }) => ({ c: conditions, r: result }),
+              (e: Error) =>
+                inBrowser().then(({ c }) => ({
+                  c: { ...c, notes: [...c.notes, `The cloud planner did not plan this run, so the browser did. ${e.message}`] },
+                  cloudFailed: true,
+                })),
+            )
+          : inBrowser()
+      const finish = ({ c, r: planned, cloudFailed }: Planned) => {
         if (token !== runToken.current) return
-        const r = optimise(depot, c.stops, departure, PROFILES[profile].weights, c.rain, c.traffic)
+        const r = planned ?? optimise(depot, c.stops, departure, PROFILES[profile].weights, c.rain, c.traffic)
         setPlanCond(c)
         setResult(r)
         if (!instant) setView('coldroute')
@@ -206,9 +224,11 @@ export default function App() {
         const notice =
           c.mode === 'live' && c.source === 'recorded'
             ? 'Live data unavailable · planned with the recorded morning'
-            : !allReal([depot, ...c.stops])
-              ? 'OSRM did not respond · drive times are estimated'
-              : null
+            : cloudFailed
+              ? 'Cloud planner unavailable · planned in the browser'
+              : !allReal([depot, ...c.stops])
+                ? 'OSRM did not respond · drive times are estimated'
+                : null
         if (notice) setToast(notice)
         // a plan made while signed in goes to the user's route history
         if (!instant && HISTORY_ENABLED && userRef.current?.account === 'cognito')
@@ -231,7 +251,7 @@ export default function App() {
       })
       // the steps play out while the feeds load; whichever takes longer wins
       const shown = new Promise<void>((done) => timers.current.push(window.setTimeout(done, 340 * OPTIMISE_STEPS.length + 220)))
-      Promise.all([read, shown]).then(([c]) => finish(c))
+      Promise.all([read, shown]).then(([planned]) => finish(planned))
     },
     [depot, stops, departure, profile, dataMode],
   )
