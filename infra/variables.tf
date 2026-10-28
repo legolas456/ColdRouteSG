@@ -30,9 +30,9 @@ variable "lta_account_key" {
 }
 
 variable "traffic_schedule" {
-  description = "How often the traffic refresh runs; LTA updates its speed bands every 5 minutes."
+  description = "How often the traffic refresh runs. LTA updates every 5 minutes, but a reading is 288 calls and the key's quota is about 3,000 calls an hour, so every 10 minutes (1,728 an hour) leaves room."
   type        = string
-  default     = "rate(5 minutes)"
+  default     = "rate(10 minutes)"
 }
 
 variable "traffic_refresh_enabled" {

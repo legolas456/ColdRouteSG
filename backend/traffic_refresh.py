@@ -1,7 +1,8 @@
 """Scheduled Lambda: publish the LTA road-speed grid to S3, and keep the reading.
 
-An EventBridge schedule runs it every 5 minutes, LTA's update interval. The
-console reads the published JSON, so no request ever waits on LTA's ~300 pages.
+An EventBridge schedule runs it every 10 minutes: LTA updates every 5, but a
+reading is 288 calls and the key's quota is about 3,000 calls an hour. The
+console reads the published JSON, so no request ever waits on LTA's pages.
 Each reading is also kept in the history (traffic/history/), from which the
 typical traffic for any time of the week is built. Needs LTA_ACCOUNT_KEY and
 TRAFFIC_BUCKET (and optionally TRAFFIC_KEY); the function's role needs
