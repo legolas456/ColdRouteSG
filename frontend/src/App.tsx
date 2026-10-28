@@ -8,6 +8,7 @@ import { ConditionsPanel } from './components/ConditionsPanel'
 import { MapView, type Layers } from './components/MapView'
 import { PANEL, PanelHandle } from './components/PanelHandle'
 import { ResultsPanel, type View } from './components/ResultsPanel'
+import { RunsDialog, TeamDialog } from './components/SavedRuns'
 import { SharePopover } from './components/SharePopover'
 import { DataPill, TopBar, type ThemeMode } from './components/Shell'
 import { StopCard } from './components/StopCard'
@@ -15,7 +16,9 @@ import { OPTIMISE_STEPS, StopsEditor } from './components/StopsEditor'
 import { Timeline } from './components/Timeline'
 import { Button, Segmented, StatusPill } from './components/ui'
 import { DEPARTURE, DEPOT, PROFILES, RECORDED_AT, SAMPLE_STOPS } from './data/sample'
+import { AUTH_ENABLED, currentUser, signOutUser } from './lib/auth'
 import { camerasNear, liveConditions, recordedConditions, type Conditions, type DataMode } from './lib/conditions'
+import { HISTORY_ENABLED, plannedRun, reopenRun, saveRun, type SavedRun } from './lib/history'
 import { ensureLive, isLoading, refreshLive, sgMinutes, useLiveFeeds } from './lib/live'
 import { validDepot } from './lib/depot'
 import { optimise } from './lib/optimizer'
@@ -93,9 +96,26 @@ export default function App() {
   }
 
   const [readOnly, setReadOnly] = useState(sharedOnLoad)
-  // mock account: signed out on first visit, remembered after that
+  // signed out on first visit, remembered after that: the demo admin, or a
+  // Cognito account whose session is checked again on load (below)
   const [user, setUser] = usePersistentState<User | null>('coldroute.user', null)
   const [signIn, setSignIn] = useState<{ reason?: string; then?: () => void } | null>(null)
+  const [savedOpen, setSavedOpen] = useState<'runs' | 'team' | null>(null)
+  // read by runOptimise, which would otherwise keep the user from when it was made
+  const userRef = useRef(user)
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+  // a Cognito session can end between visits (sign-out elsewhere, a build without sign-in)
+  useEffect(() => {
+    if (user?.account !== 'cognito') return
+    if (!AUTH_ENABLED) {
+      setUser(null)
+      return
+    }
+    void currentUser().then(setUser)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [phase, setPhase] = useState<Phase>('draft')
   // the run's stops are kept across reloads; a shared link shows its own snapshot
   const [savedStops, setSavedStops] = usePersistentState<Stop[]>('coldroute.stops.v1', SAMPLE_STOPS)
@@ -178,8 +198,18 @@ export default function App() {
         setResult(r)
         if (!instant) setView('coldroute')
         setPhase('optimised')
-        if (c.mode === 'live' && c.source === 'recorded') setToast('Live data unavailable · planned with the recorded morning')
-        else if (!allReal([depot, ...c.stops])) setToast('OSRM did not respond · drive times are estimated')
+        const notice =
+          c.mode === 'live' && c.source === 'recorded'
+            ? 'Live data unavailable · planned with the recorded morning'
+            : !allReal([depot, ...c.stops])
+              ? 'OSRM did not respond · drive times are estimated'
+              : null
+        if (notice) setToast(notice)
+        // a plan made while signed in goes to the user's route history
+        if (!instant && HISTORY_ENABLED && userRef.current?.account === 'cognito')
+          saveRun(plannedRun({ depot, stops: c.stops, departure, profile, dataMode: c.mode, result: r }))
+            .then(() => !notice && setToast('Saved to your runs'))
+            .catch((e: Error) => setToast(`Not saved to your runs: ${e.message}`))
         // road geometry for both plans' legs; the map redraws when it arrives
         const byId = Object.fromEntries(c.stops.map((s) => [s.id, s]))
         void ensureLegs([r.recommended.order, r.baseline.order].map((o) => [depot, ...o.map((id) => byId[id])]))
@@ -458,10 +488,36 @@ export default function App() {
     user,
     onSignIn: () => setSignIn({}),
     onSignOut: () => {
+      if (user?.account === 'cognito') void signOutUser()
       setUser(null)
       setToast('Signed out')
     },
+    onRuns: HISTORY_ENABLED ? () => setSavedOpen('runs') : undefined,
+    onTeam: HISTORY_ENABLED ? () => setSavedOpen('team') : undefined,
   }
+
+  // a saved run comes back as a draft: its stops and times, planned again on today's data
+  const openSavedRun = async (run: SavedRun) => {
+    const saved = await reopenRun(run)
+    timers.current.forEach(clearTimeout)
+    runToken.current++
+    setSavedDepot(saved.depot)
+    setStops(saved.stops)
+    setDeparture(saved.departure)
+    setProfile(saved.profile)
+    setSelectedId(null)
+    setResult(null)
+    setPhase('draft')
+    setSavedOpen(null)
+    setToast('Saved run opened · optimise to plan it on today’s data')
+  }
+
+  const savedDialog =
+    savedOpen === 'runs' ? (
+      <RunsDialog onClose={() => setSavedOpen(null)} onOpen={openSavedRun} />
+    ) : savedOpen === 'team' ? (
+      <TeamDialog onClose={() => setSavedOpen(null)} />
+    ) : null
 
   const topBar = (
     <TopBar
@@ -576,6 +632,7 @@ export default function App() {
         </main>
         {cameraViewer}
         {signInDialog}
+        {savedDialog}
         {toastEl}
       </div>
     )
@@ -612,6 +669,7 @@ export default function App() {
       </main>
       {cameraViewer}
       {signInDialog}
+      {savedDialog}
       {toastEl}
     </div>
   )

@@ -64,7 +64,7 @@ From the repo root, with the stack's IDs and the build settings from `terraform 
 
 ```bash
 export AMPLIFY_APP_ID=$(terraform -chdir=infra output -raw amplify_app_id)
-export VITE_TRAFFIC_URL=$(terraform -chdir=infra output -raw traffic_url)
+eval "$(terraform -chdir=infra output -json frontend_env | python3 -c 'import json,sys; [print(f"export {k}={v}") for k, v in json.load(sys.stdin).items()]')"
 DEPLOY_ENV_FILE=/dev/null ./scripts/deploy-frontend.sh
 ```
 
@@ -88,7 +88,7 @@ TOKEN=$(aws cognito-idp initiate-auth --client-id "$(terraform output -raw cogni
 curl -s -H "Authorization: Bearer $TOKEN" "$API/api/admin/me"
 ```
 
-The token gets past API Gateway; `/api/admin/me` itself answers once the Cognito branch's backend is merged (until then FastAPI returns 404).
+`/api/admin/me` answers for a user in the `admin` group and refuses (403) everyone else.
 
 ## Update and remove
 
@@ -100,6 +100,6 @@ The token gets past API Gateway; `/api/admin/me` itself answers once the Cognito
 - **State holds secrets.** `terraform.tfstate` contains the LTA key and every resource ID. It stays on the machine that ran Terraform (git-ignored); keep it private, or move it to a private S3 backend if more than one person applies.
 - **Replacing the hand-made stack.** Applying this in an account that already has the hand-made Cognito, API Gateway, Lambda and DynamoDB creates a second, separate stack; nothing existing is touched. Users and saved routes are not copied. Once the console works against the new stack, delete the old resources in the console.
 - **Cost.** Next to nothing at course scale: the traffic refresh is about 8,600 runs a month of about 7 s at 1 GB, within Lambda's free tier, plus a few cents of S3 and logs. API Gateway, Cognito and DynamoDB are free or pay-per-request at this size. Set `budget_email` for an alert anyway.
-- **Not wired yet.** The new console does not sign in or call the optimise endpoint yet (its planner runs in the browser); only live traffic uses this API today. The Cognito, route-history and admin endpoints come from the backend on `feat/lianping-admin-dashboard-cognito-dynamodb`, which still needs merging into `backend/`.
+- **What the console uses.** Built with `frontend_env`, the console signs in with Cognito, saves each signed-in plan to route history (`POST /api/routes/history`), lists and reopens saved runs, shows admins the team's activity, and reads live traffic. It still plans in the browser: the API's `POST /api/routes/optimize` (the older Python optimiser) is only used by the old UI.
 
 Tested on 29 Oct 2026 in a separate test account: apply created 30 resources; the refresh read 288 LTA pages in 7 s and published the grid; the deployed console read it through the API in Live mode; signed-in routes refused missing and forged tokens (401) and accepted a Cognito token; browser preflights from the console returned 200.

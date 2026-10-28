@@ -7,6 +7,7 @@ place of DynamoDB.
 import asyncio
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from botocore.exceptions import ClientError
@@ -280,3 +281,15 @@ def test_optimised_runs_are_stored_as_before():
 def test_planned_run_model_round_trips():
     parsed = PlannedRun.model_validate(run())
     assert parsed.stops[1].cargo == "FROZEN" and parsed.shortest.late_stops == 1
+
+
+def test_the_console_sample_run_is_accepted(table):
+    # frontend/src/lib/__tests__/history.test.ts checks the console sends exactly this
+    sample = json.loads((Path(__file__).parent / "fixtures" / "planned_run_sample.json").read_text())
+    status, _ = call("POST", "/api/routes/history", DRIVER, sample)
+    assert status == 201
+    [item] = table.items.values()
+    assert item["stop_count"] == 7
+    assert item["result"]["order"] == ["HV", "NUH", "TPG", "AMK", "WHC", "TAM", "MBFC"]
+    pharma = sum(1 for s in sample["stops"] if s["cargo"] == "PHARMA")
+    assert sum(1 for s in item["request"]["stops"] if s["cold_chain_priority"] == 1) == pharma
