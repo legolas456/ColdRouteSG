@@ -2,13 +2,14 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
-from app.models import RouteRequest, RouteResponse
+from app.models import PlannedRun, RouteRequest, RouteResponse
 from app.services.auth import get_current_user
 from app.services.dynamodb import (
     delete_route_history_item,
     get_route_history_item,
     is_aws_storage_error,
     list_route_history,
+    save_planned_run,
     save_route_history,
 )
 from app.services.optimization import optimize_route
@@ -39,6 +40,23 @@ async def optimize(payload: RouteRequest, request: Request):
         )
 
     return result
+
+
+@router.post("/history", status_code=status.HTTP_201_CREATED)
+def save_planned(payload: PlannedRun, request: Request):
+    """Save a run the console planned in the browser to the user's route history."""
+    current_user = get_current_user(request)
+    try:
+        route_id = save_planned_run(user_id=current_user["user_id"], user_email=current_user["email"], run=payload)
+    except Exception as exc:
+        if not is_aws_storage_error(exc):
+            raise
+        logger.exception("Saving a planned run to DynamoDB failed.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Route history is temporarily unavailable, so this run was not saved.",
+        ) from exc
+    return {"route_id": route_id}
 
 
 @router.get("/history")

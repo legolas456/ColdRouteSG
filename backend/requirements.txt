@@ -6,3 +6,5 @@ pydantic-settings==2.10.1
 pyproj==3.6.1
 pytest==8.4.2
 mangum==0.19.0
+# route history and the admin user list; the Lambda runtime provides its own
+boto3==1.43.121

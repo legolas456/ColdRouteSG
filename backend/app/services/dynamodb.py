@@ -12,7 +12,7 @@ from boto3.dynamodb.conditions import Key
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.config import get_settings
-from app.models import RouteRequest, RouteResponse
+from app.models import CARGO_PRIORITY, PlannedRun, RouteRequest, RouteResponse
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -48,6 +48,34 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
+def _history_item(
+    *,
+    user_id: str,
+    user_email: str,
+    depot_name: str,
+    departure_time: str,
+    request_data: dict[str, Any],
+    result_data: dict[str, Any],
+) -> dict[str, Any]:
+    """One saved run; the route id starts with the time, so a user's runs list newest first."""
+    created_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    route_id = f"{created_at}#{uuid4()}"
+    result_data["route_id"] = route_id
+
+    item = {
+        "user_id": user_id,
+        "route_id": route_id,
+        "created_at": created_at,
+        "user_email": user_email,
+        "depot_name": depot_name,
+        "departure_time": departure_time,
+        "stop_count": len(request_data.get("stops") or []),
+        "request": request_data,
+        "result": result_data,
+    }
+    return _dynamodb_safe(item)
+
+
 def build_route_history_item(
     *,
     user_id: str,
@@ -55,29 +83,44 @@ def build_route_history_item(
     route_request: RouteRequest,
     route_response: RouteResponse,
 ) -> dict[str, Any]:
-    created_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
-    route_id = f"{created_at}#{uuid4()}"
-
     response_data = route_response.model_dump(mode="json")
     request_data = route_request.model_dump(mode="json")
 
     # Route geometry can contain many coordinate pairs and is not required for
     # the route-history list. Omitting it keeps DynamoDB items compact.
     response_data.pop("route_geometry", None)
-    response_data["route_id"] = route_id
 
-    item = {
-        "user_id": user_id,
-        "route_id": route_id,
-        "created_at": created_at,
-        "user_email": user_email,
-        "depot_name": route_request.depot_name,
-        "departure_time": route_request.departure_time,
-        "stop_count": len(route_request.stops),
-        "request": request_data,
-        "result": response_data,
-    }
-    return _dynamodb_safe(item)
+    return _history_item(
+        user_id=user_id,
+        user_email=user_email,
+        depot_name=route_request.depot_name,
+        departure_time=route_request.departure_time,
+        request_data=request_data,
+        result_data=response_data,
+    )
+
+
+def build_planned_run_item(*, user_id: str, user_email: str, run: PlannedRun) -> dict[str, Any]:
+    """A run the console planned, with the fields the admin metrics read from optimised runs."""
+    request_data = run.model_dump(mode="json", exclude={"plan", "shortest"})
+    for stop in request_data["stops"]:
+        stop["cold_chain_priority"] = CARGO_PRIORITY[stop["cargo"]]
+    result_data = {"source": "console", **run.plan.model_dump(mode="json"), "shortest": run.shortest.model_dump(mode="json")}
+
+    return _history_item(
+        user_id=user_id,
+        user_email=user_email,
+        depot_name=run.depot_name,
+        departure_time=run.departure_time,
+        request_data=request_data,
+        result_data=result_data,
+    )
+
+
+def save_planned_run(*, user_id: str, user_email: str, run: PlannedRun) -> str:
+    item = build_planned_run_item(user_id=user_id, user_email=user_email, run=run)
+    _table().put_item(Item=item)
+    return str(item["route_id"])
 
 
 def save_route_history(
