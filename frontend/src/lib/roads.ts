@@ -5,8 +5,8 @@
 // (added through the OneMap search) gets its times from the OSRM table service
 // before optimising, and the legs of the chosen plans are fetched afterwards.
 // Until then, or if OSRM is down, times are a road-factor estimate and legs are
-// straight lines.
-import { useSyncExternalStore } from 'react'
+// straight lines. The cloud planner (planner/) fills the same tables from
+// Amazon Location Service instead, so this module stays free of React.
 import snapshot from '../data/osrm.json'
 
 export type Point = { id: string; lng: number; lat: number }
@@ -34,15 +34,14 @@ const bump = () => {
   version++
   listeners.forEach((l) => l())
 }
-/** Re-renders when new road data arrives (to redraw legs). */
-export const useRoadsVersion = () =>
-  useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => version,
-  )
+/** Tell `listener` when new road data arrives (lib/hooks.ts useRoadsVersion redraws legs on it). */
+export const subscribeRoads = (listener: () => void) => {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+export const roadsVersion = () => version
 
 export const haversineKm = (a: { lng: number; lat: number }, b: { lng: number; lat: number }) => {
   const R = 6371
@@ -131,10 +130,10 @@ export async function ensureMatrix(points: Point[]): Promise<boolean> {
   }
 }
 
-const round5 = (n: number) => Math.round(n * 1e5) / 1e5
+export const round5 = (n: number) => Math.round(n * 1e5) / 1e5
 
 /** Ramer–Douglas–Peucker, as in scripts/fetch-osrm.mjs, to keep legs light. */
-function simplify(points: [number, number][], tolerance: number) {
+export function simplify(points: [number, number][], tolerance: number) {
   if (points.length < 3) return points
   const sqTol = tolerance * tolerance
   const keep = new Uint8Array(points.length)
@@ -199,4 +198,33 @@ export async function ensureLegs(paths: Point[][]): Promise<boolean> {
   }
   bump()
   return ok
+}
+
+/** Drive times measured elsewhere (the cloud planner's Location Service matrix), used like OSRM's. */
+export function setDriveTimes(points: Point[], times: { from: string; to: string; minutes: number; km: number }[]) {
+  invalidate(points)
+  for (const t of times) {
+    minutes[t.from] ??= {}
+    km[t.from] ??= {}
+    minutes[t.from][t.to] = Math.round(t.minutes * 10) / 10
+    km[t.from][t.to] = Math.round(t.km * 10) / 10
+  }
+  for (const p of points) measuredAt[p.id] = where(p)
+  bump()
+}
+
+/** Road geometry measured elsewhere, keyed "fromId>toId". */
+export function mergeLegs(lines: Record<string, [number, number][]>) {
+  Object.assign(legs, lines)
+  bump()
+}
+
+/** The road geometry known for each leg of a path, keyed "fromId>toId". */
+export function legsOf(path: Point[]): Record<string, [number, number][]> {
+  const out: Record<string, [number, number][]> = {}
+  path.slice(1).forEach((p, i) => {
+    const key = `${path[i].id}>${p.id}`
+    if (legs[key]) out[key] = legs[key]
+  })
+  return out
 }

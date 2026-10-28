@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { roadsVersion, subscribeRoads } from './roads'
 
 /** Phone layout breakpoint, matches Tailwind's `md` (768px). */
 export const PHONE_QUERY = '(max-width: 767px)'
@@ -49,3 +50,6 @@ export const isTyping = () => {
   const el = document.activeElement as HTMLElement | null
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)
 }
+
+/** Re-renders when new road data arrives (to redraw legs). */
+export const useRoadsVersion = () => useSyncExternalStore(subscribeRoads, roadsVersion)
