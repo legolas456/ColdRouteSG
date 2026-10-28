@@ -38,6 +38,11 @@ output "traffic_function" {
   value       = local.traffic_enabled ? aws_lambda_function.traffic[0].function_name : null
 }
 
+output "traffic_profile_function" {
+  description = "Invoke it to rebuild typical traffic without waiting for the night."
+  value       = local.traffic_enabled ? aws_lambda_function.profile[0].function_name : null
+}
+
 output "dashboard_url" {
   value = "https://${var.region}.console.aws.amazon.com/cloudwatch/home?region=${var.region}#dashboards/dashboard/${aws_cloudwatch_dashboard.main.dashboard_name}"
 }

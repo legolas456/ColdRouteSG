@@ -54,7 +54,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [ ] API Gateway + Lambda for the backend (`backend/lambda_handler.py` is a start).
 - [ ] DynamoDB for runs, versions and results.
 - [ ] S3 for recorded condition snapshots and experiment exports.
-- [ ] EventBridge to refresh conditions on a schedule. `backend/traffic_refresh.py` publishes the road-speed grid every 5 minutes (EventBridge → Lambda → S3, see [deployment.md](deployment.md#live-traffic-service)) and keeps every reading for typical traffic; running in a test account since 29 Oct 2026, not yet in the team account. LTA's per-key call quota limits how often it can read.
+- [ ] EventBridge to refresh conditions on a schedule. `backend/traffic_refresh.py` publishes the road-speed grid every 5 minutes (EventBridge → Lambda → S3, see [deployment.md](deployment.md#live-traffic-service)) and keeps every reading; a nightly Lambda builds typical traffic per weekday and weekend 15-minute slot from them. Running in a test account since 29 Oct 2026, not yet in the team account. LTA's per-key call quota limits how often it can read.
 - [x] Cognito sign-in in the console (when built with `VITE_COGNITO_*` from `infra/`), with the demo account kept as a fallback. Signed-in plans are saved to route history (DynamoDB); the account menu lists your runs, and admins see the team's activity (Lian Ping's backend, merged from `feat/lianping-admin-dashboard-cognito-dynamodb`). Users are created by an admin; there is no sign-up.
 - [ ] CloudWatch metrics: latency, errors, cost per optimisation.
 - [ ] If AWS Educate blocks a service, use the alternative listed in the proposal and note it.

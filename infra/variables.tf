@@ -35,6 +35,18 @@ variable "traffic_schedule" {
   default     = "rate(5 minutes)"
 }
 
+variable "traffic_refresh_enabled" {
+  description = "Run the traffic refresh on its schedule. Turn off to pause it, e.g. while LTA's call quota for the key is used up."
+  type        = bool
+  default     = true
+}
+
+variable "traffic_profile_schedule" {
+  description = "When typical traffic is rebuilt from the kept readings; the default is 02:30 Singapore time."
+  type        = string
+  default     = "cron(30 18 * * ? *)"
+}
+
 variable "traffic_key" {
   description = "S3 key of the published road-speed grid."
   type        = string

@@ -75,6 +75,8 @@ Live road speeds need an LTA DataMall AccountKey, which must never reach the bro
 
 Both need `backend/app/data/speed_baseline.json` in the package: each road stretch's speed at night, which the delay factors are measured against. Without it every stretch falls back to one speed per road category, which reads junctions and bends as traffic; the grid then reports `"nightShare": 0`. To rebuild it, save a few raw readings between 2 and 5 am (`python -m app.services.traffic --out grid.json --raw night1.json`, from `backend/`, 20 minutes apart), then run `python -m app.services.traffic --baseline night*.json --out app/data/speed_baseline.json`.
 
+The Terraform in `infra/` also runs `backend/traffic_profile.handler` each night (02:30 Singapore time), which builds typical traffic for every weekday and weekend 15-minute slot from the kept readings; the console asks for it (`/api/traffic/typical`) when no live reading covers a departure.
+
 Then set `VITE_TRAFFIC_URL` for the production build (in `frontend/.env.production`, or as a variable in `deploy.yml`) and redeploy the console. Until it is set, the console plans with free-flowing drive times and shows the Road speeds section as "Off".
 
 Cost: the LTA API is free; the schedule is about 8,600 short Lambda runs and S3 writes a month.
