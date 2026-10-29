@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs && vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "data:osrm": "node scripts/fetch-osrm.mjs",
@@ -32,6 +34,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
   }
 }

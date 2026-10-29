@@ -39,13 +39,13 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [ ] LTA cameras: shown in the Conditions panel and on the stop card, and enlarged in the app, but data.gov.sg serves only 8 cameras today (Woodlands and Tuas checkpoints, and Sentosa Gateway), so most stops have none nearby.
 - [x] OneMap search for addresses. Called from the browser without a token; a new stop gets its nearest NEA area and HDB carpark straight away.
 - [x] OSRM at runtime: one table call for the run's drive times as stops are added, one route call per plan for the road geometry. Falls back to an estimate (and says so) if OSRM is down. The sample run still uses the bundled snapshot.
-- [ ] Depot picker: the depot is fixed to Jurong Cold Store.
+- [x] Depot picker: choose a Singapore depot through OneMap search, keep it across reloads, and plan from its own OSRM road matrix; **Load sample** restores Jurong Cold Store.
 - [ ] Mark a stop delivered and re-plan the rest from there (the old console's "Set current location here").
 
 ### 4. Optimiser
 
 - [ ] Today: exhaustive search up to 8 stops, 2-opt from the input order above that. Seed 2-opt with earliest-deadline or nearest-neighbour (as in the proposal) and check results at 10 and 15 stops.
-- [ ] Unit tests on fixed scenarios: rain, parking crunch, tight pharma window.
+- [x] Unit tests on fixed scenarios: rain, parking crunch, tight pharma window, checked against the normalised objective. Vitest also covers window waits, rain interval boundaries, light vs heavy rain, cargo sensitivity, weight validation, empty/single runs, 8-stop exhaustive search, 10/15-stop integrity and the recorded sample; the node:test suite covers the objective scales, profiles, depot picker and CSV export. `make test` and GitHub Checks run both. Performance and optimality evaluation are still separate work.
 - [ ] Explanations generated from cost differences, checked against the position change.
 
 ### 5. AWS (the cloud part of the course)

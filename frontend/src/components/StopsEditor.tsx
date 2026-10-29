@@ -2,7 +2,6 @@ import clsx from 'clsx'
 import {
   AlertCircle,
   Check,
-  ChevronDown,
   Loader2,
   MapPin,
   Scale,
@@ -13,16 +12,19 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ADDRESS_BOOK, DEPOT, PROFILES } from '../data/sample'
+import { ADDRESS_BOOK, PROFILES } from '../data/sample'
 import { travel } from '../lib/optimizer'
 import { MAX_STOPS, searchPlaces, stopFromPlace, type Place } from '../lib/places'
 import { useRoadsVersion } from '../lib/roads'
 import { duration, hm } from '../lib/time'
-import type { Cargo, ProfileId, Stop } from '../lib/types'
+import type { Cargo, Depot, ProfileId, Stop } from '../lib/types'
+import { DepotPicker } from './DepotPicker'
 import { LAST_SLOT, MinutesPicker, TimePicker } from './Pickers'
 import { Button, Divider, Kbd, Segmented, CargoTag } from './ui'
 
 interface Props {
+  depot: Depot
+  setDepot: (depot: Depot) => void
   stops: Stop[]
   setStops: (s: Stop[]) => void
   departure: number
@@ -53,13 +55,13 @@ export const OPTIMISE_STEPS = [
 ]
 
 export function StopsEditor(props: Props) {
-  const { stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step, dateLabel, onDepartNow, onLoadSample, isSample } =
+  const { depot, setDepot, stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step, dateLabel, onDepartNow, onLoadSample, isSample } =
     props
   const reviewCount = stops.filter((s) => s.review).length
   const roads = useRoadsVersion()
 
   const estimate = useMemo(() => {
-    let prev: { id: string; lng: number; lat: number } = DEPOT
+    let prev: { id: string; lng: number; lat: number } = depot
     let minutes = 0
     for (const s of stops) {
       minutes += travel(prev, s).minutes + s.service
@@ -68,7 +70,7 @@ export function StopsEditor(props: Props) {
     return minutes
     // roads: re-estimate once OSRM has real times for new stops
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stops, roads])
+  }, [depot, stops, roads])
 
   const update = (id: string, patch: Partial<Stop>) => setStops(stops.map((s) => (s.id === id ? { ...s, ...patch } : s)))
   const remove = (id: string) => {
@@ -120,12 +122,7 @@ export function StopsEditor(props: Props) {
             </button>
           }
         />
-        <Field label="From depot">
-          <span className="flex items-center justify-between gap-2">
-            <span className="truncate">{DEPOT.name}</span>
-            <ChevronDown size={14} className="shrink-0 text-fg-3" />
-          </span>
-        </Field>
+        <DepotPicker depot={depot} onChange={setDepot} />
       </div>
 
       <div className="mt-3 px-5">
@@ -229,15 +226,6 @@ function TextButton({ children, ...rest }: React.ButtonHTMLAttributes<HTMLButton
     <button type="button" {...rest} className="rounded-[5px] px-1.5 py-0.5 text-[11.5px] font-medium whitespace-nowrap text-brand-fg hover:bg-brand-soft">
       {children}
     </button>
-  )
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block cursor-pointer rounded-control px-2.5 py-1.5 shadow-[inset_0_0_0_1px_var(--border-dark)] transition-shadow focus-within:shadow-[inset_0_0_0_1.5px_var(--brand)] hover:bg-hover">
-      <span className="block text-[10.5px] text-fg-3">{label}</span>
-      <span className="block h-5 text-[13px] leading-5 font-medium">{children}</span>
-    </label>
   )
 }
 

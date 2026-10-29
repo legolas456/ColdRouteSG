@@ -39,7 +39,8 @@ export interface Stop {
 }
 
 export interface Depot {
-  id: 'D'
+  /** Sample depot is D; selected depots use a coordinate-specific ID for road-cache isolation. */
+  id: string
   name: string
   address: string
   lng: number
@@ -88,8 +89,8 @@ export interface StopResult {
   exposure: number
   risk: RiskFactors
   riskScore: number
-  /** weighted cost contributions, minute-equivalents */
-  cost: { weather: number; parking: number; traffic: number; cold: number; lateness: number }
+  /** weighted contributions to the normalised route objective */
+  cost: { drive: number; late: number; weather: number; parking: number; cold: number }
 }
 
 export interface Plan {
