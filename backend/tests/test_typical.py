@@ -84,15 +84,15 @@ def test_reading_time_comes_from_the_key():
 def test_a_slot_takes_each_cells_median():
     readings = [
         [[30, 18, 1.0, 0.4], [31, 17, 3.0, 0.3]],
-        # one jammed morning does not make the slot jammed: the median, not the mean (1.73)
+        # one jammed morning does not make the slot jammed: the median, not the mean (1.7)
         [[30, 18, 3.0, 0.4], [31, 17, 2.5, 0.3]],
-        [[30, 18, 1.2, 0.4]],  # this reading lacks the second cell
+        [[30, 18, 1.1, 0.4]],  # this reading lacks the second cell
     ]
     grid = build_slot(readings, "weekday", "0845", days=3, built_at=NOW)
-    assert grid["cells"] == [[30, 18, 1.2, 0.4], [31, 17, 2.75, 0.3]]
+    assert grid["cells"] == [[30, 18, 1.1, 0.4], [31, 17, 2.75, 0.3]]
     assert grid["readings"] == 3 and grid["days"] == 3
     assert grid["dayType"] == "weekday" and grid["slot"] == "0845" and grid["slotMinutes"] == 15
-    # only the second cell is slow (1.5 or worse)
+    # only the second cell is slow (SLOW_FACTOR, 1.2, or worse)
     assert grid["slowShare"] == pytest.approx(0.3 / 0.7, abs=0.001)
     # the console's grid parser needs a time and a grid origin
     assert grid["fetchedAt"] == "2026-10-29T23:00:00+08:00" and grid["origin"] == [103.55, 1.15]
