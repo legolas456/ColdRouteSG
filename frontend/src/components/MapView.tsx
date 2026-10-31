@@ -625,7 +625,7 @@ export function MapView(props: Props) {
       })
     }
 
-    // heavy-traffic tags: only on jams long enough to matter, never on top of a
+    // slow-traffic tags: only on jams long enough to matter, never on top of a
     // stop, and one per area so they never stack
     // (phones: the red stretches alone, tags would crowd the small map)
     if (layers.traffic && phase === 'optimised' && !compact) {
@@ -640,7 +640,7 @@ export function MapView(props: Props) {
           markerEl(
             `<div class="flex items-center gap-1 whitespace-nowrap rounded-full bg-bad px-1.5 py-[2px] text-[10.5px] font-semibold text-white shadow-[0_0_0_2px_var(--bg-panel),0_2px_6px_rgba(16,24,40,0.18)]">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-3l2-6h12l2 6v3z"/><path d="M6 16v3M18 16v3M4 13h16"/></svg>
-              Heavy traffic</div>`,
+              Slow traffic</div>`,
           ),
           j.mid,
           4,
@@ -815,7 +815,7 @@ export function MapView(props: Props) {
           {layers.traffic && jams.length > 0 && (
             <span className="flex items-center gap-1.5">
               <span className="h-[4px] w-5 rounded-full bg-bad" />
-              Heavy traffic
+              Slow traffic
             </span>
           )}
           {view !== 'baseline' && (
