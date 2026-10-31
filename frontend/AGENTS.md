@@ -39,7 +39,7 @@ npm run data:sg-mask # re-fetch the Singapore outline used to dim the neighbours
 | Brand orange | Actions, selection, the ColdRoute plan |
 | Green `ok` | Better than the shortest route, on time, live data |
 | Amber `warn` | Medium risk, needs review |
-| Rose `bad` | Late, high risk, heavy traffic |
+| Rose `bad` | Late, high risk, slow traffic |
 | Blue `rain` | Rain |
 | Violet, blue, cyan | Cargo: pharma, frozen, chilled (dots only) |
 
