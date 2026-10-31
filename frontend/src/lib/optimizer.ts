@@ -139,25 +139,116 @@ function* permutations(items: string[]): Generator<string[]> {
   }
 }
 
-function twoOpt(order: string[], score: (o: string[]) => number) {
-  let best = order.slice()
+/**
+ * Local search for runs too long to enumerate. 2-opt reverses a stretch of the
+ * route, Or-opt moves a run of one to three stops elsewhere, and a swap exchanges
+ * two stops. 2-opt alone does badly with time windows, because a reversal makes
+ * every stop in the stretch earlier or later at once.
+ */
+function localSearch(start: string[], score: (o: string[]) => number) {
+  let best = start.slice()
   let bestScore = score(best)
+  const tryOrder = (next: string[]) => {
+    const s = score(next)
+    if (s >= bestScore - 1e-6) return false
+    best = next
+    bestScore = s
+    return true
+  }
   let improved = true
   while (improved) {
     improved = false
+    for (let len = 1; len <= 3; len++) {
+      for (let i = 0; i + len <= best.length; i++) {
+        for (let k = 0; k <= best.length - len; k++) {
+          if (k === i) continue
+          const rest = [...best.slice(0, i), ...best.slice(i + len)]
+          if (tryOrder([...rest.slice(0, k), ...best.slice(i, i + len), ...rest.slice(k)])) improved = true
+        }
+      }
+    }
     for (let i = 0; i < best.length - 1; i++) {
       for (let k = i + 1; k < best.length; k++) {
-        const next = [...best.slice(0, i), ...best.slice(i, k + 1).reverse(), ...best.slice(k + 1)]
-        const s = score(next)
-        if (s < bestScore - 1e-6) {
-          best = next
-          bestScore = s
-          improved = true
+        if (tryOrder([...best.slice(0, i), ...best.slice(i, k + 1).reverse(), ...best.slice(k + 1)])) improved = true
+      }
+    }
+    // Neighbouring stops are already swapped by the moves above.
+    for (let i = 0; i < best.length - 2; i++) {
+      for (let k = i + 2; k < best.length; k++) {
+        const next = best.slice()
+        ;[next[i], next[k]] = [next[k], next[i]]
+        if (tryOrder(next)) improved = true
+      }
+    }
+  }
+  return { order: best, score: bestScore }
+}
+
+/** The best local optimum over several starting orders; the earlier start wins a tie. */
+function bestOf(starts: string[][], score: (o: string[]) => number) {
+  return starts.map((s) => localSearch(s, score)).reduce((a, b) => (b.score < a.score ? b : a)).order
+}
+
+/** Covers MAX_STOPS in places.ts; 2^15 subsets × 15 end stops is about 0.5 M states. */
+const EXACT_DRIVE_STOPS = 15
+
+/**
+ * The exact shortest-drive order (Held–Karp). Drive time does not depend on the
+ * time of day, so unlike the full cost it can be solved exactly over subsets of
+ * stops. This keeps the shortest-route comparison honest above eight stops.
+ */
+function shortestDriveOrder(depot: Depot, stopList: Stop[]) {
+  const n = stopList.length
+  const full = (1 << n) - 1
+  const legs = stopList.map((a) => stopList.map((b) => travel(a, b).minutes))
+  const best = new Float64Array((full + 1) * n).fill(Infinity)
+  const from = new Int8Array((full + 1) * n).fill(-1)
+  stopList.forEach((s, j) => (best[(1 << j) * n + j] = travel(depot, s).minutes))
+  for (let mask = 1; mask <= full; mask++) {
+    for (let j = 0; j < n; j++) {
+      const here = best[mask * n + j]
+      if (!(mask & (1 << j)) || here === Infinity) continue
+      for (let k = 0; k < n; k++) {
+        if (mask & (1 << k)) continue
+        const at = (mask | (1 << k)) * n + k
+        if (here + legs[j][k] < best[at]) {
+          best[at] = here + legs[j][k]
+          from[at] = j
         }
       }
     }
   }
-  return best
+  let last = 0
+  for (let j = 1; j < n; j++) if (best[full * n + j] < best[full * n + last]) last = j
+  const order: string[] = []
+  for (let mask = full, j = last; j !== -1; ) {
+    order.push(stopList[j].id)
+    const prev = from[mask * n + j]
+    mask &= ~(1 << j)
+    j = prev
+  }
+  return order.reverse()
+}
+
+/** Starting orders besides the entered one: earliest deadline first, and nearest stop next. */
+function startingOrders(depot: Depot, stopList: Stop[]) {
+  const byDeadline = stopList
+    .slice()
+    .sort((a, b) => a.windowEnd - b.windowEnd || a.windowStart - b.windowStart)
+    .map((s) => s.id)
+  const nearest: string[] = []
+  const left = stopList.slice()
+  let at: Point = depot
+  while (left.length) {
+    let next = 0
+    for (let i = 1; i < left.length; i++) {
+      if (travel(at, left[i]).minutes < travel(at, left[next]).minutes) next = i
+    }
+    at = left[next]
+    nearest.push(left[next].id)
+    left.splice(next, 1)
+  }
+  return { byDeadline, nearest }
 }
 
 export function optimise(
@@ -189,9 +280,16 @@ export function optimise(
       if (!baseline || plan.drive < baseline.drive) baseline = plan
     }
   } else {
-    const seed = ids.slice()
-    const b = twoOpt(seed, (o) => (evaluated++, simulate(o, baseCtx).drive))
-    const r = twoOpt(b, (o) => (evaluated++, simulate(o, ctx).cost))
+    // 9 stops already have 362,880 orders, so search locally from several starts.
+    // src/lib/__tests__/optimizer.search.test.ts checks fixed 9-stop runs against
+    // exhaustive search.
+    const { byDeadline, nearest } = startingOrders(depot, stopList)
+    const b =
+      ids.length <= EXACT_DRIVE_STOPS
+        ? shortestDriveOrder(depot, stopList)
+        : bestOf([ids, nearest], (o) => (evaluated++, simulate(o, baseCtx).drive))
+    // Starting from the baseline too means the plan never scores worse than it.
+    const r = bestOf([b, ids, byDeadline, nearest], (o) => (evaluated++, simulate(o, ctx).cost))
     baseline = simulate(b, ctx)
     recommended = simulate(r, ctx)
   }
