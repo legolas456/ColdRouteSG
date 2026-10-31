@@ -76,8 +76,9 @@ LETTER_CATEGORY = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6}
 # A crawl at 5 km/h would read as 15 times free flow; cap it so one jam cannot
 # stretch a leg without limit.
 MAX_FACTOR = 3.0
-# Road counts as slow from 1.5 times its free-flow travel time.
-SLOW_FACTOR = 1.5
+# Road counts as slow from 1.2 times its free-flow travel time, as in the console
+# (frontend/src/lib/traffic.ts SLOW_FACTOR, which says why 1.2).
+SLOW_FACTOR = 1.2
 CACHE_SECONDS = 300
 
 
