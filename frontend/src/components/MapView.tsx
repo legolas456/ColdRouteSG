@@ -7,7 +7,7 @@ import sgMask from '../data/sg-mask.json'
 import { legGeometry, pathFor } from '../lib/optimizer'
 import { useRoadsVersion } from '../lib/roads'
 import { hm } from '../lib/time'
-import { heavyStretches, type TrafficGrid } from '../lib/traffic'
+import { slowStretches, type TrafficGrid } from '../lib/traffic'
 import { lotsLabel } from '../lib/conditions'
 import type { Depot, OptimiseResult, RainCell, Stop } from '../lib/types'
 import type { MapPalette } from '../lib/themes'
@@ -477,7 +477,7 @@ export function MapView(props: Props) {
       : null
     : null
 
-  // Heavy traffic on the shown plan: where its roads run through cells that LTA
+  // Slow traffic on the shown plan: where its roads run through cells that LTA
   // reports slow. Without live road speeds there is nothing to draw.
   const jams = useMemo(() => {
     const out: Array<{ id: string; coords: [number, number][]; mid: [number, number]; km: number }> = []
@@ -485,7 +485,7 @@ export function MapView(props: Props) {
     let prev: { id: string; lng: number; lat: number } = depot
     for (const id of primaryPlan.order) {
       const s = stopById[id]
-      for (const stretch of heavyStretches(legGeometry(prev, s), traffic)) out.push({ id, ...stretch })
+      for (const stretch of slowStretches(legGeometry(prev, s), traffic)) out.push({ id, ...stretch })
       prev = s
     }
     return out
