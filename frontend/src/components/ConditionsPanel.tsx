@@ -6,6 +6,7 @@ import { camerasNear, MAX_WALK_KM, type Conditions, type DataMode } from '../lib
 import { nearest } from '../lib/geo'
 import { isLoading, sgMinutes, TRAFFIC_URL, type Camera, type Feed, type LiveFeeds } from '../lib/live'
 import { hm } from '../lib/time'
+import { SLOW_FACTOR } from '../lib/traffic'
 import type { Stop } from '../lib/types'
 import type { CameraView } from './CameraViewer'
 import { Segmented } from './ui'
@@ -425,7 +426,7 @@ function RoadSpeedSection({ feed, usedByPlan }: { feed: LiveFeeds['traffic']; us
         <>
           <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-line">
             <Stat label="Road stretches" value={fmt(g.stretches)} />
-            <Stat label="Slow (1.5× or worse)" value={`${Math.round(g.slowShare * 100)}%`} />
+            <Stat label={`Slow (${SLOW_FACTOR}× or worse)`} value={`${Math.round(g.slowShare * 100)}%`} />
           </dl>
           <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
             {usedByPlan

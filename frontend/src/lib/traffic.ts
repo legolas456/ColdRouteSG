@@ -38,14 +38,15 @@ export interface TrafficGrid {
   typical?: { dayType: 'weekday' | 'weekend'; slot: string; readings: number; days: number }
 }
 
-/** A stretch counts as slow from 1.5 times its free-flow travel time, as in the backend. */
-export const SLOW_FACTOR = 1.5
 /**
- * The map draws heavy traffic from twice free-flow time (under half the free-flow
- * speed). In the daytime the typical road already runs about 1.45 times slower
- * (LTA, 27 Oct 2026), so SLOW_FACTOR would paint half the route.
+ * Road counts as slow from 1.2 times its free-flow travel time: the map draws
+ * the plan's road in rose there, and the backend's slowShare counts the same.
+ * Against each road's own night speed, the area around a road (3 x 3 cells, as
+ * the map looks) runs at most about 1.3 times slower at a weekday peak. On the
+ * kept readings of 29-30 Oct 2026, 1.2 times marked 14% of the sample route at
+ * the peaks, 2% at midday and none at night; 1.5 times marked nothing at all.
  */
-export const HEAVY_FACTOR = 2
+export const SLOW_FACTOR = 1.2
 export const MAX_FACTOR = 3
 /** Spacing of the samples along a leg. */
 const SAMPLE_KM = 0.5
@@ -147,8 +148,8 @@ function densify(path: [number, number][], stepKm = 0.2) {
   return out
 }
 
-/** The heavy-traffic runs along a road path, for the map: each with its length and a midpoint for a tag. */
-export function heavyStretches(path: [number, number][], grid: TrafficGrid, minKm = 0.3) {
+/** The slow runs along a road path, for the map: each with its length and a midpoint for a tag. */
+export function slowStretches(path: [number, number][], grid: TrafficGrid, minKm = 0.3) {
   const out: Array<{ coords: [number, number][]; mid: [number, number]; km: number }> = []
   let run: [number, number][] = []
   const flush = () => {
@@ -158,7 +159,7 @@ export function heavyStretches(path: [number, number][], grid: TrafficGrid, minK
     run = []
   }
   for (const p of densify(path)) {
-    if (areaFactor(grid, { lng: p[0], lat: p[1] }) >= HEAVY_FACTOR) run.push(p)
+    if (areaFactor(grid, { lng: p[0], lat: p[1] }) >= SLOW_FACTOR) run.push(p)
     else flush()
   }
   flush()
