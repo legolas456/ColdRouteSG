@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 // The grid backend/tests/test_traffic.py builds from its LTA fixture; both sides
 // read this one file, so the Python builder and this parser cannot drift apart.
 import BACKEND_GRID from '../../../../backend/tests/fixtures/traffic_grid_expected.json'
-import { areaFactor, HEAVY_FACTOR, heavyStretches, legFactor, MAX_FACTOR, parseTrafficGrid, type TrafficGrid } from '../traffic'
+import { areaFactor, legFactor, MAX_FACTOR, parseTrafficGrid, SLOW_FACTOR, slowStretches, type TrafficGrid } from '../traffic'
 
 const ORIGIN: [number, number] = [103.55, 1.15]
 const CELL = 0.01
@@ -142,16 +142,16 @@ describe('legFactor', () => {
   })
 })
 
-describe('heavyStretches', () => {
+describe('slowStretches', () => {
   const road: [number, number][] = [
     [103.80, 1.30],
     [103.90, 1.30],
   ]
-  // a jam in the two cells from 103.84 to 103.86; with the neighbouring cells it reaches twice free-flow time there only
+  // a jam in the two cells from 103.84 to 103.86; with the neighbouring cells it reads slow one cell either side too
   const slowMiddle = () => cover((lng) => (lng > 103.84 && lng < 103.86 ? 3 : 1))
 
-  it('finds the heavy run between two road vertices', () => {
-    const out = heavyStretches(road, slowMiddle())
+  it('finds the slow run between two road vertices', () => {
+    const out = slowStretches(road, slowMiddle())
     expect(out).toHaveLength(1)
     const [s] = out
     // inside the jam, with blur from the neighbouring cells
@@ -162,20 +162,20 @@ describe('heavyStretches', () => {
   })
 
   it('finds nothing on free-flowing roads or without data', () => {
-    expect(heavyStretches(road, uniform(1))).toEqual([])
-    expect(heavyStretches(road, grid([]))).toEqual([])
+    expect(slowStretches(road, uniform(1))).toEqual([])
+    expect(slowStretches(road, grid([]))).toEqual([])
   })
 
-  it('draws from twice free-flow time, not from merely slow', () => {
-    // 1.6 times is slow (it gets a chip on a long enough approach) but not heavy
-    expect(heavyStretches(road, uniform(1.6))).toEqual([])
-    const all = heavyStretches(road, uniform(HEAVY_FACTOR))
+  it('draws from SLOW_FACTOR times free-flow time', () => {
+    // what a weekday peak looks like around most roads: slower, but not slow
+    expect(slowStretches(road, uniform(1.15))).toEqual([])
+    const all = slowStretches(road, uniform(SLOW_FACTOR))
     expect(all).toHaveLength(1)
     expect(all[0].coords[0]).toEqual(road[0])
     expect(all[0].coords.at(-1)).toEqual(road[1])
   })
 
   it('skips runs shorter than the minimum', () => {
-    expect(heavyStretches(road, slowMiddle(), 50)).toEqual([])
+    expect(slowStretches(road, slowMiddle(), 50)).toEqual([])
   })
 })
