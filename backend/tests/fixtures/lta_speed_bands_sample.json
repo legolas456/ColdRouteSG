@@ -1,0 +1,19 @@
+[
+  {"LinkID": "103000000", "RoadName": "PAN ISLAND EXPRESSWAY", "RoadCategory": 1, "SpeedBand": 8, "MinimumSpeed": 70, "MaximumSpeed": 999, "StartLon": 103.8467, "StartLat": 1.3332, "EndLon": 103.8493, "EndLat": 1.3338},
+  {"LinkID": "103000001", "RoadName": "PAN ISLAND EXPRESSWAY", "RoadCategory": 1, "SpeedBand": 3, "MinimumSpeed": 20, "MaximumSpeed": 29, "StartLon": 103.8493, "StartLat": 1.3338, "EndLon": 103.8520, "EndLat": 1.3345},
+  {"LinkID": "103000010", "RoadName": "CENTRAL EXPRESSWAY", "RoadCategory": 1, "SpeedBand": 5, "MinimumSpeed": 40, "MaximumSpeed": 49, "StartLon": 103.8488, "StartLat": 1.3672, "EndLon": 103.8486, "EndLat": 1.3700},
+  {"LinkID": "103000020", "RoadName": "ORCHARD ROAD", "RoadCategory": 2, "SpeedBand": 2, "MinimumSpeed": 10, "MaximumSpeed": 19, "StartLon": 103.8325, "StartLat": 1.3048, "EndLon": 103.8350, "EndLat": 1.3040},
+  {"LinkID": "103000021", "RoadName": "ORCHARD ROAD", "RoadCategory": 2, "SpeedBand": 6, "MinimumSpeed": 50, "MaximumSpeed": 59, "StartLon": 103.8350, "StartLat": 1.3040, "EndLon": 103.8372, "EndLat": 1.3032},
+  {"LinkID": "1", "RoadName": "SERANGOON ROAD", "RoadCategory": 3, "SpeedBand": 2, "MinimumSpeed": 10, "MaximumSpeed": 19, "StartLon": 103.86246461405193, "StartLat": 1.3220591510051254, "EndLon": 103.86315591911669, "EndLat": 1.3215993547809128},
+  {"LinkID": "103000030", "RoadName": "JALAN BESAR", "RoadCategory": 4, "SpeedBand": 4, "MinimumSpeed": 30, "MaximumSpeed": 39, "StartLon": 103.8568, "StartLat": 1.3101, "EndLon": 103.8575, "EndLat": 1.3121},
+  {"LinkID": "103000040", "RoadName": "LORONG 1 TOA PAYOH", "RoadCategory": 5, "SpeedBand": 4, "MinimumSpeed": 30, "MaximumSpeed": 39, "StartLon": 103.8451, "StartLat": 1.3380, "EndLon": 103.8470, "EndLat": 1.3385},
+  {"LinkID": "103000050", "RoadName": "PIE SLIP ROAD", "RoadCategory": 6, "SpeedBand": 5, "MinimumSpeed": 40, "MaximumSpeed": 49, "StartLon": 103.8480, "StartLat": 1.3330, "EndLon": 103.8486, "EndLat": 1.3334},
+  {"LinkID": "103000060", "RoadName": "FORT CANNING TUNNEL", "RoadCategory": 8, "SpeedBand": 7, "MinimumSpeed": 60, "MaximumSpeed": 69, "StartLon": 103.8461, "StartLat": 1.2962, "EndLon": 103.8478, "EndLat": 1.2951},
+  {"LinkID": "103000070", "RoadName": "AYER RAJAH EXPRESSWAY", "RoadCategory": "1", "SpeedBand": "4", "MinimumSpeed": "30", "MaximumSpeed": "39", "StartLon": "103.7801", "StartLat": "1.2940", "EndLon": "103.7830", "EndLat": "1.2933"},
+  {"LinkID": "103000080", "RoadName": "BUKIT TIMAH EXPRESSWAY", "RoadCategory": "A", "SpeedBand": 4, "MinimumSpeed": 30, "MaximumSpeed": 39, "StartLon": 103.7742, "StartLat": 1.3601, "EndLon": 103.7738, "EndLat": 1.3630},
+  {"LinkID": "103000090", "RoadName": "UNCATEGORISED ROAD", "RoadCategory": "G", "SpeedBand": 3, "MinimumSpeed": 20, "MaximumSpeed": 29, "StartLon": 103.9001, "StartLat": 1.3501, "EndLon": 103.9010, "EndLat": 1.3510},
+  {"LinkID": "103000100", "RoadName": "MISSING END", "RoadCategory": 3, "SpeedBand": 5, "MinimumSpeed": 40, "MaximumSpeed": 49, "StartLon": 103.85, "StartLat": 1.30, "EndLon": 103.851},
+  {"LinkID": "103000101", "RoadName": "BAND ZERO", "RoadCategory": 3, "SpeedBand": 0, "MinimumSpeed": 0, "MaximumSpeed": 0, "StartLon": 103.85, "StartLat": 1.30, "EndLon": 103.851, "EndLat": 1.301},
+  {"LinkID": "103000102", "RoadName": "NO COORDINATES", "RoadCategory": 3, "SpeedBand": 5, "MinimumSpeed": 40, "MaximumSpeed": 49, "StartLon": 0, "StartLat": 0, "EndLon": 0, "EndLat": 0},
+  {"LinkID": "103000103", "RoadName": "OUTSIDE SINGAPORE", "RoadCategory": 1, "SpeedBand": 8, "MinimumSpeed": 70, "MaximumSpeed": 999, "StartLon": 103.76, "StartLat": 1.52, "EndLon": 103.76, "EndLat": 1.53}
+]

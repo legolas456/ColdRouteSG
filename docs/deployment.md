@@ -57,6 +57,24 @@ There was no CI before October 2026. There were no workflows, no `amplify.yml` a
 | Old frontend | https://production.d3afn54umnn6ms.amplifyapp.com/ | The pre-redesign UI, built on 10 Oct and uploaded by hand as `frontend/coldroute-frontend.zip` (commit `b2aab2b`, removed in `c1372c9`). |
 | Old backend | `https://h1mcomkkll.execute-api.ap-southeast-1.amazonaws.com/` | API Gateway + Lambda running FastAPI through Mangum (`backend/lambda_handler.py`), uploaded by hand from `backend/backend-source.zip`. `frontend/.env.production` still points at it, but the new console doesn't call the backend yet. |
 
+## Live traffic service
+
+Live road speeds need an LTA DataMall AccountKey, which must never reach the browser or the repo. Two ways to serve the grid the console reads (`VITE_TRAFFIC_URL`), both in `ap-southeast-1`:
+
+| | Scheduled grid (planned) | On request (simplest) |
+| --- | --- | --- |
+| Runs | `backend/traffic_refresh.handler` as a Lambda, triggered by an EventBridge schedule `rate(5 minutes)` | The existing FastAPI Lambda (`backend/lambda_handler.py`), route `GET /api/traffic/grid` |
+| Environment | `LTA_ACCOUNT_KEY`, `TRAFFIC_BUCKET`, optionally `TRAFFIC_KEY` (default `traffic/speed-grid.json`) | `LTA_ACCOUNT_KEY` |
+| Permissions | `s3:PutObject` on the grid's key | none beyond the function's own |
+| Console reads | the S3 object (public read, or through CloudFront), with bucket CORS allowing the console's origin | the API route, which must not need a sign-in token (it is public data) and must allow the console's origin in CORS |
+| Timeout | 60 s (it reads 288 LTA pages, 16 at a time with retries: 3–6 s on 27 Oct 2026, up to 30 s seen with 8 at a time) | 30 s at API Gateway; the first request after a cold start does the same reading, so a slow LTA can time it out |
+
+Both need `backend/app/data/speed_baseline.json` in the package: each road stretch's speed at night, which the delay factors are measured against. Without it every stretch falls back to one speed per road category, which reads junctions and bends as traffic; the grid then reports `"nightShare": 0`. To rebuild it, save a few raw readings between 2 and 5 am (`python -m app.services.traffic --out grid.json --raw night1.json`, from `backend/`, 20 minutes apart), then run `python -m app.services.traffic --baseline night*.json --out app/data/speed_baseline.json`.
+
+Then set `VITE_TRAFFIC_URL` for the production build (in `frontend/.env.production`, or as a variable in `deploy.yml`) and redeploy the console. Until it is set, the console plans with free-flowing drive times and shows the Road speeds section as "Off".
+
+Cost: the LTA API is free; the schedule is about 8,600 short Lambda runs and S3 writes a month.
+
 ## Still open
 
 We're `write` collaborators on `legolas456/ColdRouteSG`. We can push workflows and set Actions secrets, but only the owner can change the repository's Actions settings, webhooks and installed GitHub Apps.
@@ -64,3 +82,4 @@ We're `write` collaborators on `legolas456/ColdRouteSG`. We can push workflows a
 - [ ] Ask legolas456 to protect `main` so that the Checks must pass before a merge.
 - [ ] Optional: swap the long-lived key for a GitHub OIDC role (`aws-actions/configure-aws-credentials`), or switch to Amplify's own Git connection once the owner authorises the AWS Amplify GitHub App.
 - [ ] Deploy the backend from CI too, once the frontend calls it (roadmap section 5).
+- [ ] Deploy the live traffic service (see above) and set `VITE_TRAFFIC_URL` for the production build.

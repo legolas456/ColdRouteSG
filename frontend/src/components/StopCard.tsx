@@ -37,6 +37,8 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
   const prevId = result.recommended.order[rec.seq - 2]
   const from = prevId ? (names[prevId] ?? prevId) : depotName
   const park = stop.parking
+  // the plan used LTA road speeds; otherwise drive times are OSRM's free-flow estimate
+  const live = result.trafficAt !== null
 
   const factors = [
     {
@@ -56,9 +58,9 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
     {
       key: 'T' as const,
       label: 'Traffic',
-      source: 'LTA est.',
-      now: `${Math.round(rec.legMinutes)} min approach`,
-      was: `${Math.round(base.legMinutes)} min approach`,
+      source: live ? 'LTA live' : 'Not measured',
+      now: live ? `+${Math.round(rec.trafficMinutes)} min on approach` : `${Math.round(rec.legMinutes)} min approach`,
+      was: live ? `+${Math.round(base.trafficMinutes)} min on approach` : `${Math.round(base.legMinutes)} min approach`,
     },
     {
       key: 'C' as const,
@@ -122,11 +124,17 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
 
       <div className="border-t border-line px-4 py-3">
         <dl className="space-y-2">
-          <Detail label="Journey" source="OSRM">
+          <Detail label="Journey" source={live ? 'OSRM · LTA' : 'OSRM'}>
             <span className="num">
               {Math.round(rec.legMinutes)} min · {rec.legKm.toFixed(1)} km
             </span>
             <span className="text-fg-3"> from {from}</span>
+            {live && rec.trafficMinutes >= 1 && (
+              <span className="block text-fg-3">
+                Includes <span className="num">{Math.round(rec.trafficMinutes)}</span> min of traffic (LTA road speeds at{' '}
+                <span className="num">{hm(result.trafficAt ?? 0)}</span>)
+              </span>
+            )}
           </Detail>
           <Detail label="Weather" source="NEA">
             {rec.inRain && cell ? (

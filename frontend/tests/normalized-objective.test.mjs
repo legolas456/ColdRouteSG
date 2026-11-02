@@ -27,6 +27,8 @@ async function loadOptimizerWithFixedRoads() {
     '../data/sample': { CARGO_SENSITIVITY: { PHARMA: 1, FROZEN: 0.8, CHILLED: 0.6 }, RAIN_CELLS: [] },
     './roads': roads,
     './objective': { objectiveContribution, stopRawTerms },
+    // these tests plan without live traffic, so no leg is ever scaled
+    './traffic': { legFactor: () => 1 },
   }
   const out = { exports: {} }
   new Function('require', 'module', 'exports', javascript)((id) => {

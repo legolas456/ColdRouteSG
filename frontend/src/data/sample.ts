@@ -41,7 +41,6 @@ export const SAMPLE_STOPS: Stop[] = [
     area: 'Queenstown',
     forecast: 'Partly cloudy',
     parking: park('NUH Car Park A', 103.7838, 1.2951, 0.2, 41),
-    trafficRisk: 0.25,
   },
   {
     id: 'WHC',
@@ -57,7 +56,6 @@ export const SAMPLE_STOPS: Stop[] = [
     area: 'Woodlands',
     forecast: 'Cloudy',
     parking: park('WHC Basement 2', 103.7956, 1.4239, 0.1, 55),
-    trafficRisk: 0.45,
   },
   {
     id: 'AMK',
@@ -73,7 +71,6 @@ export const SAMPLE_STOPS: Stop[] = [
     area: 'Ang Mo Kio',
     forecast: 'Partly cloudy',
     parking: park('AMK Hub B1 Loading', 103.8491, 1.3697, 0.1, 18),
-    trafficRisk: 0.35,
   },
   {
     id: 'TAM',
@@ -89,7 +86,6 @@ export const SAMPLE_STOPS: Stop[] = [
     area: 'Tampines',
     forecast: 'Cloudy',
     parking: park('Tampines Mall Loading Bay', 103.9452, 1.3529, 0.05, 30),
-    trafficRisk: 0.5,
   },
   {
     id: 'MBFC',
@@ -105,7 +101,6 @@ export const SAMPLE_STOPS: Stop[] = [
     area: 'City',
     forecast: 'Heavy rain 10:30–11:15',
     parking: park('Marina Square MSCP', 103.8583, 1.2913, 1.1, 12),
-    trafficRisk: 0.6,
   },
   {
     id: 'TPG',
@@ -121,7 +116,6 @@ export const SAMPLE_STOPS: Stop[] = [
     area: 'City',
     forecast: 'Heavy rain 10:30–11:15',
     parking: park('Guoco Tower B2', 103.8462, 1.2769, 0.4, 22),
-    trafficRisk: 0.5,
   },
   {
     id: 'HV',
@@ -137,7 +131,6 @@ export const SAMPLE_STOPS: Stop[] = [
     area: 'Bukit Timah',
     forecast: 'Partly cloudy',
     parking: park('Holland Village MSCP', 103.7951, 1.3119, 0.3, 26),
-    trafficRisk: 0.3,
     review: { query: 'Holland V Bistro', candidates: ['118 Holland Ave, 278997', '211 Holland Ave, 278967'] },
   },
 ]
@@ -186,7 +179,6 @@ export const ADDRESS_BOOK: Stop[] = [
     area: 'Bedok',
     forecast: 'Cloudy',
     parking: park('Bedok Mall B2', 103.9301, 1.3252, 0.1, 34),
-    trafficRisk: 0.4,
   },
   {
     id: 'KKH',
@@ -202,7 +194,6 @@ export const ADDRESS_BOOK: Stop[] = [
     area: 'Novena',
     forecast: 'Partly cloudy',
     parking: park('KKH Car Park', 103.8469, 1.3111, 0.2, 20),
-    trafficRisk: 0.45,
   },
   {
     id: 'JWL',
@@ -218,6 +209,5 @@ export const ADDRESS_BOOK: Stop[] = [
     area: 'Changi',
     forecast: 'Cloudy',
     parking: park('Jewel B3 Loading', 103.9889, 1.3598, 0.1, 44),
-    trafficRisk: 0.3,
   },
 ]

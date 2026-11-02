@@ -1,13 +1,13 @@
 # ColdRoute SG — Local MVP
 
-ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation in Singapore** using public weather, parking and traffic-camera data. The frontend is **React + TypeScript + Vite + Tailwind CSS + MapLibre**, a single-screen dispatcher console. See [`frontend/README.md`](frontend/README.md); UI conventions are in [`frontend/AGENTS.md`](frontend/AGENTS.md). The backend is **Python + FastAPI**.
+ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation in Singapore** using public weather and parking data and LTA's live road speeds. The frontend is **React + TypeScript + Vite + Tailwind CSS + MapLibre**, a single-screen dispatcher console. See [`frontend/README.md`](frontend/README.md); UI conventions are in [`frontend/AGENTS.md`](frontend/AGENTS.md). The backend is **Python + FastAPI**.
 
 Project background, the preliminary proposal, product design, brand and to-dos are in [`docs/`](docs/README.md).
 New to the team? Start with [`docs/contributing.md`](docs/contributing.md): which demo to use, what's real or mocked, local setup and a safe first PR.
 
-**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify; GitHub Actions redeploys it on every merge to `main`, see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. **Live data** (top bar) plans with the live NEA forecast and HDB carpark availability from data.gov.sg; the default **Recorded** mode replays a rainy sample morning. Stops come from a real OneMap address search, with OSRM drive times and roads. Traffic is estimated, accounts are mocked, and the optimiser runs in the browser.
+**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify; GitHub Actions redeploys it on every merge to `main`, see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. **Live data** (top bar) plans with the live NEA forecast and HDB carpark availability from data.gov.sg; the default **Recorded** mode replays a rainy sample morning. Stops come from a real OneMap address search, with OSRM drive times and roads. Live traffic comes from LTA road speeds when the traffic service is running (see [Live traffic](#live-traffic-lta-traffic-speed-bands)); otherwise drive times assume free-flowing traffic and the app says so. Accounts are mocked, and the optimiser runs in the browser.
 
-The app does **not require any API key or registration** to run locally.
+The app does **not require any API key or registration** to run locally. Live road speeds are optional and need a free LTA DataMall AccountKey on the backend.
 
 ## Quick start
 
@@ -36,20 +36,24 @@ From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`;
 - LTA traffic-camera images from data.gov.sg
 - Public OSRM route matrix and route geometry
 - OneMap public basemap tiles for map display
-- Route sequencing in the browser on five normalised terms: drive time, lateness, rain, parking and cold-chain exposure (traffic is shown as an estimate but not scored)
+- Route sequencing in the browser on five normalised terms: drive time, lateness, rain, parking and cold-chain exposure, with drive times scaled by live LTA road speeds when available
+- Live road speeds from LTA DataMall Traffic Speed Bands, summarised by the backend (`GET /api/traffic/grid`)
 - FastAPI Swagger docs at `/docs`
 - Built-in fallback data so the app remains demo-able when an external public endpoint is temporarily unavailable
 
-## Important traffic limitation
+## Live traffic (LTA Traffic Speed Bands)
 
-The no-registration public datasets on data.gov.sg expose **traffic camera images**, but not the LTA Traffic Speed Bands API used for actual congestion speeds. LTA DataMall speed-band access requires credentials.
+LTA DataMall publishes a speed band (1 to 8, in 10 km/h steps) for every stretch of expressway and arterial road every 5 minutes. The API is free but needs an AccountKey ([request one](https://datamall.lta.gov.sg/content/datamall/en/request-for-api.html); terms: Singapore Open Data Licence, up to 10 million calls a day). The key must stay on a server, so:
 
-Therefore, this MVP:
+1. **Backend** (`backend/app/services/traffic.py`) reads every page of `v4/TrafficSpeedBands`: about 144,000 stretches in 288 pages of 500, 16 pages at a time, retrying a page that fails for a moment; 3–6 s on 27 Oct 2026. For each cell of 0.01° (about 1.1 km) it divides its roads' free-flow speed by their speed now, both averaged by road length: the cell's delay factor, from 1 to 3. It serves the grid at `GET /api/traffic/grid`, cached for 5 minutes and stamped with LTA's own `lastUpdatedTime`. With no key it answers 503 and says why.
+2. **Which roads, and what counts as free flow**: expressways, major arterials, arterials, slip roads and short tunnels, about 43,000 stretches. A stretch's free flow is its own speed on empty roads: the lower quartile (the second slowest) of five readings taken from 02:50 to 04:20 on 29 Oct 2026, kept in `backend/app/data/speed_baseline.json`. One speed per road category does not work: at 02:50 a quarter of arterial and slip-road length still read 1.5 times slower than its category's speed (junctions and bends, not traffic), which added 31% to the empty-road sample run. Night readings flicker between bands, so a cell compares average speeds, in which the flicker cancels: on held-out night readings 0.4% of slowdown remains (4% against the median night speed, at the cost of daytime slowdowns reading about 5% smaller). A stretch the baseline does not know uses its category's speed (75, 55, 45, 55 and 45 km/h, the 85th-percentile band speeds of two daytime readings on 27 Oct). Minor arterials and small roads are left out: their bands were the same at both daytime readings, with a third of small roads under 10 km/h, so they show stop-start between junctions (already in OSRM's times), not traffic.
+3. **Console** (`frontend/src/lib/traffic.ts`) reads the grid in Live mode when `VITE_TRAFFIC_URL` is set. Each leg's OSRM drive time is multiplied by the mean factor at points every 0.5 km along the straight line between its ends (each point looks at the 3 × 3 cells around it; with under 1 km of monitored road nearby, the slowdown is scaled down). The shortest route and the ColdRoute plan both use these times. A stop shows "+N min traffic" when traffic adds 3 minutes or more to its approach. The map draws the plan's road in rose where the roads around it run 1.2 times their free-flow time or slower, and the Conditions panel's slow share counts the same. Against each road's own night speed, a weekday peak is about 1.1 to 1.3 times slower around most roads: on the readings of 29 and 30 Oct 2026, 1.2 times marked 14% of the sample route at the morning and evening peaks, 2% at midday and none at night, while 1.5 times would have marked nothing.
+4. **When it applies**: one reading stands for the whole run, so it is used only if it is under 20 minutes old and the run leaves within 60 minutes of it. Otherwise the plan uses free-flowing drive times and the Conditions panel says why. Recorded mode never uses live traffic.
+5. **Scheduled refresh** (`backend/traffic_refresh.py`): a Lambda that EventBridge can run every 5 minutes to publish the grid to S3, so no request waits on LTA. See [docs/deployment.md](docs/deployment.md#live-traffic-service).
 
-1. displays public traffic-camera images for operational context; and
-2. uses a clearly labelled **traffic-risk input/proxy** for the optimisation score.
+Limits to state in the report: free flow comes from five readings on one night, not a longer history, and errs low, so slowdowns read slightly small; a leg follows the straight line between stops, not its road, when it is scored; traffic is taken at departure, not predicted for later legs; minor and small roads count as free-flowing. Camera images are context only.
 
-This is deliberate. The application does not claim to infer traffic speed from an image. A future version can replace this proxy with LTA DataMall traffic speeds once the team decides to use an authenticated API.
+To run it locally, put `LTA_ACCOUNT_KEY=...` in `backend/.env` (git-ignored), start the backend, and run the frontend with `VITE_TRAFFIC_URL=http://localhost:8000/api/traffic/grid npm run dev`. `python -m app.services.traffic --out grid.json` (from `backend/`) saves a snapshot; add `--raw night1.json` to keep the raw records, and `python -m app.services.traffic --baseline night*.json --out app/data/speed_baseline.json` rebuilds the night baseline from readings taken between 2 and 5 am.
 
 ## Public endpoints used
 
@@ -63,6 +67,7 @@ No credentials are supplied by the project.
 | HDB carpark information | `https://data.gov.sg/api/action/datastore_search?resource_id=d_23f946fa557947f93a8043bbef41dd09` |
 | Route matrix / routing | `https://router.project-osrm.org` |
 | Map tiles | `https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png` |
+| Live road speeds (backend only, needs `LTA_ACCOUNT_KEY`) | `https://datamall2.mytransport.sg/ltaodataservice/v4/TrafficSpeedBands` |
 
 `data.gov.sg` allows public API use without a key; creating a key is optional for higher rate limits. The public OSRM server is appropriate for a low-volume student prototype, not production use.
 
@@ -217,6 +222,14 @@ GET /api/data/traffic-cameras?limit=8
 ```http
 GET /api/data/traffic-cameras/nearby?lat=1.2937&lng=103.7831&limit=4
 ```
+
+## Live road speeds
+
+```http
+GET /api/traffic/grid
+```
+
+The LTA road-speed grid the console applies to drive times (see [Live traffic](#live-traffic-lta-traffic-speed-bands)): `fetchedAt`, `origin`, `cellDeg`, `stretches`, `slowShare` and `cells` as `[i, j, factor, road km]`. 503 with a reason when no key is configured or LTA does not respond.
 
 ## Optimise a route
 

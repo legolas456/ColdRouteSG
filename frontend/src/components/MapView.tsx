@@ -7,6 +7,7 @@ import sgMask from '../data/sg-mask.json'
 import { legGeometry, pathFor } from '../lib/optimizer'
 import { useRoadsVersion } from '../lib/roads'
 import { hm } from '../lib/time'
+import { slowStretches, type TrafficGrid } from '../lib/traffic'
 import type { Depot, OptimiseResult, RainCell, Stop } from '../lib/types'
 import type { MapPalette } from '../lib/themes'
 import type { View } from './ResultsPanel'
@@ -281,15 +282,6 @@ function addOverlays(map: MapLibre, c: MapPalette, rain: RainCell[]) {
 const kmBetween = ([x1, y1]: [number, number], [x2, y2]: [number, number]) =>
   Math.hypot((x2 - x1) * Math.cos((y1 * Math.PI) / 180), y2 - y1) * 111.2
 
-/** The part of a line between two fractions of its length (by distance, not by vertex). */
-function sliceByDistance(line: [number, number][], from: number, to: number) {
-  const d = [0]
-  for (let i = 1; i < line.length; i++) d.push(d[i - 1] + kmBetween(line[i - 1], line[i]))
-  const total = d[d.length - 1]
-  const coords = line.filter((_, i) => d[i] >= from * total && d[i] <= to * total)
-  return { coords, mid: coords[Math.floor(coords.length / 2)] ?? line[0], km: total * (to - from) }
-}
-
 /** Gradient that paints the first `p` of a line and leaves the rest transparent. */
 function reveal(color: string, p: number) {
   return ['step', ['line-progress'], color, Math.min(1, Math.max(0.0001, p)), 'rgba(0,0,0,0)'] as ExpressionSpecification
@@ -314,6 +306,8 @@ interface Props {
   stops: Stop[]
   /** rain cells to draw: the plan's once optimised, the current ones in the draft */
   rain: RainCell[]
+  /** the live road speeds the shown plan used; slow stretches are drawn from them */
+  traffic: TrafficGrid | null
   result: OptimiseResult | null
   view: View
   phase: 'draft' | 'optimising' | 'optimised'
@@ -330,7 +324,7 @@ interface Props {
 }
 
 export function MapView(props: Props) {
-  const { palette, depot, stops, rain, result, view, phase, selectedId, onSelect, layers, setLayers } = props
+  const { palette, depot, stops, rain, traffic, result, view, phase, selectedId, onSelect, layers, setLayers } = props
   const insetLeft = props.insetLeft ?? 0
   const insetBottom = props.insetBottom ?? 0
   const compact = !!props.compact
@@ -482,25 +476,20 @@ export function MapView(props: Props) {
       : null
     : null
 
-  // Heavy traffic on the shown plan: the slow stretch of each approach into a
-  // congested stop (LTA speed bands in production)
+  // Slow traffic on the shown plan: where its roads run through cells that LTA
+  // reports slow. Without live road speeds there is nothing to draw.
   const jams = useMemo(() => {
     const out: Array<{ id: string; coords: [number, number][]; mid: [number, number]; km: number }> = []
-    if (!primaryPlan) return out
+    if (!primaryPlan || !traffic) return out
     let prev: { id: string; lng: number; lat: number } = depot
     for (const id of primaryPlan.order) {
       const s = stopById[id]
-      if (s.trafficRisk >= 0.5) {
-        // 12% of the approach at risk 0.5, up to 18% at 0.6, ending just before the stop
-        const span = 0.12 + (s.trafficRisk - 0.5) * 0.6
-        const seg = sliceByDistance(legGeometry(prev, s), 0.88 - span, 0.88)
-        if (seg.coords.length > 1) out.push({ id, ...seg })
-      }
+      for (const stretch of slowStretches(legGeometry(prev, s), traffic)) out.push({ id, ...stretch })
       prev = s
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [primaryPlan, depot, stopById, roads])
+  }, [primaryPlan, depot, stopById, roads, traffic])
 
   // lines + overlay visibility
   useEffect(() => {
@@ -636,7 +625,7 @@ export function MapView(props: Props) {
       })
     }
 
-    // heavy-traffic tags: only on jams long enough to matter, never on top of a
+    // slow-traffic tags: only on jams long enough to matter, never on top of a
     // stop, and one per area so they never stack
     // (phones: the red stretches alone, tags would crowd the small map)
     if (layers.traffic && phase === 'optimised' && !compact) {
@@ -651,7 +640,7 @@ export function MapView(props: Props) {
           markerEl(
             `<div class="flex items-center gap-1 whitespace-nowrap rounded-full bg-bad px-1.5 py-[2px] text-[10.5px] font-semibold text-white shadow-[0_0_0_2px_var(--bg-panel),0_2px_6px_rgba(16,24,40,0.18)]">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v-3l2-6h12l2 6v3z"/><path d="M6 16v3M18 16v3M4 13h16"/></svg>
-              Heavy traffic</div>`,
+              Slow traffic</div>`,
           ),
           j.mid,
           4,
@@ -826,7 +815,7 @@ export function MapView(props: Props) {
           {layers.traffic && jams.length > 0 && (
             <span className="flex items-center gap-1.5">
               <span className="h-[4px] w-5 rounded-full bg-bad" />
-              Heavy traffic
+              Slow traffic
             </span>
           )}
           {view !== 'baseline' && (

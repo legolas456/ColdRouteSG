@@ -26,7 +26,7 @@ const driveAnd = (term: Exclude<keyof Weights, 'drive'>, share = 0.5): Weights =
 const stop = (id: string, changes: Partial<Stop> = {}): Stop => ({
   id, name: id, short: id, address: 'Test address', lng: 103.81, lat: 1.31,
   windowStart: 540, windowEnd: 1000, service: 10, cargo: 'CHILLED',
-  area: 'City', forecast: 'Fair', trafficRisk: 0,
+  area: 'City', forecast: 'Fair',
   parking: { name: 'Loading bay', lng: 103.81, lat: 1.31, distanceKm: 0, freePct: 100, risk: 0 },
   ...changes,
 })

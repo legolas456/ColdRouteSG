@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
+import { parseTrafficGrid, type TrafficGrid } from './traffic'
 
 /**
  * Live public feeds, read straight from data.gov.sg in the browser. All three
@@ -7,6 +8,13 @@ import { useEffect, useSyncExternalStore } from 'react'
  * feeds; once our own API is deployed this file is the one place to switch.
  */
 const BASE = 'https://api.data.gov.sg/v1'
+
+/**
+ * Live road speeds come from our own backend, because LTA's AccountKey must
+ * stay on a server (backend/app/services/traffic.py). Without this URL the
+ * console does not measure traffic, and says so.
+ */
+export const TRAFFIC_URL: string | undefined = import.meta.env.VITE_TRAFFIC_URL || undefined
 export const FEED_URLS = {
   weather: `${BASE}/environment/2-hour-weather-forecast`,
   carparks: `${BASE}/transport/carpark-availability`,
@@ -95,6 +103,8 @@ export interface LiveFeeds {
   weather: Feed<WeatherFeed>
   carparks: Feed<CarparkFeed>
   cameras: Feed<CameraFeed>
+  /** stays idle when TRAFFIC_URL is not set */
+  traffic: Feed<TrafficGrid>
   /** when the last fetch finished, epoch ms */
   fetchedAt?: number
 }
@@ -187,7 +197,11 @@ async function getJson(url: string, ms = 12_000): Promise<Json> {
   const timer = window.setTimeout(() => ctl.abort(), ms)
   try {
     const res = await fetch(url, { signal: ctl.signal })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      // our backend says why in `detail` (e.g. no LTA key); the public feeds only send a status
+      const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+      throw new Error(typeof body?.detail === 'string' ? body.detail : `HTTP ${res.status}`)
+    }
     return (await res.json()) as Json
   } catch (e) {
     throw new Error(ctl.signal.aborted ? 'Timed out' : e instanceof Error ? e.message : String(e))
@@ -198,7 +212,7 @@ async function getJson(url: string, ms = 12_000): Promise<Json> {
 
 // ---- shared store ----------------------------------------------------------
 
-let state: LiveFeeds = { weather: { status: 'idle' }, carparks: { status: 'idle' }, cameras: { status: 'idle' } }
+let state: LiveFeeds = { weather: { status: 'idle' }, carparks: { status: 'idle' }, cameras: { status: 'idle' }, traffic: { status: 'idle' } }
 const listeners = new Set<() => void>()
 const emit = (next: LiveFeeds) => {
   state = next
@@ -212,20 +226,29 @@ const settle = <T,>(prev: Feed<T>, r: PromiseSettledResult<T>): Feed<T> =>
     : // keep the last good values so a flaky refresh does not blank the panel
       { status: 'error', data: prev.data, error: r.reason instanceof Error ? r.reason.message : String(r.reason) }
 
-/** Fetch all three feeds now (one request each; concurrent callers share it). */
+/** Fetch every feed now (one request each; concurrent callers share it). */
 export function refreshLive(): Promise<LiveFeeds> {
   if (inflight) return inflight
   const loading = <T,>(f: Feed<T>): Feed<T> => ({ ...f, status: 'loading' })
-  emit({ ...state, weather: loading(state.weather), carparks: loading(state.carparks), cameras: loading(state.cameras) })
+  emit({
+    ...state,
+    weather: loading(state.weather),
+    carparks: loading(state.carparks),
+    cameras: loading(state.cameras),
+    traffic: TRAFFIC_URL ? loading(state.traffic) : state.traffic,
+  })
   inflight = Promise.allSettled([
     getJson(FEED_URLS.weather).then(parseWeather),
     getJson(FEED_URLS.carparks).then(parseCarparks),
     getJson(FEED_URLS.cameras).then(parseCameras),
-  ]).then(([w, c, cam]) => {
+    // a cold backend reads ~100 LTA pages before answering, so allow it longer
+    TRAFFIC_URL ? getJson(TRAFFIC_URL, 30_000).then(parseTrafficGrid) : Promise.resolve(null),
+  ]).then(([w, c, cam, t]) => {
     emit({
       weather: settle(state.weather, w),
       carparks: settle(state.carparks, c),
       cameras: settle(state.cameras, cam),
+      traffic: TRAFFIC_URL ? settle(state.traffic, t as PromiseSettledResult<TrafficGrid>) : state.traffic,
       fetchedAt: Date.now(),
     })
     inflight = null
@@ -266,4 +289,5 @@ export function useLiveFeeds(active: boolean) {
   return feeds
 }
 
-export const isLoading = (f: LiveFeeds) => f.weather.status === 'loading' || f.carparks.status === 'loading' || f.cameras.status === 'loading'
+export const isLoading = (f: LiveFeeds) =>
+  f.weather.status === 'loading' || f.carparks.status === 'loading' || f.cameras.status === 'loading' || f.traffic.status === 'loading'

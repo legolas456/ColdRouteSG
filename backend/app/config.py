@@ -7,6 +7,12 @@ class Settings(BaseSettings):
     allow_mock_fallback: bool = True
     request_timeout_seconds: float = 12.0
     cors_origins: str = "http://localhost:5173"
+    # LTA DataMall AccountKey for live road speeds (free sign-up). Never commit it.
+    lta_account_key: str = ""
+    # When set, /api/traffic/grid reads the grid the scheduled job publishes here
+    # instead of calling LTA on request.
+    traffic_bucket: str = ""
+    traffic_key: str = "traffic/speed-grid.json"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

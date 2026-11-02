@@ -27,7 +27,9 @@ const HEADERS = [
   'stop_id', 'stop_name', 'address', 'latitude', 'longitude', 'cargo',
   'window_start', 'window_end', 'arrival', 'service_start', 'finish',
   'service_minutes', 'leg_drive_minutes', 'late_minutes', 'unloads_in_rain',
-  'parking_risk_proxy', 'traffic_risk_proxy', 'cold_chain_exposure_proxy_minutes',
+  'parking_risk_proxy', 'traffic_delay_minutes', 'cold_chain_exposure_proxy_minutes',
+  // when the LTA road speeds were read; blank when the plan used free-flow drive times
+  'traffic_time',
 ]
 
 export function routeCsv(
@@ -52,7 +54,8 @@ export function routeCsv(
       row.id, stop.name, stop.address, stop.lat, stop.lng, stop.cargo,
       clock(stop.windowStart), clock(stop.windowEnd), clock(row.arrival),
       clock(row.start), clock(row.finish), stop.service, row.legMinutes,
-      row.late, row.inRain, stop.parking.risk, stop.trafficRisk, row.exposure,
+      row.late, row.inRain, stop.parking.risk, Math.round(row.trafficMinutes * 10) / 10, row.exposure,
+      result.trafficAt === null ? '' : clock(result.trafficAt),
     ].map(cell).join(',')
   }))
 

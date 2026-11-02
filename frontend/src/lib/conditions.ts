@@ -2,6 +2,7 @@ import { RAIN_CELLS, RECORDED_AT } from '../data/sample'
 import { kmBetween, nearest, parkingRisk } from './geo'
 import type { Camera, LiveFeeds, LiveCarpark, WeatherArea } from './live'
 import { hm } from './time'
+import type { TrafficGrid } from './traffic'
 import type { Carpark, RainCell, Stop } from './types'
 
 export type DataMode = 'live' | 'recorded'
@@ -20,8 +21,43 @@ export interface Conditions {
   rain: RainCell[]
   /** the stops with live area, forecast and parking applied */
   stops: Stop[]
+  /** live road speeds the plan uses; null when it uses OSRM's free-flow drive times */
+  traffic: TrafficGrid | null
   /** plain-English caveats, shown in the Conditions panel */
   notes: string[]
+}
+
+/**
+ * Live road speeds describe the roads now. They stand in for the whole run only
+ * if it leaves within this many minutes of the reading.
+ */
+export const TRAFFIC_HORIZON_MIN = 60
+/** A reading older than this is no longer live. */
+export const TRAFFIC_MAX_AGE_MIN = 20
+
+/** Minutes from `b` to `a` on a 24-hour clock, between -720 and 719. */
+const clockDiff = (a: number, b: number) => ((((a - b + 720) % 1440) + 1440) % 1440) - 720
+
+/** The reading the plan may use, or why not. */
+export function trafficFor(feed: LiveFeeds['traffic'], now: number, departure?: number): { traffic: TrafficGrid | null; note?: string } {
+  const grid = feed.data
+  if (!grid) {
+    // the backend explains itself in a sentence (e.g. no LTA key); a network failure is a bare phrase
+    const reason = !feed.error ? '' : feed.error.endsWith('.') ? ` ${feed.error}` : ` The traffic service did not answer (${feed.error}).`
+    return feed.status === 'error'
+      ? { traffic: null, note: `Live road speeds are unavailable, so drive times assume free-flowing traffic.${reason}` }
+      : { traffic: null }
+  }
+  if (clockDiff(now, grid.at) > TRAFFIC_MAX_AGE_MIN) {
+    return { traffic: null, note: `The LTA road speeds are from ${hm(grid.at)}, too old to use, so drive times assume free-flowing traffic.` }
+  }
+  if (departure !== undefined && Math.abs(clockDiff(departure, grid.at)) > TRAFFIC_HORIZON_MIN) {
+    return {
+      traffic: null,
+      note: `LTA road speeds show traffic at ${hm(grid.at)}. A run leaving at ${hm(departure)} is planned with free-flowing traffic; use Now to plan with current traffic.`,
+    }
+  }
+  return { traffic: grid }
 }
 
 type Point = { lng: number; lat: number }
@@ -46,7 +82,7 @@ function liveCarpark(c: LiveCarpark, stop: Point): Carpark {
 }
 
 export function recordedConditions(stops: Stop[]): Conditions {
-  return { mode: 'recorded', source: 'recorded', at: RECORDED_AT, rain: RAIN_CELLS, stops, notes: [] }
+  return { mode: 'recorded', source: 'recorded', at: RECORDED_AT, rain: RAIN_CELLS, stops, traffic: null, notes: [] }
 }
 
 /**
@@ -103,7 +139,9 @@ export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, dep
       `NEA forecasts ${hm(w.validFrom)}–${hm(w.validTo)} only. A run leaving at ${hm(departure)} is planned without rain; use Now to plan from the current time.`,
     )
   }
-  return { mode: 'live', source: parks.length ? 'live' : 'mixed', at: now, rain, stops: out, notes }
+  const { traffic, note } = trafficFor(feeds.traffic, now, departure)
+  if (note) notes.push(note)
+  return { mode: 'live', source: parks.length ? 'live' : 'mixed', at: now, rain, stops: out, traffic, notes }
 }
 
 

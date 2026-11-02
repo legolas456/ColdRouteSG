@@ -44,18 +44,23 @@ interface Props {
   onLoadSample: () => void
   /** true while the stops are exactly the sample run */
   isSample: boolean
+  /** the next plan will use live LTA road speeds */
+  trafficLive: boolean
 }
 
 export const OPTIMISE_STEPS = [
   { label: 'Reading 2-hour forecast', source: 'NEA' },
   { label: 'Checking carpark availability', source: 'HDB' },
-  { label: 'Estimating traffic on approaches', source: 'LTA' },
+  { label: 'Applying live road speeds', source: 'LTA' },
   { label: 'Scoring every stop order', source: 'ColdRoute' },
   { label: 'Comparing with the shortest route', source: 'OSRM' },
 ]
+const TRAFFIC_STEP = 2
+/** The traffic step when the plan will not use live road speeds. */
+const NO_TRAFFIC_STEP = { label: 'Drive times without live traffic', source: 'OSRM' }
 
 export function StopsEditor(props: Props) {
-  const { depot, setDepot, stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step, dateLabel, onDepartNow, onLoadSample, isSample } =
+  const { depot, setDepot, stops, setStops, departure, setDeparture, profile, setProfile, selectedId, onSelect, onOptimise, busy, step, dateLabel, onDepartNow, onLoadSample, isSample, trafficLive } =
     props
   const reviewCount = stops.filter((s) => s.review).length
   const roads = useRoadsVersion()
@@ -86,7 +91,7 @@ export function StopsEditor(props: Props) {
         <p className="mt-1 text-fg-3">{dateLabel} · Van SGX 4821K · Ahmad R.</p>
         {busy ? (
           <div className="mt-3 rounded-[10px] bg-subtle px-3.5 py-3">
-            <OptimisingSteps step={step} count={stops.length} />
+            <OptimisingSteps step={step} count={stops.length} trafficLive={trafficLive} />
           </div>
         ) : (
           <Button
@@ -513,7 +518,8 @@ function AddressSearch({
   )
 }
 
-function OptimisingSteps({ step, count }: { step: number; count: number }) {
+function OptimisingSteps({ step, count, trafficLive }: { step: number; count: number; trafficLive: boolean }) {
+  const steps = OPTIMISE_STEPS.map((s, i) => (i === TRAFFIC_STEP && !trafficLive ? NO_TRAFFIC_STEP : s))
   // every order is scored up to 8 stops; above that the optimiser improves a route by local search
   const orders = count <= 8 ? Array.from({ length: count }, (_, i) => i + 1).reduce((a, b) => a * b, 1) : 0
   return (
@@ -523,7 +529,7 @@ function OptimisingSteps({ step, count }: { step: number; count: number }) {
         <span className="num text-[11px] text-fg-3">{orders ? `${orders.toLocaleString()} orders` : 'local search'}</span>
       </div>
       <ol className="space-y-1">
-        {OPTIMISE_STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <li key={s.label} className={clsx('flex items-center gap-2 text-[12px]', i > step ? 'text-fg-4' : 'text-fg-2')}>
             <span className="flex size-4 items-center justify-center">
               {i < step ? (

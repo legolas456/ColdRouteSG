@@ -1,11 +1,12 @@
 import clsx from 'clsx'
-import { Cctv, CloudRain, CloudSun, Loader2, Maximize2, RefreshCw, SquareParking, TriangleAlert, X, type LucideIcon } from 'lucide-react'
+import { Cctv, CloudRain, CloudSun, Gauge, Loader2, Maximize2, RefreshCw, SquareParking, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { RECORDED_AT, RECORDED_DATE } from '../data/sample'
 import { camerasNear, MAX_WALK_KM, type Conditions, type DataMode } from '../lib/conditions'
 import { nearest } from '../lib/geo'
-import { isLoading, sgMinutes, type Camera, type Feed, type LiveFeeds } from '../lib/live'
+import { isLoading, sgMinutes, TRAFFIC_URL, type Camera, type Feed, type LiveFeeds } from '../lib/live'
 import { hm } from '../lib/time'
+import { SLOW_FACTOR } from '../lib/traffic'
 import type { Stop } from '../lib/types'
 import type { CameraView } from './CameraViewer'
 import { Segmented } from './ui'
@@ -109,8 +110,8 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
             <>Live data could not be read, so the plan uses the recorded morning for now.</>
           ) : (
             <>
-              The plan reads the NEA forecast and HDB free lots fetched at <span className="num">{hm(conditions.at)}</span>. Re-optimise to pick
-              up newer data; the feeds below refresh every 5 minutes.
+              The plan reads the NEA forecast{conditions.traffic ? ', HDB free lots and LTA road speeds' : ' and HDB free lots'} fetched at{' '}
+              <span className="num">{hm(conditions.at)}</span>. Re-optimise to pick up newer data; the feeds below refresh every 5 minutes.
             </>
           )}
         </p>
@@ -144,6 +145,7 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
       <div className="space-y-2 px-3 pb-3">
         <WeatherSection feed={feeds.weather} stops={stops} />
         <ParkingSection feed={feeds.carparks} stops={stops} />
+        <RoadSpeedSection feed={feeds.traffic} usedByPlan={conditions.traffic !== null} />
         <CameraSection feed={feeds.cameras} stops={stops} onView={onViewCamera} />
       </div>
     </div>
@@ -156,6 +158,8 @@ function Section<T>({
   source,
   feed,
   updated,
+  failed = (error) => <p className="text-[12px] text-fg-3">Could not reach data.gov.sg ({error}). Try Refresh.</p>,
+  off,
   children,
 }: {
   icon: LucideIcon
@@ -163,8 +167,13 @@ function Section<T>({
   source: string
   feed: Feed<T>
   updated?: number
+  /** what to say when the feed failed and there is no earlier data */
+  failed?: (error?: string) => ReactNode
+  /** shown instead of a loading placeholder when the feed is not set up */
+  off?: ReactNode
   children: ReactNode
 }) {
+  const isOff = off !== undefined && feed.status === 'idle' && !feed.data
   return (
     <section className="rounded-[10px] px-3 py-2.5 shadow-[inset_0_0_0_1px_var(--border-main)]">
       <div className="flex items-center gap-2">
@@ -172,7 +181,9 @@ function Section<T>({
         <span className="text-[12.5px] font-medium">{title}</span>
         <span className="num truncate text-[9.5px] tracking-[0.04em] text-fg-4 uppercase">{source}</span>
         <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px]">
-          {feed.status === 'loading' && !feed.data ? (
+          {isOff ? (
+            <span className="text-fg-3">Off</span>
+          ) : feed.status === 'loading' && !feed.data ? (
             <>
               <Loader2 size={11} className="animate-spin text-fg-3" /> <span className="text-fg-3">Loading</span>
             </>
@@ -191,8 +202,10 @@ function Section<T>({
       <div className="mt-2">
         {feed.data ? (
           children
+        ) : isOff ? (
+          off
         ) : feed.status === 'error' ? (
-          <p className="text-[12px] text-fg-3">Could not reach data.gov.sg ({feed.error}). Try Refresh.</p>
+          failed(feed.error)
         ) : (
           <div className="h-9 animate-pulse rounded-md bg-hover" />
         )}
@@ -376,8 +389,49 @@ function CameraSection({ feed, stops, onView }: { feed: LiveFeeds['cameras']; st
             <p className="text-[12px] text-fg-3">No cameras online right now.</p>
           )}
           <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
-            {cams.cameras.length} {cams.cameras.length === 1 ? 'camera' : 'cameras'} online. Live speed bands need an LTA DataMall key, so
-            traffic on the route is still an estimate.
+            {cams.cameras.length} {cams.cameras.length === 1 ? 'camera' : 'cameras'} online. The images are for context; they do not change the
+            plan.
+          </p>
+        </>
+      )}
+    </Section>
+  )
+}
+
+function RoadSpeedSection({ feed, usedByPlan }: { feed: LiveFeeds['traffic']; usedByPlan: boolean }) {
+  const g = feed.data
+  return (
+    <Section
+      icon={Gauge}
+      title="Road speeds"
+      source="LTA speed bands"
+      feed={feed}
+      updated={g?.at}
+      failed={(error) => (
+        <p className="text-[12px] leading-relaxed text-fg-3">
+          {/* the backend's reasons are sentences (e.g. no LTA key); network failures are bare phrases */}
+          {error?.endsWith('.') ? error : `The ColdRoute traffic service did not answer (${error ?? 'no response'}).`} Drive times assume free-flowing
+          traffic.
+        </p>
+      )}
+      off={
+        TRAFFIC_URL ? undefined : (
+          <p className="text-[12px] leading-relaxed text-fg-3">
+            Not set up: live road speeds need the ColdRoute traffic service, which holds the LTA key. Drive times assume free-flowing traffic.
+          </p>
+        )
+      }
+    >
+      {g && (
+        <>
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-line">
+            <Stat label="Road stretches" value={fmt(g.stretches)} />
+            <Stat label={`Slow (${SLOW_FACTOR}× or worse)`} value={`${Math.round(g.slowShare * 100)}%`} />
+          </dl>
+          <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
+            {usedByPlan
+              ? 'The plan stretches each drive by how much slower the roads along it are now than at night.'
+              : 'Not used for this plan: see the note above.'}
           </p>
         </>
       )}
