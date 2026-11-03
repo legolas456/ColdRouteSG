@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Every setting has a
+# default; see variables.tf.
+
+# aws_profile = "coldroute"
+
+# LTA DataMall AccountKey (free: https://datamall.lta.gov.sg). Leave it out to
+# skip the scheduled traffic refresh. Or pass it without saving it to a file:
+#   export TF_VAR_lta_account_key=...
+# lta_account_key = ""
+
+# Monthly cost alert for the whole account.
+# budget_email     = "you@example.com"
+# budget_limit_usd = 10
+
+# For the team's real stack: deletion protection on users and route history.
+# protect_data = true

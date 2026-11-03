@@ -57,6 +57,10 @@ There was no CI before October 2026. There were no workflows, no `amplify.yml` a
 | Old frontend | https://production.d3afn54umnn6ms.amplifyapp.com/ | The pre-redesign UI, built on 10 Oct and uploaded by hand as `frontend/coldroute-frontend.zip` (commit `b2aab2b`, removed in `c1372c9`). |
 | Old backend | `https://h1mcomkkll.execute-api.ap-southeast-1.amazonaws.com/` | API Gateway + Lambda running FastAPI through Mangum (`backend/lambda_handler.py`), uploaded by hand from `backend/backend-source.zip`. `frontend/.env.production` still points at it, but the new console doesn't call the backend yet. |
 
+## Infrastructure as code
+
+[`infra/`](../infra/README.md) creates the whole stack with Terraform: Amplify Hosting for the console, Cognito, the FastAPI Lambda behind an API Gateway HTTP API (Cognito tokens checked at the gateway), DynamoDB route history, the scheduled traffic refresh (EventBridge, Lambda, S3) and a CloudWatch dashboard. The live demo's Amplify app and the old backend (above) were set up by hand, not with `infra/`. The plan is to apply `infra/` in the team's account and retire the hand-made resources.
+
 ## Live traffic service
 
 Live road speeds need an LTA DataMall AccountKey, which must never reach the browser or the repo. Two ways to serve the grid the console reads (`VITE_TRAFFIC_URL`), both in `ap-southeast-1`:

@@ -50,6 +50,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 
 ### 5. AWS (the cloud part of the course)
 
+- [x] Terraform for the whole stack ([`infra/`](../infra/README.md)): Amplify, Cognito, API Gateway + Lambda, DynamoDB, the traffic refresh (EventBridge, Lambda, S3) and a CloudWatch dashboard. Tested end to end in a separate account on 29 Oct 2026; not yet applied in the team's account.
 - [ ] API Gateway + Lambda for the backend (`backend/lambda_handler.py` is a start).
 - [ ] DynamoDB for runs, versions and results.
 - [ ] S3 for recorded condition snapshots and experiment exports.

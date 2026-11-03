@@ -1,0 +1,9 @@
+# Terraform state holds the LTA key and every resource ID: keep it on the
+# machine that runs Terraform (or in a private S3 backend), never in Git.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+terraform.tfvars
+build/
