@@ -39,11 +39,22 @@ describe('typicalSlot', () => {
   })
 })
 
+// the index the nightly build writes when it published the weekday 08:45 slot
+const INDEX = { 'traffic/typical/index.json': { slots: { weekday: { '0845': { readings: 3, days: 3 } }, weekend: {} } } }
+
 describe('readTypical', () => {
   it('reads the slot a departure falls in', async () => {
-    const t = await readTypical(src({ 'traffic/typical/weekday/0845.json': TYPICAL_GRID }), 8 * 60 + 50, THU)
+    const t = await readTypical(src({ ...INDEX, 'traffic/typical/weekday/0845.json': TYPICAL_GRID }), 8 * 60 + 50, THU)
     expect(t.grid?.typical).toEqual({ dayType: 'weekday', slot: '0845', readings: 3, days: 3 })
     expect(t.raw).toEqual(TYPICAL_GRID)
+  })
+
+  it('leaves out a slot the last nightly build did not publish', async () => {
+    // an older build's grid is still in the bucket
+    const old = { 'traffic/typical/weekday/0845.json': TYPICAL_GRID }
+    expect((await readTypical(src({ ...old, 'traffic/typical/index.json': { slots: { weekday: { '0900': {} }, weekend: {} } } }), 8 * 60 + 50, THU)).grid).toBeNull()
+    // and before the first build there is no index at all
+    expect((await readTypical(src(old), 8 * 60 + 50, THU)).grid).toBeNull()
   })
 
   it('gives the reason the backend gives when the slot has none yet', async () => {

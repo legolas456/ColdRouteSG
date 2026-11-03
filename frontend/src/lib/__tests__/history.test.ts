@@ -91,6 +91,32 @@ describe('the history API', () => {
     await expect(listRuns()).rejects.toMatchObject({ status: 401, message: 'Sign in again to use your saved runs.' })
   })
 
+  it('tells the console when the session has ended, so it can ask to sign in again', async () => {
+    const { listRuns } = await load()
+    const { onSessionExpired } = await import('../api')
+    const expired = vi.fn()
+    onSessionExpired(expired)
+    signedIn()
+    reply(401, { message: 'Unauthorized' })
+    await expect(listRuns()).rejects.toMatchObject({ status: 401 })
+    // a session Cognito will not refresh any more
+    session.fetchAuthSession.mockRejectedValue(Object.assign(new Error('Refresh Token has expired'), { name: 'NotAuthorizedException' }))
+    await expect(listRuns()).rejects.toMatchObject({ status: 401, message: 'Sign in again to use your saved runs.' })
+    expect(expired).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not end the session over a network failure while refreshing it', async () => {
+    const { listRuns } = await load()
+    const { onSessionExpired } = await import('../api')
+    const expired = vi.fn()
+    onSessionExpired(expired)
+    session.fetchAuthSession.mockRejectedValue(new TypeError('Failed to fetch'))
+    const fetch = vi.spyOn(globalThis, 'fetch')
+    await expect(listRuns()).rejects.toMatchObject({ status: 0, message: 'Could not reach the sign-in service. Check your connection.' })
+    expect(expired).not.toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('says so when the API cannot be reached', async () => {
     const { listRuns } = await load()
     signedIn()

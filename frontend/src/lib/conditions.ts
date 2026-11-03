@@ -110,6 +110,19 @@ export const MAX_WALK_KM = 0.6
  * that carpark is within MAX_WALK_KM.
  * Without the forecast there is no live plan, so it falls back to recorded.
  */
+/**
+ * URA and mall free lots older than this are no longer live: the traffic
+ * refresh publishes them every 10 minutes, so this is two missed runs. Plans
+ * then use the HDB carparks.
+ */
+export const LTA_PARKING_MAX_AGE_MIN = 30
+
+/** LTA's URA and mall carparks while their lots are fresh enough to plan with, else null. */
+export function freshLtaCarparks(feeds: Pick<LiveFeeds, 'ltaCarparks' | 'fetchedAt'>) {
+  const lta = feeds.ltaCarparks?.data
+  return lta && (feeds.fetchedAt ?? Date.now()) - lta.fetchedAt <= LTA_PARKING_MAX_AGE_MIN * 60_000 ? lta : null
+}
+
 export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, departure?: number, typical?: TypicalTraffic): Conditions {
   const w = feeds.weather.data
   if (!w) {
@@ -131,8 +144,10 @@ export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, dep
       radiusKm: a.rain === 2 ? 2.5 : 2,
       heavy: a.rain === 2,
     }))
-  // HDB carparks (data.gov.sg) and URA and mall carparks (LTA): the nearest counts
-  const parks: (LiveCarpark | LtaCarpark)[] = [...(feeds.carparks.data?.carparks ?? []), ...(feeds.ltaCarparks?.data?.carparks ?? [])]
+  // HDB carparks (data.gov.sg) and, while fresh, URA and mall carparks (LTA): the nearest counts
+  const lta = feeds.ltaCarparks?.data
+  const fresh = freshLtaCarparks(feeds)
+  const parks: (LiveCarpark | LtaCarpark)[] = [...(feeds.carparks.data?.carparks ?? []), ...(fresh?.carparks ?? [])]
   const out = stops.map((s) => {
     const area = nearest(w.areas, s)?.item
     const park = nearest(parks, s)
@@ -144,6 +159,7 @@ export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, dep
     }
   })
   const notes: string[] = []
+  if (lta && !fresh) notes.push(`LTA's URA and mall carpark lots are from ${hm(lta.updated)}, too old to use, so parking uses the HDB carparks.`)
   if (!parks.length) notes.push('The HDB carpark feed did not load, so parking uses the recorded values.')
   // the forecast only covers the next two hours; a run outside it is planned dry
   if (departure !== undefined && rain.length && (departure + 5 * 60 < w.validFrom || departure > w.validTo)) {

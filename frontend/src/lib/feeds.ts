@@ -98,6 +98,8 @@ export interface LtaCarpark {
 }
 export interface LtaCarparkFeed {
   updated: number
+  /** when our backend read LTA, epoch ms: lots this old are no longer live (conditions.ts) */
+  fetchedAt: number
   carparks: LtaCarpark[]
 }
 export interface LiveFeeds {
@@ -192,7 +194,7 @@ export function parseLtaCarparks(raw: Json): LtaCarparkFeed {
     if ((agency !== 'URA' && agency !== 'LTA') || typeof lng !== 'number' || typeof lat !== 'number' || typeof free !== 'number') return []
     return [{ no: String(c.id ?? ''), address: String(c.name ?? ''), lng, lat, free: Math.max(0, free), agency }]
   })
-  return { updated: sgMinutes(raw.fetchedAt), carparks }
+  return { updated: sgMinutes(raw.fetchedAt), fetchedAt: Date.parse(raw.fetchedAt), carparks }
 }
 
 export function parseCameras(raw: Json): CameraFeed {

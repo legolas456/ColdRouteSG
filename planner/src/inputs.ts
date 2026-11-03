@@ -75,10 +75,19 @@ export function typicalSlot(minutes: number, now = Date.now()) {
   return { dayType: day === 0 || day === 6 ? ('weekend' as const) : ('weekday' as const), slot }
 }
 
-/** Typical traffic for a departure today, with the grid as published; or the reason there is none yet. */
+// the slots the latest nightly build published (backend/app/services/typical.py INDEX_KEY)
+const TYPICAL_INDEX = 'traffic/typical/index.json'
+
+/**
+ * Typical traffic for a departure today, with the grid as published; or the
+ * reason there is none yet. As in the backend, the latest build's index
+ * decides: a slot it left out still has an older grid in the bucket.
+ */
 export async function readTypical(src: Sources, departure: number, now = Date.now()): Promise<TypicalTraffic & { raw: Json | null }> {
   const { dayType, slot } = typicalSlot(departure, now)
-  const raw = await readJson(src, `traffic/typical/${dayType}/${slot}.json`)
+  const index = await readJson(src, TYPICAL_INDEX)
+  const slots = (index?.slots as Record<string, Record<string, unknown>> | undefined)?.[dayType]
+  const raw = slots && Object.hasOwn(slots, slot) ? await readJson(src, `traffic/typical/${dayType}/${slot}.json`) : null
   if (!raw) {
     return {
       grid: null,

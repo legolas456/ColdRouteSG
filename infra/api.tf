@@ -1,7 +1,20 @@
-# One HTTP API in front of the FastAPI function and the planner. API Gateway checks the Cognito
-# token before a signed-in route reaches Lambda; the backend reads the verified
-# claims from the request context (backend/app/services/auth.py on the Cognito
-# branch). Everything else, public data and the traffic grid, needs no token.
+# One HTTP API in front of the FastAPI function and the planner. It fails
+# closed: API Gateway checks a Cognito token before any request reaches
+# Lambda, except the public GET routes and the browser's CORS preflight below.
+# The backend reads the verified claims from the request context
+# (backend/app/services/auth.py on the Cognito branch).
+
+locals {
+  # what anyone may read without signing in: the root and health check, the
+  # data.gov.sg routes, the LTA road-speed grid and the URA and mall carparks
+  public_routes = [
+    "GET /",
+    "GET /api/health",
+    "GET /api/data/{proxy+}",
+    "GET /api/traffic/{proxy+}",
+    "GET /api/parking/{proxy+}",
+  ]
+}
 
 resource "aws_apigatewayv2_api" "api" {
   name          = "${local.name}-api"
@@ -69,10 +82,39 @@ resource "aws_apigatewayv2_route" "plan" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
-resource "aws_apigatewayv2_route" "public" {
+resource "aws_apigatewayv2_route" "public_read" {
+  for_each  = toset(local.public_routes)
   api_id    = aws_apigatewayv2_api.api.id
-  route_key = "$default"
+  route_key = each.value
   target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+}
+
+# The preflight carries no token, so it gets a route of its own; otherwise the
+# signed-in $default route below would fail it with a 401 (AWS's documented
+# setup for an authorizer on $default).
+resource "aws_apigatewayv2_route" "preflight" {
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = "OPTIONS /{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+}
+
+# Everything without a route of its own needs a token too, so a method or path
+# added later is not public by accident.
+resource "aws_apigatewayv2_route" "fallback" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "$default"
+  target             = "integrations/${aws_apigatewayv2_integration.api.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+
+  # public reads keep working while an existing stack switches over
+  depends_on = [aws_apigatewayv2_route.public_read, aws_apigatewayv2_route.preflight]
+}
+
+# The $default route was public before; it is the same route, now signed in.
+moved {
+  from = aws_apigatewayv2_route.public
+  to   = aws_apigatewayv2_route.fallback
 }
 
 resource "aws_cloudwatch_log_group" "api_access" {

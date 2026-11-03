@@ -16,6 +16,7 @@ import { OPTIMISE_STEPS, StopsEditor } from './components/StopsEditor'
 import { Timeline } from './components/Timeline'
 import { Button, Segmented, StatusPill } from './components/ui'
 import { DEPARTURE, DEPOT, PROFILES, RECORDED_AT, SAMPLE_STOPS } from './data/sample'
+import { onSessionExpired } from './lib/api'
 import { AUTH_ENABLED, currentUser, signOutUser } from './lib/auth'
 import { camerasNear, liveConditions, recordedConditions, wantsTypical, type Conditions, type DataMode } from './lib/conditions'
 import { copyToast, HISTORY_ENABLED, plannedRun, reopenRun, saveRun, type SavedRun } from './lib/history'
@@ -119,6 +120,20 @@ export default function App() {
     void currentUser().then(setUser)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // the API turned the session down (it expired, or was revoked): sign out here
+  // too and ask to sign in again; the plan on screen stays
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        if (userRef.current?.account !== 'cognito') return
+        void signOutUser()
+        setUser(null)
+        setSavedOpen(null)
+        setSignIn({ reason: 'Your session has expired. Sign in again to keep saving your runs; the plan on screen stays.' })
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
   const [phase, setPhase] = useState<Phase>('draft')
   // the run's stops are kept across reloads; a shared link shows its own snapshot
   const [savedStops, setSavedStops] = usePersistentState<Stop[]>('coldroute.stops.v1', SAMPLE_STOPS)

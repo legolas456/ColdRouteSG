@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { Cctv, CloudRain, CloudSun, Gauge, Loader2, Maximize2, RefreshCw, SquareParking, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { RECORDED_AT, RECORDED_DATE } from '../data/sample'
-import { camerasNear, MAX_WALK_KM, type Conditions, type DataMode } from '../lib/conditions'
+import { camerasNear, freshLtaCarparks, MAX_WALK_KM, type Conditions, type DataMode } from '../lib/conditions'
 import { nearest } from '../lib/geo'
 import { isLoading, sgMinutes, TRAFFIC_URL, type Camera, type Feed, type LiveFeeds } from '../lib/live'
 import { hm } from '../lib/time'
@@ -61,6 +61,8 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
 
   const loading = isLoading(feeds)
   const fetched = feeds.fetchedAt ? hm(sgMinutes(feeds.fetchedAt)) : null
+  // typical traffic for the departure's slot, when no live reading stood for it
+  const typical = conditions.traffic?.typical ? { ...conditions.traffic.typical, at: conditions.traffic.at } : null
 
   return (
     <div
@@ -110,8 +112,14 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
             <>Live data could not be read, so the plan uses the recorded morning for now.</>
           ) : (
             <>
-              The plan reads the NEA forecast{conditions.traffic ? ', HDB free lots and LTA road speeds' : ' and HDB free lots'} fetched at{' '}
-              <span className="num">{hm(conditions.at)}</span>. Re-optimise to pick up newer data; the feeds below refresh every 5 minutes.
+              The plan reads the NEA forecast{conditions.traffic && !typical ? ', HDB free lots and LTA road speeds' : ' and HDB free lots'} fetched at{' '}
+              <span className="num">{hm(conditions.at)}</span>
+              {typical && (
+                <>
+                  , and typical {typical.dayType} LTA road speeds for <span className="num">{hm(typical.at)}</span>
+                </>
+              )}
+              . Re-optimise to pick up newer data; the feeds below refresh every 5 minutes.
               {conditions.cloud && (
                 <>
                   {' '}
@@ -151,8 +159,8 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
       )}
       <div className="space-y-2 px-3 pb-3">
         <WeatherSection feed={feeds.weather} stops={stops} />
-        <ParkingSection feed={feeds.carparks} lta={feeds.ltaCarparks} stops={stops} />
-        <RoadSpeedSection feed={feeds.traffic} usedByPlan={conditions.traffic !== null} />
+        <ParkingSection feed={feeds.carparks} lta={feeds.ltaCarparks} ltaFresh={freshLtaCarparks(feeds) !== null} stops={stops} />
+        <RoadSpeedSection feed={feeds.traffic} use={conditions.traffic ? (typical ? 'typical' : 'live') : null} />
         <CameraSection feed={feeds.cameras} stops={stops} onView={onViewCamera} />
       </div>
     </div>
@@ -285,7 +293,7 @@ function WeatherSection({ feed, stops }: { feed: LiveFeeds['weather']; stops: St
   )
 }
 
-function ParkingSection({ feed, lta, stops }: { feed: LiveFeeds['carparks']; lta: LiveFeeds['ltaCarparks']; stops: Stop[] }) {
+function ParkingSection({ feed, lta, ltaFresh, stops }: { feed: LiveFeeds['carparks']; lta: LiveFeeds['ltaCarparks']; ltaFresh: boolean; stops: Stop[] }) {
   const c = feed.data
   const atStops = useMemo(() => (c ? stops.map((s) => ({ stop: s, ...nearest(c.carparks, s)! })).filter((r) => r.item) : []), [c, stops])
   return (
@@ -299,9 +307,18 @@ function ParkingSection({ feed, lta, stops }: { feed: LiveFeeds['carparks']; lta
           </dl>
           {lta?.data && lta.data.carparks.length > 0 && (
             <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
-              Plus <span className="num">{fmt(lta.data.carparks.length)}</span> URA and mall carparks with{' '}
-              <span className="num">{fmt(lta.data.carparks.reduce((sum, p) => sum + p.free, 0))}</span> free lots (LTA). A stop uses whichever
-              carpark is nearest.
+              {ltaFresh ? (
+                <>
+                  Plus <span className="num">{fmt(lta.data.carparks.length)}</span> URA and mall carparks with{' '}
+                  <span className="num">{fmt(lta.data.carparks.reduce((sum, p) => sum + p.free, 0))}</span> free lots (LTA,{' '}
+                  <span className="num">{hm(lta.data.updated)}</span>). A stop uses whichever carpark is nearest.
+                </>
+              ) : (
+                <>
+                  LTA&apos;s URA and mall carparks are from <span className="num">{hm(lta.data.updated)}</span>, too old to use, so stops use the HDB
+                  carparks.
+                </>
+              )}
             </p>
           )}
           {atStops.length > 0 && (
@@ -412,7 +429,8 @@ function CameraSection({ feed, stops, onView }: { feed: LiveFeeds['cameras']; st
   )
 }
 
-function RoadSpeedSection({ feed, usedByPlan }: { feed: LiveFeeds['traffic']; usedByPlan: boolean }) {
+/** The live reading, and whether the plan used it, typical traffic for its departure instead, or neither. */
+function RoadSpeedSection({ feed, use }: { feed: LiveFeeds['traffic']; use: 'live' | 'typical' | null }) {
   const g = feed.data
   return (
     <Section
@@ -443,9 +461,11 @@ function RoadSpeedSection({ feed, usedByPlan }: { feed: LiveFeeds['traffic']; us
             <Stat label={`Slow (${SLOW_FACTOR}× or worse)`} value={`${Math.round(g.slowShare * 100)}%`} />
           </dl>
           <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
-            {usedByPlan
+            {use === 'live'
               ? 'The plan stretches each drive by how much slower the roads along it are now than at night.'
-              : 'Not used for this plan: see the note above.'}
+              : use === 'typical'
+                ? 'Not used for this plan, which leaves too far from this reading: it uses typical traffic for its departure (see the note above).'
+                : 'Not used for this plan: see the note above.'}
           </p>
         </>
       )}

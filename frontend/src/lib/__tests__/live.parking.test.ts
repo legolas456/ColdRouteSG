@@ -16,6 +16,8 @@ describe('parseLtaCarparks', () => {
   it('reads the carparks our backend publishes', () => {
     const f = parseLtaCarparks(FEED)
     expect(f.updated).toBe(5 * 60 + 10)
+    // the full time, so a feed from another day does not look current
+    expect(f.fetchedAt).toBe(Date.UTC(2026, 9, 28, 21, 10))
     expect(f.carparks).toEqual([
       { no: 'LTA-1', address: 'Suntec City', lng: 103.85718, lat: 1.29375, free: 2917, agency: 'LTA' },
       { no: 'URA-A0007', address: 'ANGULLIA PARK OFF ST', lng: 103.8296, lat: 1.3053, free: 224, agency: 'URA' },
