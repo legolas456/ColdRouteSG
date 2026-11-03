@@ -9,7 +9,7 @@
 %          Build report/final.tex to hide every TO DO/DECIDE box and
 %          check the 10-page limit (cover, ToC, figures, refs included).
 % Facts:   every technical statement was checked against the final code
-%          (main at e7922c4 on 4 Nov 2026, incl. the cloud planner #26).
+%          (main at 8865fec on 4 Nov 2026, incl. the cloud planner #26 and #27).
 % =====================================================================
 \documentclass[10.5pt,a4paper]{article}
 \usepackage[a4paper,margin=17mm,top=15mm,bottom=17mm]{geometry}
@@ -427,9 +427,9 @@ We evaluated four questions: does the system behave correctly, does the recommen
 is it fast and reliable on AWS, and can people use it.
 
 \subsection{Correctness: automated tests and deployment checks}
-The repository has 334 automated tests, all passing on the final code: 131 Vitest and 12 Node tests for the console, 23 for
-the planner (with fake Location Service, DynamoDB and S3 clients) and 168 pytest tests for the backend. GitHub Actions runs
-them, the TypeScript builds and the planner bundle on every pull request. They check, among other things, that every stop
+The repository has 336 automated tests, all passing on the final code: 132 Vitest and 12 Node tests for the console, 23 for
+the planner (with fake Location Service, DynamoDB and S3 clients) and 169 pytest tests for the backend. GitHub Actions runs
+them, the TypeScript builds, the planner bundle and \texttt{terraform validate} on every pull request. They check, among other things, that every stop
 appears exactly once; that waiting, lateness and rain overlap are simulated correctly; that the heuristic matches exhaustive
 search on fixed 9-stop seeds and is repeatable at 12 stops; the traffic-grid maths, typical-traffic slot medians and
 stale-carpark rejection; JWT ownership of saved runs; that the planner never re-measures a cached pair; and that the
@@ -595,7 +595,7 @@ JWT authorizers and partition keys enforce ownership; how fixed reference scales
 \section*{Draft notes (not part of the report)}
 \begin{itemize}
 \item \textbf{Page limit:} build \texttt{report/final.tex} (notes hidden) and keep it to 10 pages including cover and references.
-\item \textbf{Checked against:} merged \texttt{main} at \texttt{e7922c4} (all PRs \#13--26 merged; only Kun's old docs proposal \#10 is open).
+\item \textbf{Checked against:} merged \texttt{main} at \texttt{8865fec} (all PRs \#13--27 merged; only Kun's old docs proposal \#10 is open).
 \item \textbf{Cover IDs:} this cover uses NUS NetIDs (E\ldots, from Chien's draft); \texttt{Final.docx} used matriculation numbers (A\ldots). Check which the spec/submission wants and fill in all six.
 \item \textbf{Chien's original:} kept unchanged on branch \texttt{docs/final-report-draft}; this draft is on \texttt{docs/final-report-v1}. His \texttt{materials.tex} and \texttt{planning\_notes.tex} are untouched.
 \item \textbf{Older drafts:} \texttt{Final.docx}, the slides and Lian's backend reference describe an earlier version (camera-based traffic, backend greedy optimiser, SNS alarms, Python 3.11). This draft follows the final code; update the slides to match.
