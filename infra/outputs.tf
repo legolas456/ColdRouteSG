@@ -49,10 +49,5 @@ output "dashboard_url" {
 
 output "frontend_env" {
   description = "Build-time settings for the console (frontend/.env.production or the Deploy workflow)."
-  value = {
-    VITE_TRAFFIC_URL          = "${aws_apigatewayv2_api.api.api_endpoint}/api/traffic/grid"
-    VITE_API_BASE_URL         = aws_apigatewayv2_api.api.api_endpoint
-    VITE_COGNITO_USER_POOL_ID = aws_cognito_user_pool.users.id
-    VITE_COGNITO_CLIENT_ID    = aws_cognito_user_pool_client.console.id
-  }
+  value       = local.frontend_env
 }

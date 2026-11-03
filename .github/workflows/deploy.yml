@@ -1,16 +1,12 @@
-# Deploys the frontend to AWS Amplify Hosting whenever main changes.
+# Deploys the frontend to the earlier Amplify app (daledp6z7ncmz), by hand
+# only. The live console is built and deployed with the rest of the AWS stack
+# by `terraform apply` (infra/), so merges to main no longer publish here.
 # Keys come from the repository secrets AWS_ACCESS_KEY_ID and
 # AWS_SECRET_ACCESS_KEY (IAM user coldroute-deployer, Amplify-only policy).
 # See docs/deployment.md.
 name: Deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'frontend/**'
-      - 'scripts/deploy-frontend.sh'
-      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 # One deploy at a time; a newer push waits for the running one.

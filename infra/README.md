@@ -4,7 +4,7 @@ The whole AWS stack as code, so anyone can create it in their own account, and t
 
 | Part | Resources |
 | --- | --- |
-| Console | Amplify Hosting app `coldroute-console`, branch `main`, uploaded by `scripts/deploy-frontend.sh` (no Git connection, as before) |
+| Console | Amplify Hosting app `coldroute-console`, branch `main`; apply builds the console and uploads it with `scripts/deploy-frontend.sh` (no Git connection) |
 | Sign-in | Cognito user pool (email sign-in, an admin creates users), console app client without a secret, `admin` group |
 | API | API Gateway HTTP API. It fails closed: every request needs a Cognito token, which API Gateway checks before Lambda runs, except the public reads (`GET /`, `/api/health`, `/api/data/*`, `/api/traffic/*`) and the browser's `OPTIONS` preflight. All of it goes to the FastAPI Lambda `coldroute-api` (Python 3.12). CORS allows the console and `extra_origins`. |
 | Route history | DynamoDB `coldroute-route-history`, key `user_id` + `route_id`, on demand |
@@ -16,16 +16,15 @@ Each function's role allows only what it uses: the API reads and writes route hi
 
 ## Before you start
 
-- Terraform 1.6 or newer, AWS CLI v2, and `uv` or Python 3 with pip (for the Lambda package; no Docker needed).
+- Terraform 1.6 or newer and AWS CLI v2.
+- `uv` or Python 3 with pip, and `zip`: apply packages the backend (no Docker needed).
+- Node 22 with npm, and `curl`: apply builds the console and uploads it. Without them, set `deploy_console = false` and deploy it another way.
 - An AWS CLI profile for an IAM user or role that can create these resources (e.g. `AdministratorAccess`). **Not the root user.**
 - Optional: an LTA DataMall AccountKey for live traffic (free, https://datamall.lta.gov.sg).
 
 ## Create the stack
 
-From the repo root:
-
 ```bash
-./infra/build-lambda.sh                 # backend/ -> infra/build/backend.zip
 cd infra
 cp terraform.tfvars.example terraform.tfvars   # optional: profile, budget email, protect_data
 export AWS_PROFILE=coldroute            # your profile
@@ -34,13 +33,13 @@ terraform init
 terraform apply
 ```
 
-`terraform output` then lists the console URL, the API URL, the Cognito IDs and `frontend_env`, the settings the console build needs.
+That is the whole deploy. Apply creates the resources, packages `backend/` for the Lambda functions (`build-lambda.sh`), builds the console with this stack's API and Cognito settings and uploads it to Amplify (`scripts/deploy-frontend.sh`). `terraform output` then lists the console URL, the API URL and the Cognito IDs.
 
 For the team's real stack, set `protect_data = true`: deletion protection on the user pool and route history, point-in-time recovery for the table, and the bucket is kept on destroy.
 
 ### Publish the first traffic grid
 
-The schedule publishes within 5 minutes. To not wait:
+The schedule publishes within 10 minutes. To not wait:
 
 ```bash
 aws lambda invoke --function-name "$(terraform output -raw traffic_function)" /dev/stdout
@@ -59,17 +58,9 @@ aws cognito-idp admin-add-user-to-group --user-pool-id $POOL --username manager@
 
 Cognito emails a temporary password; the first sign-in asks for a new one. Leave out the group for a driver.
 
-### Deploy the console
+### The console from elsewhere
 
-From the repo root, with the stack's IDs and the build settings from `terraform output frontend_env`:
-
-```bash
-export AMPLIFY_APP_ID=$(terraform -chdir=infra output -raw amplify_app_id)
-eval "$(terraform -chdir=infra output -json frontend_env | python3 -c 'import json,sys; [print(f"export {k}={v}") for k, v in json.load(sys.stdin).items()]')"
-DEPLOY_ENV_FILE=/dev/null ./scripts/deploy-frontend.sh
-```
-
-For the GitHub Deploy workflow, set `AMPLIFY_APP_ID` and the `VITE_*` values in `.github/workflows/deploy.yml`, and store keys for a user that can deploy to this app as the repository secrets (see [docs/deployment.md](../docs/deployment.md#keys)).
+Apply deploys the console itself. To deploy it from CI instead, set `deploy_console = false`, put `AMPLIFY_APP_ID` (`terraform output amplify_app_id`) and the `VITE_*` values (`terraform output frontend_env`) in `.github/workflows/deploy.yml`, and store keys for a user that can deploy to this app as the repository secrets (see [docs/deployment.md](../docs/deployment.md#keys)).
 
 ## Check it
 
@@ -94,10 +85,13 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API/api/admin/me"
 
 ## Update and remove
 
-- Code change: `./infra/build-lambda.sh && terraform -chdir=infra apply` updates both functions.
+- Code change: `terraform apply` again. It rebuilds only what changed: the Lambda package (and every function) when a backend source changes, the console when a frontend source or one of its settings changes. With nothing changed it reports "No changes"; test files and Python caches never count as changes.
 - Remove everything: `terraform destroy` (refused for the user pool and table while `protect_data = true`).
 
 ## Things to know
+
+- **`backend.zip` went missing** (you deleted `infra/build/`, or applied existing state from a fresh clone): terraform only rebuilds the package when `backend/` changes, so new or replaced functions would point at a missing file. Rebuild it first with `terraform apply -replace=terraform_data.backend_package`.
+- **Two AWS accounts on one machine**: apply uploads the console with the same credentials as the provider and stops if they belong to a different account than the stack. Set `aws_profile` in `terraform.tfvars` to be explicit.
 
 - **State holds secrets.** `terraform.tfstate` contains the LTA key and every resource ID. It stays on the machine that ran Terraform (git-ignored); keep it private, or move it to a private S3 backend if more than one person applies.
 - **Replacing the hand-made stack.** Applying this in an account that already has the hand-made Cognito, API Gateway, Lambda and DynamoDB creates a second, separate stack; nothing existing is touched. Users and saved routes are not copied. Once the console works against the new stack, delete the old resources in the console.

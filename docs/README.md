@@ -21,7 +21,7 @@ Project knowledge for the ColdRoute SG group project (CS5224 Cloud Computing, Gr
 | Backend, public data endpoints, optimisation logic | [`../README.md`](../README.md) and `backend/` |
 | Frontend features, layouts, screenshots | [`../frontend/README.md`](../frontend/README.md) and `frontend/docs/screenshots/` |
 | UI rules (tokens, buttons, switches, copy) | [`../frontend/AGENTS.md`](../frontend/AGENTS.md) |
-| Live demo | https://main.daledp6z7ncmz.amplifyapp.com/ (AWS Amplify, redeployed by GitHub Actions on every merge to `main`, see [deployment.md](deployment.md)) |
+| Live demo | https://main.d1f8mppryelp5v.amplifyapp.com/ (AWS Amplify, deployed with the AWS stack by `terraform apply`, see [`infra/README.md`](../infra/README.md)) |
 | Singapore data sources | data.gov.sg (NEA weather, HDB carparks, traffic cameras), LTA DataMall, OneMap, OSRM. Check their official docs before quoting numbers. |
 
 If two sources disagree, the code on `main` wins. Then fix the doc.

@@ -23,14 +23,31 @@ AMPLIFY_BRANCH="${AMPLIFY_BRANCH:-main}"
 AMPLIFY_APP_ID="${AMPLIFY_APP_ID:-}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 export AWS_REGION AWS_PAGER=""
-# Keys in the environment (CI) win; otherwise use the local profile.
+# Keys in the environment (CI) win; then AWS_PROFILE (terraform apply passes
+# its own); then a "coldroute" profile if this machine has one; else the AWS
+# CLI's usual chain (the default profile, SSO, instance roles). terraform apply
+# turns the coldroute fallback off (COLDROUTE_PROFILE_FALLBACK=0), so the upload
+# uses the same credentials as the provider.
 if [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
   unset AWS_PROFILE
-else
-  export AWS_PROFILE="${AWS_PROFILE:-coldroute}"
+elif [ -z "${AWS_PROFILE:-}" ] && [ "${COLDROUTE_PROFILE_FALLBACK:-1}" != 0 ] &&
+  aws configure list-profiles 2>/dev/null | grep -qx coldroute; then
+  export AWS_PROFILE=coldroute
 fi
 
 command -v aws >/dev/null || { echo "AWS CLI v2 not found. See docs/deployment.md." >&2; exit 1; }
+
+# terraform apply passes the account it created the stack in; refuse to upload
+# into a different one (e.g. a default profile and a coldroute profile that
+# belong to different accounts).
+if [ -n "${EXPECT_AWS_ACCOUNT:-}" ]; then
+  ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+  if [ "$ACCOUNT" != "$EXPECT_AWS_ACCOUNT" ]; then
+    echo "AWS CLI credentials are for account $ACCOUNT, but terraform created the stack in $EXPECT_AWS_ACCOUNT." >&2
+    echo "Set aws_profile in terraform.tfvars (or export AWS_PROFILE) so both use the same account." >&2
+    exit 1
+  fi
+fi
 
 echo "==> Deploying as $(aws sts get-caller-identity --query Arn --output text) in $AWS_REGION"
 
