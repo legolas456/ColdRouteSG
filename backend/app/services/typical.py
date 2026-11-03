@@ -65,6 +65,8 @@ def build_slot(readings: list[list[list[float]]], day: str, slot: str, days: int
     cells_out = [
         [i, j, round(min(MAX_FACTOR, max(1.0, statistics.median(values))), 2), road_km[(i, j)]]
         for (i, j), values in sorted(factors.items())
+        # each cell needs MIN_READINGS of its own, or one jam would set it
+        if len(values) >= MIN_READINGS
     ]
     total = sum(km for *_, km in cells_out)
     slow = sum(km for _, _, factor, km in cells_out if factor >= SLOW_FACTOR)
