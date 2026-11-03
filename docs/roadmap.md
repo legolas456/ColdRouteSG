@@ -55,7 +55,7 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [ ] DynamoDB for runs, versions and results.
 - [ ] S3 for recorded condition snapshots and experiment exports.
 - [ ] EventBridge to refresh conditions on a schedule. `backend/traffic_refresh.py` is ready for the road-speed grid (EventBridge → Lambda → S3, see [deployment.md](deployment.md#live-traffic-service)), not deployed yet.
-- [ ] Cognito sign-in to replace the mock account.
+- [x] Cognito sign-in in the console (when built with `VITE_COGNITO_*` from `infra/`), with the demo account kept as a fallback. Signed-in plans are saved to route history (DynamoDB); the account menu lists your runs, and admins see the team's activity (Lian Ping's backend, merged from `feat/lianping-admin-dashboard-cognito-dynamodb`). Users are created by an admin; there is no sign-up.
 - [ ] CloudWatch metrics: latency, errors, cost per optimisation.
 - [ ] If AWS Educate blocks a service, use the alternative listed in the proposal and note it.
 

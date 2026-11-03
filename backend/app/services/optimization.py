@@ -25,9 +25,9 @@ def _priority_factor(priority: int) -> float:
 def _rationale(stop: DeliveryStop, weather_risk: float, parking_risk: float, lateness: float) -> list[str]:
     reasons: list[str] = []
     if stop.cold_chain_priority == 1:
-        reasons.append("Cold-chain priority 1 favours earlier delivery.")
+        reasons.append("High cold-chain urgency makes postponing this delivery more costly.")
     elif stop.cold_chain_priority == 2:
-        reasons.append("Cold-chain priority 2 gives this delivery moderate urgency.")
+        reasons.append("Medium cold-chain urgency is considered when estimating delay exposure.")
     if weather_risk >= 0.7:
         reasons.append("Adverse weather risk increases delay/exposure cost.")
     if parking_risk >= 0.7:
@@ -61,6 +61,7 @@ async def optimize_route(request: RouteRequest) -> RouteResponse:
 
     while remaining:
         candidates: list[tuple[float, int]] = []
+        candidate_leg_scores: dict[int, float] = {}
         for idx in remaining:
             stop = request.stops[idx - 1]
             travel_min = durations[current_idx][idx]
@@ -76,17 +77,44 @@ async def optimize_route(request: RouteRequest) -> RouteResponse:
                 except Exception:
                     lateness = 0.0
 
-            cold_exposure = _priority_factor(stop.cold_chain_priority) * max(0.0, arrival_elapsed / 60.0)
-            score = (
+            # Realised cost of travelling to THIS stop. This is what we retain
+            # as the leg's incremental score in the existing API response.
+            own_exposure = _priority_factor(stop.cold_chain_priority) * max(0.0, arrival_elapsed / 60.0)
+            leg_score = (
                 request.weights.travel * travel_min
                 + request.weights.weather * weather_risk * 18
                 + request.weights.parking * parking_risk * 16
-                + request.weights.cold_chain * cold_exposure * 8
+                + request.weights.cold_chain * own_exposure * 8
                 + request.weights.lateness * lateness * 2.5
             )
-            candidates.append((score, idx))
 
-        score, chosen_idx = min(candidates, key=lambda x: x[0])
+            # One-step look-ahead: if we serve idx next, every OTHER unvisited
+            # stop must wait at least until travel + service at idx have passed,
+            # plus the road travel time from idx to that stop. Evaluate each
+            # other stop as if it could be visited immediately afterward.
+            # This is an optimistic exposure estimate, not a full route search.
+            # A high-priority remaining stop has a larger priority factor, so
+            # a choice that keeps it waiting incurs a larger selection cost.
+            postponed_exposure = 0.0
+            for other_idx in remaining:
+                if other_idx == idx:
+                    continue
+                other = request.stops[other_idx - 1]
+                next_arrival = arrival_elapsed + stop.service_minutes + durations[idx][other_idx]
+                postponed_exposure += (
+                    _priority_factor(other.cold_chain_priority)
+                    * max(0.0, next_arrival / 60.0)
+                )
+
+            selection_score = leg_score + request.weights.cold_chain * postponed_exposure * 8
+            candidates.append((selection_score, idx))
+            candidate_leg_scores[idx] = leg_score
+
+        # Stable tie-break preserves input order when candidate scores match.
+        _selection_score, chosen_idx = min(candidates, key=lambda x: x[0])
+        # The API reports the selected stop's realised incremental cost, not
+        # its look-ahead selection score (which projects costs of other stops).
+        score = candidate_leg_scores[chosen_idx]
         travel_min = durations[current_idx][chosen_idx]
         elapsed += travel_min + request.stops[chosen_idx - 1].service_minutes
         order.append(chosen_idx)

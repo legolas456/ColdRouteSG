@@ -14,11 +14,11 @@ The frontend searches Singapore addresses through OneMap and gets road times and
 
 The optimiser currently runs **in the browser**: exhaustive search through eight stops; above that, an exact shortest route and a local search (2-opt, Or-opt and swap moves) for the ColdRoute plan. The FastAPI backend has separate optimisation and data endpoints but is not connected to this redesigned UI yet. The depot can be any Singapore address found through OneMap; **Load sample** restores Jurong Cold Store.
 
-Traffic comes from LTA road speeds when the traffic service runs (backend with an LTA key, console with `VITE_TRAFFIC_URL`); otherwise drive times assume free-flowing traffic, and the app says so. Camera images do not calculate speed. Exposure is a modelled risk indicator, not a temperature measurement. Sign-in and dispatch are browser-local demonstrations, not real accounts or messages sent to drivers. A share link is not a production access-control system.
+Traffic comes from LTA road speeds when the traffic service runs (backend with an LTA key, console with `VITE_TRAFFIC_URL`); otherwise drive times assume free-flowing traffic, and the app says so. Camera images do not calculate speed. Exposure is a modelled risk indicator, not a temperature measurement. Sign-in is real when the console is built with the Cognito settings from `infra/` (otherwise only the demo account, which never leaves the browser); dispatch is still a demonstration, not a message sent to a driver. A share link is not a production access-control system.
 
 ## Set up a fresh working copy
 
-You need repository access, Git, Node **22** (matching `frontend/.nvmrc`), npm, Python **3.11** (matching CI), and `make` on macOS/Linux. Prefer those versions rather than the newest Python or an old Node 20 release: pinned Python packages may lack wheels on a new interpreter, and Vite needs Node >=20.19 or a compatible Node 22 release.
+You need repository access, Git, Node **22** (matching `frontend/.nvmrc`), npm, Python **3.11** (matching CI), and `make` on macOS/Linux. Prefer those versions rather than the newest Python or an old Node 20 release: pinned Python packages may lack wheels on a new interpreter, and Vite needs Node >=20.19 or a compatible Node 22 release. Change `frontend/package-lock.json` (`npm install <package>`) with Node 22 in particular: npm 11, which comes with Node 24, leaves out optional entries that CI's npm 10 requires, and the Checks then fail at `npm ci`.
 
 ```bash
 git clone https://github.com/legolas456/ColdRouteSG.git

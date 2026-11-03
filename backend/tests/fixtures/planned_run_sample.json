@@ -1,0 +1,126 @@
+{
+ "depot": {
+  "lat": 1.3088,
+  "lng": 103.7205
+ },
+ "depot_name": "Jurong Cold Store",
+ "depot_address": "9 Fishery Port Rd, 619742",
+ "departure_time": "09:00",
+ "profile": "pharma",
+ "data_mode": "recorded",
+ "stops": [
+  {
+   "id": "NUH",
+   "name": "NUH Pharmacy",
+   "address": "5 Lower Kent Ridge Rd, 119074",
+   "lat": 1.294,
+   "lng": 103.783,
+   "window_start": "09:30",
+   "window_end": "10:30",
+   "service_minutes": 12,
+   "cargo": "PHARMA"
+  },
+  {
+   "id": "WHC",
+   "name": "Woodlands Health Campus",
+   "address": "17 Woodlands Dr 17, 737628",
+   "lat": 1.4246,
+   "lng": 103.7948,
+   "window_start": "09:30",
+   "window_end": "11:00",
+   "service_minutes": 15,
+   "cargo": "PHARMA"
+  },
+  {
+   "id": "AMK",
+   "name": "AMK Hub FairPrice",
+   "address": "53 Ang Mo Kio Ave 3, 569933",
+   "lat": 1.3692,
+   "lng": 103.8484,
+   "window_start": "10:00",
+   "window_end": "12:30",
+   "service_minutes": 8,
+   "cargo": "FROZEN"
+  },
+  {
+   "id": "TAM",
+   "name": "Tampines Mall Cold Store",
+   "address": "4 Tampines Central 5, 529510",
+   "lat": 1.3525,
+   "lng": 103.9447,
+   "window_start": "10:30",
+   "window_end": "13:00",
+   "service_minutes": 10,
+   "cargo": "FROZEN"
+  },
+  {
+   "id": "MBFC",
+   "name": "MBFC Catering · Tower 3",
+   "address": "12 Marina Blvd, 018982",
+   "lat": 1.2793,
+   "lng": 103.854,
+   "window_start": "11:00",
+   "window_end": "12:30",
+   "service_minutes": 10,
+   "cargo": "CHILLED"
+  },
+  {
+   "id": "TPG",
+   "name": "Tanjong Pagar Clinic",
+   "address": "7 Wallich St, 078884",
+   "lat": 1.2765,
+   "lng": 103.8457,
+   "window_start": "10:00",
+   "window_end": "13:00",
+   "service_minutes": 6,
+   "cargo": "PHARMA"
+  },
+  {
+   "id": "HV",
+   "name": "Holland V Bistro",
+   "address": "118 Holland Ave, 278997",
+   "lat": 1.311,
+   "lng": 103.796,
+   "window_start": "09:30",
+   "window_end": "14:00",
+   "service_minutes": 8,
+   "cargo": "CHILLED"
+  }
+ ],
+ "plan": {
+  "order": [
+   "HV",
+   "NUH",
+   "TPG",
+   "AMK",
+   "WHC",
+   "TAM",
+   "MBFC"
+  ],
+  "total_distance_km": 91.2,
+  "total_travel_minutes": 109.3,
+  "total_service_minutes": 69,
+  "total_lateness_minutes": 0,
+  "late_stops": 0,
+  "exposure_minutes": 540.9,
+  "rain_stops": 0
+ },
+ "shortest": {
+  "order": [
+   "HV",
+   "NUH",
+   "TPG",
+   "MBFC",
+   "TAM",
+   "AMK",
+   "WHC"
+  ],
+  "total_distance_km": 70.5,
+  "total_travel_minutes": 90.5,
+  "total_service_minutes": 69,
+  "total_lateness_minutes": 82.3,
+  "late_stops": 1,
+  "exposure_minutes": 666.1,
+  "rain_stops": 1
+ }
+}
