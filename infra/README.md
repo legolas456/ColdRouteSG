@@ -89,6 +89,9 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API/api/admin/me"
 
 ## Things to know
 
+- **`backend.zip` went missing** (you deleted `infra/build/`, or applied existing state from a fresh clone): terraform only rebuilds the package when `backend/` changes, so new or replaced functions would point at a missing file. Rebuild it first with `terraform apply -replace=terraform_data.backend_package`.
+- **Two AWS accounts on one machine**: apply uploads the console with the same credentials as the provider and stops if they belong to a different account than the stack. Set `aws_profile` in `terraform.tfvars` to be explicit.
+
 - **State holds secrets.** `terraform.tfstate` contains the LTA key and every resource ID. It stays on the machine that ran Terraform (git-ignored); keep it private, or move it to a private S3 backend if more than one person applies.
 - **Replacing the hand-made stack.** Applying this in an account that already has the hand-made Cognito, API Gateway, Lambda and DynamoDB creates a second, separate stack; nothing existing is touched. Users and saved routes are not copied. Once the console works against the new stack, delete the old resources in the console.
 - **Cost.** Next to nothing at course scale: the traffic refresh is about 4,300 runs a month of about 7 s at 1 GB, within Lambda's free tier, plus a few cents of S3 and logs. API Gateway, Cognito and DynamoDB are free or pay-per-request at this size. Set `budget_email` for an alert anyway.

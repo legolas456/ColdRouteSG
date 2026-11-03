@@ -355,7 +355,11 @@ export function typicalTraffic(departure: number, now = Date.now()): Promise<Typ
   if (!hit) {
     hit = getJson(`${TYPICAL_TRAFFIC_URL}?at=${encodeURIComponent(at)}`, 15_000)
       .then((raw) => ({ grid: parseTrafficGrid(raw) }))
-      .catch((e: unknown) => ({ grid: null, reason: e instanceof Error ? e.message : String(e) }))
+      .catch((e: unknown) => {
+        // a failure or a slot not built yet is not kept: the next plan asks again
+        typicalCache.delete(at)
+        return { grid: null, reason: e instanceof Error ? e.message : String(e) }
+      })
     typicalCache.set(at, hit)
   }
   return hit

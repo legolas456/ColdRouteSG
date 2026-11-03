@@ -34,6 +34,17 @@ describe('typicalTraffic', () => {
     expect(await live.typicalTraffic(13 * 60, NOW)).toEqual({ grid: null, reason: detail })
   })
 
+  it('asks again after a failure, so a later plan gets the grid', async () => {
+    const live = await load()
+    const fetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockImplementation(async () => new Response(JSON.stringify(TYPICAL_GRID)))
+    expect((await live.typicalTraffic(9 * 60, NOW)).grid).toBeNull()
+    expect((await live.typicalTraffic(9 * 60, NOW)).grid?.typical?.slot).toBe('0845')
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
   it('is off without the traffic service', async () => {
     const live = await load('')
     const fetch = vi.spyOn(globalThis, 'fetch')
