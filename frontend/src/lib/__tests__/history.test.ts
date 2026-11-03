@@ -154,6 +154,20 @@ describe('reopenRun', () => {
     expect(first).toMatchObject({ id: 'NUH', windowStart: 13 * 60 + 15, windowEnd: 15 * 60, service: 25, cargo: 'FROZEN' })
   })
 
+  it('refuses, in words, a run saved by the older /optimize endpoint', async () => {
+    const { reopenRun, canReopen, LEGACY_RUN } = await load()
+    // what backend build_route_history_item stores for /api/routes/optimize
+    const legacy = saved({
+      depot: { lat: 1.3, lng: 103.8 },
+      depot_name: 'Old depot',
+      departure_time: '08:30',
+      stops: [{ id: 'a', name: 'A', lat: 1.31, lng: 103.81 }],
+    } as unknown as SavedRun['request'])
+    expect(canReopen(legacy)).toBe(false)
+    await expect(reopenRun(legacy)).rejects.toThrow(LEGACY_RUN)
+    expect(canReopen(saved(sampleRequest()))).toBe(true)
+  })
+
   it('rebuilds a depot and a stop that are not in the sample', async () => {
     const { reopenRun } = await load()
     const request = sampleRequest()
@@ -165,5 +179,14 @@ describe('reopenRun', () => {
     expect(run.stops).toHaveLength(1)
     expect(run.stops[0]).toMatchObject({ id: 'P238801', name: 'Ion Orchard', windowStart: 600, windowEnd: 720, service: 15, cargo: 'CHILLED', lat: 1.304, lng: 103.8318 })
     expect(run.stops[0].area).toBeTruthy()
+  })
+})
+
+describe('copyToast', () => {
+  it('does not claim a copy is saved before it is optimised', async () => {
+    const { copyToast } = await load()
+    expect(copyToast(true)).toBe('Copy made · it is saved to your runs when you optimise it')
+    expect(copyToast(false)).toBe('Copy made · you can edit it now')
+    for (const signedIn of [true, false]) expect(copyToast(signedIn)).not.toMatch(/^Saved/)
   })
 })
