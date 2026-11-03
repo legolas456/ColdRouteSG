@@ -170,9 +170,15 @@ def test_the_nightly_handler(monkeypatch):
 # ---- serving it -------------------------------------------------------------------------
 
 
+def _index(**slots):
+    """The index a nightly build writes, listing these slots per day type."""
+    return json.dumps({"slots": {"weekday": {}, "weekend": {}} | {day: {s: {} for s in names} for day, names in slots.items()}}).encode()
+
+
 def test_a_slot_is_read_once_an_hour(monkeypatch):
     s3 = FakeS3()
     s3.objects[profile_key("weekday", "0845")] = json.dumps({"slot": "0845"}).encode()
+    s3.objects[typical.INDEX_KEY] = _index(weekday=["0845"])
     monkeypatch.setattr(typical, "_cached", {})
     monkeypatch.setattr(typical, "get_settings", lambda: Settings(traffic_bucket="bucket"), raising=False)
     import app.config
@@ -181,9 +187,34 @@ def test_a_slot_is_read_once_an_hour(monkeypatch):
     at = datetime(2026, 10, 30, 8, 47, tzinfo=SGT)
     assert typical.typical_grid(at, s3=s3) == {"slot": "0845"}
     assert typical.typical_grid(at + timedelta(minutes=5), s3=s3) == {"slot": "0845"}
-    assert s3.gets == 1
+    # the index and the slot, once
+    assert s3.gets == 2
     # a slot with none yet is remembered too
     assert typical.typical_grid(datetime(2026, 10, 31, 3, 0, tzinfo=SGT), s3=s3) is None
+
+
+def test_only_the_slots_the_last_build_published_are_served():
+    # an older build published 08:45; the last one had too few recent readings for it
+    s3 = FakeS3()
+    s3.objects[profile_key("weekday", "0845")] = json.dumps({"slot": "0845"}).encode()
+    s3.objects[profile_key("weekday", "0900")] = json.dumps({"slot": "0900"}).encode()
+    s3.objects[typical.INDEX_KEY] = _index(weekday=["0900"])
+    assert typical.read_typical_grid(s3, "bucket", datetime(2026, 10, 30, 8, 47, tzinfo=SGT)) is None
+    assert typical.read_typical_grid(s3, "bucket", datetime(2026, 10, 30, 9, 5, tzinfo=SGT)) == {"slot": "0900"}
+    # a weekend departure in the same slot has none
+    assert typical.read_typical_grid(s3, "bucket", datetime(2026, 10, 31, 9, 5, tzinfo=SGT)) is None
+    # before the first build there is no index, so nothing is served
+    del s3.objects[typical.INDEX_KEY]
+    assert typical.read_typical_grid(s3, "bucket", datetime(2026, 10, 30, 9, 5, tzinfo=SGT)) is None
+
+
+def test_a_built_profile_is_served():
+    s3 = FakeS3()
+    for day in (27, 28, 29):
+        for minute in (45, 50):
+            keep(s3, datetime(2026, 10, day, 8, minute, tzinfo=SGT), [[30, 18, 1.5, 0.4]])
+    build_profile(s3, "bucket", NOW)
+    assert typical.read_typical_grid(s3, "bucket", datetime(2026, 10, 30, 8, 47, tzinfo=SGT))["slot"] == "0845"
 
 
 def test_the_api_serves_the_departures_slot(monkeypatch):

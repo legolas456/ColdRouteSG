@@ -125,7 +125,7 @@ export function DataPill({
       onClick={onClick}
       title={
         live
-          ? `Planning with live NEA and HDB data${traffic ? ' and LTA road speeds' : ''}. Open the live feeds.`
+          ? `Planning with live NEA and HDB data${traffic ? (traffic.typical ? ' and typical LTA road speeds' : ' and LTA road speeds') : ''}. Open the live feeds.`
           : 'Planning with the recorded rainy morning (sample data). Open the live feeds.'
       }
       className={clsx(
@@ -143,8 +143,8 @@ export function DataPill({
         </span>
       )}
       <span className="max-md:hidden">{label}</span>
-      {/* what the plan reads: LTA only when its road speeds were used (cameras never feed the plan) */}
-      {ok && <span className="max-xl:hidden">· NEA · HDB{traffic ? ' · LTA' : ''}</span>}
+      {/* what the plan reads: LTA only when its road speeds were used, live or typical (cameras never feed the plan) */}
+      {ok && <span className="max-xl:hidden">· NEA · HDB{traffic ? (traffic.typical ? ' · LTA typical' : ' · LTA') : ''}</span>}
       {(!live || source !== 'recorded') && <span className="num max-md:hidden">{hm(at)}</span>}
     </button>
   )

@@ -178,13 +178,25 @@ def typical_grid(at: datetime, s3: Any = None) -> Optional[dict[str, Any]]:
 
 
 def read_typical_grid(s3: Any, bucket: str, at: datetime) -> Optional[dict[str, Any]]:
-    """The typical grid for a departure time, or None if that slot has none yet."""
+    """The typical grid for a departure time, or None if that slot has none.
+
+    The latest nightly build's index decides: a slot it left out (too few recent
+    readings) is not served, although its older grid is still in the bucket.
+    """
+    index = _read_json(s3, bucket, INDEX_KEY)
+    day, slot = day_type(at), slot_of(at)
+    if not index or slot not in (index.get("slots") or {}).get(day, {}):
+        return None
+    return _read_json(s3, bucket, profile_key(day, slot))
+
+
+def _read_json(s3: Any, bucket: str, key: str) -> Optional[dict[str, Any]]:
     from botocore.exceptions import ClientError  # with boto3: in the Lambda runtime and requirements.txt
 
     try:
-        body = s3.get_object(Bucket=bucket, Key=profile_key(day_type(at), slot_of(at)))["Body"].read()
+        body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
     except ClientError as exc:
-        # the API's role may list the prefix, so a slot without a grid is a 404, not a 403
+        # the API's role may list the prefix, so a missing object is a 404, not a 403
         if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
             return None
         raise
