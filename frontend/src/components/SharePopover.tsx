@@ -59,7 +59,8 @@ export function SharePopover({ viewLabel, buildLink, onClose, notify }: Props) {
       setCopied(true)
       notify('Link copied')
     }
-    const failed = () => notify('Could not copy the link · copy it from the address bar')
+    // the share link is not the address bar's: it carries the share and view
+    const failed = () => notify('Could not copy the link · click it in the box to select it, then copy')
     if (!navigator.clipboard) return failed()
     navigator.clipboard.writeText(link).then(ok, failed)
   }

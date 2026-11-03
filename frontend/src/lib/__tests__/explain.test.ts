@@ -10,9 +10,16 @@ const result = (recommended: Partial<Plan>, baseline: Partial<Plan>) =>
 const stops = [{ id: 'A', cargo: 'CHILLED' }, { id: 'B', cargo: 'FROZEN' }] as Stop[]
 
 describe('summarise', () => {
-  it('names less cold cargo time on board, at the same driving', () => {
-    const text = summarise(result({ order: ['B', 'A'], exposure: 16 }, { exposure: 19 }), stops)
-    expect(text).toBe('3 fewer minutes of cold cargo on board.')
+  it('names the lower cold-chain exposure, as the KPI does', () => {
+    expect(summarise(result({ order: ['B', 'A'], exposure: 16 }, { exposure: 19 }), stops)).toBe('Cold-chain exposure drops by 3 minutes.')
+    expect(summarise(result({ order: ['B', 'A'], exposure: 18 }, { exposure: 19 }), stops)).toBe('Cold-chain exposure drops by 1 minute.')
+  })
+
+  it('ends the list of what the plan gains with "and", as clauses', () => {
+    const withPharma = [...stops, { id: 'P', cargo: 'PHARMA' }] as Stop[]
+    const onTime = { P: { late: 0 } } as unknown as Plan['byId']
+    const text = summarise(result({ drive: 50, exposure: 16, byId: onTime }, { drive: 40, lateMinutes: 30, exposure: 19 }), withPharma)
+    expect(text).toBe('Every pharma stop lands inside its window, 10 extra minutes of driving remove 30 minutes of lateness and cold-chain exposure drops by 3 minutes.')
   })
 
   it('only says the shortest route is safest when it is the same route', () => {
