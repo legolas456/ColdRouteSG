@@ -93,6 +93,32 @@ def test_a_carpark_failure_does_not_stop_the_traffic(monkeypatch):
     assert summary["kept"] == f"traffic/history/{MEASURED_AT:%Y/%m/%d/%H%M}.json.gz"
 
 
+def test_a_page_that_is_not_json_is_a_carpark_failure():
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="<html>busy</html>")))
+    with pytest.raises(TrafficUnavailable, match="not JSON"):
+        asyncio.run(fetch_carparks("key", client))
+    odd = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=["value"])))
+    with pytest.raises(TrafficUnavailable, match="unexpected"):
+        asyncio.run(fetch_carparks("key", odd))
+
+
+def test_rows_that_are_not_objects_are_skipped():
+    assert carpark_feed(["URA", None, 3, URA], FETCHED_AT)["carparks"][0]["id"] == "URA-A0007"
+
+
+def test_a_carpark_publish_failure_does_not_stop_the_traffic(monkeypatch):
+    class RefusesCarparks(FakeS3):
+        def put_object(self, **kw):
+            if kw["Key"] == PARKING_KEY:
+                raise RuntimeError("AccessDenied")
+            return super().put_object(**kw)
+
+    s3 = RefusesCarparks()
+    summary = _refresh(monkeypatch, s3)
+    assert summary["carparks"] == "not refreshed: The carparks could not be published (RuntimeError)."
+    assert "traffic/grid.json" in s3.objects and PARKING_KEY not in s3.objects
+
+
 def test_the_api_serves_the_published_carparks(monkeypatch):
     feed = carpark_feed(CARPARK_ROWS, FETCHED_AT)
     reads = []
