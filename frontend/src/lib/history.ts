@@ -166,10 +166,37 @@ export class ApiError extends Error {
   }
 }
 
+const SIGN_IN_AGAIN = 'Sign in again to use your saved runs.'
+const expiredListeners = new Set<() => void>()
+
+/**
+ * Tell `listener` when the session has ended under the console: the API turned
+ * the token down, or Cognito would not refresh it. The console then signs out
+ * and asks to sign in again, keeping the plan on screen.
+ */
+export function onSessionExpired(listener: () => void) {
+  expiredListeners.add(listener)
+  return () => {
+    expiredListeners.delete(listener)
+  }
+}
+
+function sessionExpired() {
+  expiredListeners.forEach((l) => l())
+  return new ApiError(SIGN_IN_AGAIN, 401)
+}
+
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!API_URL) throw new ApiError('The ColdRoute API is not set up for this console.', 0)
-  const token = await idToken()
-  if (!token) throw new ApiError('Sign in again to use your saved runs.', 401)
+  let token: string | null
+  try {
+    token = await idToken()
+  } catch (e) {
+    // Cognito refused to refresh the session; anything else is the network
+    if ((e as Error).name === 'NotAuthorizedException') throw sessionExpired()
+    throw new ApiError('Could not reach the sign-in service. Check your connection.', 0)
+  }
+  if (!token) throw sessionExpired()
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), 15000)
   try {
@@ -180,9 +207,10 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     })
     if (res.status === 204) return undefined as T
     const body = await res.json().catch(() => null)
+    if (res.status === 401) throw sessionExpired()
     if (!res.ok) {
       const detail = body && typeof body.detail === 'string' ? body.detail : null
-      throw new ApiError(detail ?? (res.status === 401 ? 'Sign in again to use your saved runs.' : `The ColdRoute API answered ${res.status}.`), res.status)
+      throw new ApiError(detail ?? `The ColdRoute API answered ${res.status}.`, res.status)
     }
     return body as T
   } catch (e) {
