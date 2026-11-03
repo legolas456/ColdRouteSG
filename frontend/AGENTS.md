@@ -94,12 +94,13 @@ Serif is only for titles and big numbers. Don't add new sizes for one-off cases.
 ### Mock vs real
 
 - Mocks live in `src/data/`. Keep them realistic: real places, plausible times. Where a real system would differ, say so in the UI (e.g. the note in the sign-in dialog).
-- Runtime calls go to public, keyless services straight from the browser: OneMap (search and tiles), OSRM (drive times and roads) and data.gov.sg (live feeds). Anything that needs a key or an account goes through our own API instead (`VITE_API_BASE_URL`, `VITE_TRAFFIC_URL`): LTA road speeds and typical traffic, URA and mall carparks, and saved runs. Cognito sign-in is the exception: Amplify talks to Cognito directly with the public user pool and client IDs (`VITE_COGNITO_*`), which are not secrets. The browser never holds a key. Each call has a fallback, and the UI says when it is used. The sample run makes no calls apart from tiles.
+- Runtime calls go to public, keyless services straight from the browser: OneMap (search and tiles), OSRM (drive times and roads) and data.gov.sg (live feeds). Anything that needs a key or an account goes through our own API instead (`VITE_API_BASE_URL`, `VITE_TRAFFIC_URL`): LTA road speeds and typical traffic, URA and mall carparks, saved runs, and planning a signed-in run in the cloud (`POST /api/plan`, which calls Amazon Location Service). Cognito sign-in is the exception: Amplify talks to Cognito directly with the public user pool and client IDs (`VITE_COGNITO_*`), which are not secrets. The browser never holds a key. Each call has a fallback, and the UI says when it is used. The sample run makes no calls apart from tiles.
 - Saved UI preferences use `usePersistentState` with `coldroute.*` keys.
 
 ## Code
 
 - TypeScript strict and no `any`. Shared types belong in `lib/types.ts`.
+- The cloud planner (`../planner/`, Node 22) bundles the modules it imports from `src/lib` (conditions, feeds, geo, objective, optimizer, profiles, roads, time, traffic, types) and `src/data`. Keep those free of React and browser-only globals; CI's planner job type-checks and tests them.
 - Use Tailwind classes, with `clsx` for conditional classes. Global CSS goes only in `index.css`.
 - Comments explain why, not what.
 - Commits use an imperative summary line. PRs that change the UI include screenshots.

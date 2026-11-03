@@ -1,5 +1,6 @@
 # What the evaluation reports: API latency (p50/p95), errors and Lambda time,
-# plus whether the traffic refresh keeps running.
+# how long plans take and what Location Service bills for them, and whether
+# the traffic refresh keeps running.
 
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = local.name
@@ -30,6 +31,33 @@ resource "aws_cloudwatch_dashboard" "main" {
               ["AWS/ApiGateway", "Count", "ApiId", aws_apigatewayv2_api.api.id],
               [".", "4xx", ".", "."],
               [".", "5xx", ".", "."],
+            ]
+          }
+        },
+        {
+          type = "metric", x = 0, y = 12, width = 12, height = 6
+          properties = {
+            title  = "Plans: time (ms)"
+            region = var.region
+            period = 300
+            metrics = [
+              [local.metrics_namespace, "PlanMs", "Service", "planner", { stat = "p50", label = "p50" }],
+              ["...", { stat = "p95", label = "p95" }],
+              ["AWS/Lambda", "Errors", "FunctionName", aws_lambda_function.planner.function_name, { stat = "Sum", label = "planner errors", yAxis = "right" }],
+            ]
+          }
+        },
+        {
+          type = "metric", x = 12, y = 12, width = 12, height = 6
+          properties = {
+            title  = "Plans: Location Service routes billed"
+            region = var.region
+            period = 3600
+            stat   = "Sum"
+            metrics = [
+              [local.metrics_namespace, "RoutesBilled", "Service", "planner", { label = "routes billed" }],
+              [".", "PairsCached", ".", ".", { label = "pairs from the cache" }],
+              [".", "PlanMs", ".", ".", { stat = "SampleCount", label = "plans" }],
             ]
           }
         },

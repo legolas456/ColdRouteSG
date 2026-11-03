@@ -92,7 +92,8 @@ describe('the history API', () => {
   })
 
   it('tells the console when the session has ended, so it can ask to sign in again', async () => {
-    const { listRuns, onSessionExpired } = await load()
+    const { listRuns } = await load()
+    const { onSessionExpired } = await import('../api')
     const expired = vi.fn()
     onSessionExpired(expired)
     signedIn()
@@ -105,7 +106,8 @@ describe('the history API', () => {
   })
 
   it('does not end the session over a network failure while refreshing it', async () => {
-    const { listRuns, onSessionExpired } = await load()
+    const { listRuns } = await load()
+    const { onSessionExpired } = await import('../api')
     const expired = vi.fn()
     onSessionExpired(expired)
     session.fetchAuthSession.mockRejectedValue(new TypeError('Failed to fetch'))

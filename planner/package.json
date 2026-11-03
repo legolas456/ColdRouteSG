@@ -1,0 +1,23 @@
+{
+  "name": "coldroute-planner",
+  "private": true,
+  "type": "module",
+  "description": "ColdRoute's planner on AWS Lambda: the console's optimiser, with drive times from Amazon Location Service.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1159.0",
+    "@aws-sdk/client-geo-routes": "^3.1159.0",
+    "@aws-sdk/client-s3": "^3.1159.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

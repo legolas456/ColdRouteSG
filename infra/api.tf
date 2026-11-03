@@ -1,8 +1,8 @@
-# One HTTP API in front of the FastAPI function. It fails closed: API Gateway
-# checks a Cognito token before any request reaches Lambda, except the public
-# GET routes and the browser's CORS preflight below. The backend reads the
-# verified claims from the request context (backend/app/services/auth.py on
-# the Cognito branch).
+# One HTTP API in front of the FastAPI function and the planner. It fails
+# closed: API Gateway checks a Cognito token before any request reaches
+# Lambda, except the public GET routes and the browser's CORS preflight below.
+# The backend reads the verified claims from the request context
+# (backend/app/services/auth.py on the Cognito branch).
 
 locals {
   # what anyone may read without signing in: the root and health check, the
@@ -61,6 +61,23 @@ resource "aws_apigatewayv2_route" "signed_in" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = each.value
   target             = "integrations/${aws_apigatewayv2_integration.api.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
+# Planning a run in the cloud (planner.tf): for signed-in users, since each new
+# pair of stops is a Location Service call.
+resource "aws_apigatewayv2_integration" "planner" {
+  api_id                 = aws_apigatewayv2_api.api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.planner.invoke_arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "plan" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "POST /api/plan"
+  target             = "integrations/${aws_apigatewayv2_integration.planner.id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }

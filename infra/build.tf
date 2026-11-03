@@ -1,8 +1,9 @@
 # `terraform apply` builds what it deploys, so applying is all a deploy takes:
-# the backend's Lambda package when its sources change, and the console when
-# its sources or its settings (the API and Cognito IDs below) change. A plan
-# with nothing changed rebuilds nothing. The machine that applies needs Python 3
-# with uv or pip, Node 22 with npm, zip, curl and the AWS CLI.
+# the backend's and the planner's Lambda packages when their sources change,
+# and the console when its sources or its settings (the API and Cognito IDs
+# below) change. A plan with nothing changed rebuilds nothing. The machine that
+# applies needs Python 3 with uv or pip, Node 22 with npm, zip, curl and the
+# AWS CLI.
 
 locals {
   backend_dir = abspath("${path.module}/../backend")
@@ -14,6 +15,17 @@ locals {
   backend_package_hash = base64sha256(join("\n", concat(
     [for f in local.backend_files : "${f} ${filesha256("${local.backend_dir}/${f}")}"],
     ["build-lambda.sh ${filesha256("${path.module}/build-lambda.sh")}"],
+  )))
+
+  planner_dir = abspath("${path.module}/../planner")
+  # the planner bundles the console's own code (frontend/src/lib and its data), so changes there rebuild it too
+  planner_files = sort(concat(
+    [for f in setunion([for pattern in ["src/**", "package.json", "package-lock.json", "build.mjs"] : fileset(local.planner_dir, pattern)]...) : "planner/${f}" if !strcontains(f, "__tests__")],
+    [for f in setunion([for pattern in ["src/lib/**", "src/data/**"] : fileset(local.frontend_dir, pattern)]...) : "frontend/${f}" if !strcontains(f, "__tests__")],
+  ))
+  planner_package_hash = base64sha256(join("\n", concat(
+    [for f in local.planner_files : "${f} ${filesha256("${path.module}/../${f}")}"],
+    ["build-planner.sh ${filesha256("${path.module}/build-planner.sh")}"],
   )))
 
   frontend_dir = abspath("${path.module}/../frontend")
@@ -44,6 +56,15 @@ resource "terraform_data" "backend_package" {
 
   provisioner "local-exec" {
     command = "${path.module}/build-lambda.sh"
+  }
+}
+
+# Bundles planner/ into build/planner.zip (build-planner.sh).
+resource "terraform_data" "planner_package" {
+  triggers_replace = [local.planner_package_hash]
+
+  provisioner "local-exec" {
+    command = "${path.module}/build-planner.sh"
   }
 }
 

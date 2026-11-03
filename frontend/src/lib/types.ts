@@ -1,3 +1,5 @@
+import type { Conditions } from './conditions'
+
 export type Cargo = 'PHARMA' | 'FROZEN' | 'CHILLED'
 
 export type ProfileId = 'pharma' | 'balanced' | 'fastest'
@@ -121,4 +123,35 @@ export interface OptimiseResult {
   trafficAt: number | null
   /** what those road speeds were: one live reading, or typical traffic for the departure's slot */
   trafficKind: 'live' | 'typical' | null
+}
+
+/** A drive time between two points, as OSRM or Amazon Location Service measured it. */
+export interface DriveTime {
+  from: string
+  to: string
+  minutes: number
+  km: number
+}
+
+/** Where a cloud plan's drive times came from, and what Location Service bills for them. */
+export interface RoadsUsed {
+  source: 'location' | 'osrm' | 'estimate'
+  /** pairs read from the planner's cache, and pairs Location Service measured */
+  cached: number
+  measured: number
+  /** routes Location Service bills for: every cell of a matrix (a stop to itself too), and each route drawn */
+  billed: number
+}
+
+/** What the cloud planner (planner/, POST /api/plan) answers. */
+export interface PlanResponse {
+  result: OptimiseResult
+  /** what the plan read; `traffic` is the road-speed grid as published, since JSON has no Map */
+  conditions: Omit<Conditions, 'traffic' | 'cloud'> & { traffic: Record<string, unknown> | null }
+  /** road lines of both plans' legs, keyed "fromId>toId" */
+  legs: Record<string, [number, number][]>
+  /** the measured drive times the plan used, for the console's own table */
+  times: DriveTime[]
+  roads: RoadsUsed
+  elapsedMs: number
 }

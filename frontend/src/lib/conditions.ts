@@ -1,9 +1,9 @@
 import { RAIN_CELLS, RECORDED_AT } from '../data/sample'
 import { kmBetween, nearest, parkingRisk } from './geo'
-import type { Camera, LiveCarpark, LiveFeeds, LtaCarpark, WeatherArea } from './live'
+import type { Camera, LiveCarpark, LiveFeeds, LtaCarpark, WeatherArea } from './feeds'
 import { hm } from './time'
 import type { TrafficGrid } from './traffic'
-import type { Carpark, RainCell, Stop } from './types'
+import type { Carpark, RainCell, RoadsUsed, Stop } from './types'
 
 export type DataMode = 'live' | 'recorded'
 
@@ -25,6 +25,8 @@ export interface Conditions {
   traffic: TrafficGrid | null
   /** plain-English caveats, shown in the Conditions panel */
   notes: string[]
+  /** set when the cloud planner (planner/ on AWS Lambda) made the plan: where its drive times came from, and how long it took */
+  cloud?: { roads: RoadsUsed['source']; ms: number }
 }
 
 /**

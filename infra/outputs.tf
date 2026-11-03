@@ -29,6 +29,15 @@ output "route_history_table" {
   value = aws_dynamodb_table.route_history.name
 }
 
+output "planner_function" {
+  description = "Plans runs for signed-in users (POST /api/plan); its logs carry each plan's time and Location Service routes."
+  value       = aws_lambda_function.planner.function_name
+}
+
+output "drive_times_table" {
+  value = aws_dynamodb_table.drive_times.name
+}
+
 output "traffic_bucket" {
   value = aws_s3_bucket.traffic.bucket
 }

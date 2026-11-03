@@ -120,6 +120,13 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
                 </>
               )}
               . Re-optimise to pick up newer data; the feeds below refresh every 5 minutes.
+              {conditions.cloud && (
+                <>
+                  {' '}
+                  It was planned on AWS Lambda in <span className="num">{(conditions.cloud.ms / 1000).toFixed(1)} s</span>
+                  {conditions.cloud.roads === 'location' && ', with drive times from Amazon Location Service'}.
+                </>
+              )}
             </>
           )}
         </p>

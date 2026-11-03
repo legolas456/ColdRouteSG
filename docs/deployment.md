@@ -61,7 +61,7 @@ There was no CI before October 2026. There were no workflows, no `amplify.yml` a
 
 ## Infrastructure as code
 
-[`infra/`](../infra/README.md) creates the whole stack with Terraform: Amplify Hosting for the console, Cognito, the FastAPI Lambda behind an API Gateway HTTP API (Cognito tokens checked at the gateway), DynamoDB route history, the scheduled traffic refresh (EventBridge, Lambda, S3) and a CloudWatch dashboard. The live demo's Amplify app and the old backend (above) were set up by hand, not with `infra/`. The plan is to apply `infra/` in the team's account and retire the hand-made resources.
+[`infra/`](../infra/README.md) creates the whole stack with Terraform: Amplify Hosting for the console, Cognito, the FastAPI Lambda and the cloud planner behind an API Gateway HTTP API (Cognito tokens checked at the gateway), DynamoDB route history and drive times, the scheduled traffic refresh (EventBridge, Lambda, S3) and a CloudWatch dashboard. It runs in Jay's account as the team's production stack. The earlier Amplify app and the old backend (above) were set up by hand and are no longer updated.
 
 ## Live traffic service
 
