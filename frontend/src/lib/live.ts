@@ -18,6 +18,13 @@ const BASE = 'https://api.data.gov.sg/v1'
 export const TRAFFIC_URL: string | undefined = import.meta.env.VITE_TRAFFIC_URL || undefined
 /** Typical traffic for a departure lives next to the live grid: /api/traffic/typical?at=… */
 export const TYPICAL_TRAFFIC_URL = TRAFFIC_URL?.replace(/\/grid$/, '/typical')
+/**
+ * URA and mall carparks with their free car lots: LTA DataMall, through our
+ * backend because of the key (backend/app/services/parking.py). HDB carparks
+ * come straight from data.gov.sg.
+ */
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || undefined
+export const PARKING_URL = API_BASE ? `${API_BASE}/api/parking/carparks` : undefined
 export const FEED_URLS = {
   weather: `${BASE}/environment/2-hour-weather-forecast`,
   carparks: `${BASE}/transport/carpark-availability`,
@@ -102,9 +109,26 @@ export interface Feed<T> {
   error?: string
 }
 
+/** A URA or mall carpark: LTA reports its free car lots, not its size. */
+export interface LtaCarpark {
+  no: string
+  address: string
+  lng: number
+  lat: number
+  free: number
+  agency: 'URA' | 'LTA'
+}
+export interface LtaCarparkFeed {
+  updated: number
+  /** when our backend read LTA, epoch ms: lots this old are no longer live (conditions.ts) */
+  fetchedAt: number
+  carparks: LtaCarpark[]
+}
 export interface LiveFeeds {
   weather: Feed<WeatherFeed>
   carparks: Feed<CarparkFeed>
+  /** URA and mall carparks; stays idle when PARKING_URL is not set */
+  ltaCarparks?: Feed<LtaCarparkFeed>
   cameras: Feed<CameraFeed>
   /** stays idle when TRAFFIC_URL is not set */
   traffic: Feed<TrafficGrid>
@@ -184,6 +208,17 @@ export async function parseCarparks(raw: Json): Promise<CarparkFeed> {
   return { updated: sgMinutes(item.timestamp as string), carparks, reporting: Object.keys(lots).length, totalLots, freeLots }
 }
 
+/** Our backend's carpark feed (GET /api/parking/carparks). */
+export function parseLtaCarparks(raw: Json): LtaCarparkFeed {
+  if (typeof raw.fetchedAt !== 'string' || Number.isNaN(Date.parse(raw.fetchedAt))) throw new Error('Unexpected carpark feed (fetchedAt)')
+  const carparks = arr(raw.carparks).flatMap((c): LtaCarpark[] => {
+    const { agency, lng, lat, free } = c
+    if ((agency !== 'URA' && agency !== 'LTA') || typeof lng !== 'number' || typeof lat !== 'number' || typeof free !== 'number') return []
+    return [{ no: String(c.id ?? ''), address: String(c.name ?? ''), lng, lat, free: Math.max(0, free), agency }]
+  })
+  return { updated: sgMinutes(raw.fetchedAt), fetchedAt: Date.parse(raw.fetchedAt), carparks }
+}
+
 export function parseCameras(raw: Json): CameraFeed {
   const item = arr(raw.items)[0] as Json | undefined
   if (!item) throw new Error('No cameras in the response')
@@ -215,7 +250,13 @@ async function getJson(url: string, ms = 12_000): Promise<Json> {
 
 // ---- shared store ----------------------------------------------------------
 
-let state: LiveFeeds = { weather: { status: 'idle' }, carparks: { status: 'idle' }, cameras: { status: 'idle' }, traffic: { status: 'idle' } }
+let state: LiveFeeds = {
+  weather: { status: 'idle' },
+  carparks: { status: 'idle' },
+  ltaCarparks: { status: 'idle' },
+  cameras: { status: 'idle' },
+  traffic: { status: 'idle' },
+}
 const listeners = new Set<() => void>()
 const emit = (next: LiveFeeds) => {
   state = next
@@ -239,6 +280,7 @@ export function refreshLive(): Promise<LiveFeeds> {
     carparks: loading(state.carparks),
     cameras: loading(state.cameras),
     traffic: TRAFFIC_URL ? loading(state.traffic) : state.traffic,
+    ltaCarparks: PARKING_URL ? loading(state.ltaCarparks ?? { status: 'idle' }) : state.ltaCarparks,
   })
   inflight = Promise.allSettled([
     getJson(FEED_URLS.weather).then(parseWeather),
@@ -246,12 +288,14 @@ export function refreshLive(): Promise<LiveFeeds> {
     getJson(FEED_URLS.cameras).then(parseCameras),
     // a cold backend reads ~100 LTA pages before answering, so allow it longer
     TRAFFIC_URL ? getJson(TRAFFIC_URL, 30_000).then(parseTrafficGrid) : Promise.resolve(null),
-  ]).then(([w, c, cam, t]) => {
+    PARKING_URL ? getJson(PARKING_URL).then(parseLtaCarparks) : Promise.resolve(null),
+  ]).then(([w, c, cam, t, lta]) => {
     emit({
       weather: settle(state.weather, w),
       carparks: settle(state.carparks, c),
       cameras: settle(state.cameras, cam),
       traffic: TRAFFIC_URL ? settle(state.traffic, t as PromiseSettledResult<TrafficGrid>) : state.traffic,
+      ltaCarparks: PARKING_URL ? settle(state.ltaCarparks ?? { status: 'idle' }, lta as PromiseSettledResult<LtaCarparkFeed>) : state.ltaCarparks,
       fetchedAt: Date.now(),
     })
     inflight = null
@@ -293,7 +337,11 @@ export function useLiveFeeds(active: boolean) {
 }
 
 export const isLoading = (f: LiveFeeds) =>
-  f.weather.status === 'loading' || f.carparks.status === 'loading' || f.cameras.status === 'loading' || f.traffic.status === 'loading'
+  f.weather.status === 'loading' ||
+  f.carparks.status === 'loading' ||
+  f.cameras.status === 'loading' ||
+  f.traffic.status === 'loading' ||
+  f.ltaCarparks?.status === 'loading'
 
 const typicalCache = new Map<string, Promise<TypicalTraffic>>()
 

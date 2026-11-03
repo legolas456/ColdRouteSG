@@ -508,13 +508,26 @@ def test_api_says_why_traffic_is_unavailable(monkeypatch):
 MEASURED_AT = datetime(2026, 10, 27, 8, 25, tzinfo=SGT)
 
 
-def _refresh(monkeypatch, s3: FakeS3, rows=ROWS, measured_at=MEASURED_AT) -> dict:
+CARPARK_ROWS = [
+    {"CarParkID": "A0007", "Area": "", "Development": "ANGULLIA PARK OFF ST", "Location": "1.3053 103.8296", "AvailableLots": 224, "LotType": "C", "Agency": "URA"},
+    {"CarParkID": "1", "Area": "Marina", "Development": "Suntec City", "Location": "1.29375 103.85718", "AvailableLots": 2917, "LotType": "C", "Agency": "LTA"},
+    {"CarParkID": "ACB", "Area": "", "Development": "BLK 270/271 ALBERT CENTRE", "Location": "1.3017 103.8546", "AvailableLots": 90, "LotType": "C", "Agency": "HDB"},
+]
+
+
+def _refresh(monkeypatch, s3: FakeS3, rows=ROWS, measured_at=MEASURED_AT, carparks=CARPARK_ROWS) -> dict:
     async def fake_read(key):
         assert key == "lta-key"
         return Reading(rows, measured_at)
 
+    async def fake_carparks(key, timeout):
+        if isinstance(carparks, Exception):
+            raise carparks
+        return carparks
+
     monkeypatch.setattr(traffic_refresh, "get_settings", lambda: Settings(lta_account_key="lta-key", traffic_bucket="bucket", traffic_key="traffic/grid.json"))
     monkeypatch.setattr(traffic_refresh, "read_live", fake_read)
+    monkeypatch.setattr(traffic_refresh, "_carpark_rows", fake_carparks)
     return traffic_refresh.handler({}, None, s3=s3)
 
 
@@ -560,7 +573,7 @@ def test_the_index_is_written_once_and_readings_by_time(monkeypatch):
     # the next run sees the same LTA reading again: the same key, and the index is not rewritten
     again = _refresh(monkeypatch, s3)
     assert again["kept"] == first["kept"]
-    assert s3.puts == 3 + 2  # grid, index, reading; then grid and reading
+    assert s3.puts == 4 + 3  # grid, index, reading, carparks; then the same without the index
     later = _refresh(monkeypatch, s3, measured_at=MEASURED_AT + timedelta(minutes=5))
     assert later["kept"] == "traffic/history/2026/10/27/0830.json.gz"
     assert sum(1 for key in s3.objects if key.startswith(traffic.HISTORY_INDEX_PREFIX)) == 1

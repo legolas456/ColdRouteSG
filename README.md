@@ -64,6 +64,7 @@ No credentials are supplied by the project.
 |---|---|
 | 2-hour weather forecast | `https://api.data.gov.sg/v1/environment/2-hour-weather-forecast` |
 | HDB carpark availability | `https://api.data.gov.sg/v1/transport/carpark-availability` |
+| URA and mall carpark availability | LTA DataMall `CarParkAvailabilityv2` (AccountKey; read by the scheduled refresh, served at `/api/parking/carparks`) |
 | LTA traffic camera images | `https://api.data.gov.sg/v1/transport/traffic-images` |
 | HDB carpark information | `https://data.gov.sg/api/action/datastore_search?resource_id=d_23f946fa557947f93a8043bbef41dd09` |
 | Route matrix / routing | `https://router.project-osrm.org` |

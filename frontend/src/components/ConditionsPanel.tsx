@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { Cctv, CloudRain, CloudSun, Gauge, Loader2, Maximize2, RefreshCw, SquareParking, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { RECORDED_AT, RECORDED_DATE } from '../data/sample'
-import { camerasNear, MAX_WALK_KM, type Conditions, type DataMode } from '../lib/conditions'
+import { camerasNear, freshLtaCarparks, MAX_WALK_KM, type Conditions, type DataMode } from '../lib/conditions'
 import { nearest } from '../lib/geo'
 import { isLoading, sgMinutes, TRAFFIC_URL, type Camera, type Feed, type LiveFeeds } from '../lib/live'
 import { hm } from '../lib/time'
@@ -152,7 +152,7 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
       )}
       <div className="space-y-2 px-3 pb-3">
         <WeatherSection feed={feeds.weather} stops={stops} />
-        <ParkingSection feed={feeds.carparks} stops={stops} />
+        <ParkingSection feed={feeds.carparks} lta={feeds.ltaCarparks} ltaFresh={freshLtaCarparks(feeds) !== null} stops={stops} />
         <RoadSpeedSection feed={feeds.traffic} use={conditions.traffic ? (typical ? 'typical' : 'live') : null} />
         <CameraSection feed={feeds.cameras} stops={stops} onView={onViewCamera} />
       </div>
@@ -286,7 +286,7 @@ function WeatherSection({ feed, stops }: { feed: LiveFeeds['weather']; stops: St
   )
 }
 
-function ParkingSection({ feed, stops }: { feed: LiveFeeds['carparks']; stops: Stop[] }) {
+function ParkingSection({ feed, lta, ltaFresh, stops }: { feed: LiveFeeds['carparks']; lta: LiveFeeds['ltaCarparks']; ltaFresh: boolean; stops: Stop[] }) {
   const c = feed.data
   const atStops = useMemo(() => (c ? stops.map((s) => ({ stop: s, ...nearest(c.carparks, s)! })).filter((r) => r.item) : []), [c, stops])
   return (
@@ -298,6 +298,22 @@ function ParkingSection({ feed, stops }: { feed: LiveFeeds['carparks']; stops: S
             <Stat label="Free lots" value={fmt(c.freeLots)} />
             <Stat label="Free" value={`${((c.freeLots / c.totalLots) * 100).toFixed(1)}%`} />
           </dl>
+          {lta?.data && lta.data.carparks.length > 0 && (
+            <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
+              {ltaFresh ? (
+                <>
+                  Plus <span className="num">{fmt(lta.data.carparks.length)}</span> URA and mall carparks with{' '}
+                  <span className="num">{fmt(lta.data.carparks.reduce((sum, p) => sum + p.free, 0))}</span> free lots (LTA,{' '}
+                  <span className="num">{hm(lta.data.updated)}</span>). A stop uses whichever carpark is nearest.
+                </>
+              ) : (
+                <>
+                  LTA&apos;s URA and mall carparks are from <span className="num">{hm(lta.data.updated)}</span>, too old to use, so stops use the HDB
+                  carparks.
+                </>
+              )}
+            </p>
+          )}
           {atStops.length > 0 && (
             <>
               <div className="mt-2 text-[11px] text-fg-3">Nearest HDB carpark to each stop</div>
