@@ -68,15 +68,31 @@ export function parseOneMap(rows: OneMapRow[]): Place[] {
   return out
 }
 
-/** Up to 6 places for a building name, street or postal code. */
+export const SEARCH_TIMEOUT_MS = 8000
+
+/**
+ * Up to 6 places for a building name, street or postal code. Cancelling
+ * `signal` rejects with an AbortError (a newer query); a OneMap that does not
+ * answer in SEARCH_TIMEOUT_MS rejects with an Error, so the UI can say so.
+ */
 export async function searchPlaces(query: string, signal?: AbortSignal): Promise<Place[]> {
   const q = query.trim()
   if (q.length < 2) return []
   const url = `${ONEMAP}?searchVal=${encodeURIComponent(q)}&returnGeom=Y&getAddrDetails=Y&pageNum=1`
-  const res = await fetch(url, { signal })
-  if (!res.ok) throw new Error(`OneMap answered ${res.status}`)
-  const body = (await res.json()) as { results?: OneMapRow[] }
-  return parseOneMap(body.results ?? []).slice(0, 6)
+  const ctrl = new AbortController()
+  const cancel = () => ctrl.abort()
+  if (signal?.aborted) cancel()
+  signal?.addEventListener('abort', cancel)
+  const timer = setTimeout(() => ctrl.abort(new Error('OneMap did not answer in time')), SEARCH_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, { signal: ctrl.signal })
+    if (!res.ok) throw new Error(`OneMap answered ${res.status}`)
+    const body = (await res.json()) as { results?: OneMapRow[] }
+    return parseOneMap(body.results ?? []).slice(0, 6)
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', cancel)
+  }
 }
 
 const AREAS = (neaAreas.areas as Array<[string, number, number]>).map(([name, lng, lat]) => ({ name, lng, lat }))

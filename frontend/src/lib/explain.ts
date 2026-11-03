@@ -70,7 +70,13 @@ export function summarise(result: OptimiseResult, stops: Stop[]) {
   if (b.lateMinutes > r.lateMinutes && extra > 0) {
     parts.push(`${extra} extra minutes of driving remove ${Math.round(b.lateMinutes - r.lateMinutes)} minutes of lateness`)
   }
-  if (!parts.length) return 'The shortest route is already the safest for these stops.'
+  const lessExposure = Math.round(b.exposure - r.exposure)
+  if (lessExposure > 0) parts.push(`${lessExposure} fewer minutes of cold cargo on board`)
+  if (!parts.length) {
+    return r.order.join() === b.order.join()
+      ? 'The shortest route is already the safest for these stops.'
+      : 'A different order scores lower on the overall risk for these stops.'
+  }
   const [first, ...rest] = parts
   const sentence = `${first}${rest.length ? ', ' + rest.slice(0, -1).join(', ') + (rest.length > 1 ? ' and ' : '') + rest[rest.length - 1] : ''}.`
   return sentence.charAt(0).toUpperCase() + sentence.slice(1)
