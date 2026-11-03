@@ -117,4 +117,6 @@ export interface OptimiseResult {
   highestRiskId: string
   /** minutes after midnight of the LTA road speeds the plan used; null when it used none */
   trafficAt: number | null
+  /** what those road speeds were: one live reading, or typical traffic for the departure's slot */
+  trafficKind: 'live' | 'typical' | null
 }

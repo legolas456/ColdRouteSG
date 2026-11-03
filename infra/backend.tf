@@ -44,7 +44,18 @@ data "aws_iam_policy_document" "api" {
   statement {
     sid       = "TrafficGrid"
     actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.traffic.arn}/${var.traffic_key}"]
+    resources = ["${aws_s3_bucket.traffic.arn}/${var.traffic_key}", "${aws_s3_bucket.traffic.arn}/traffic/typical/*"]
+  }
+  statement {
+    # so a slot with no typical grid yet reads as missing (404), not forbidden
+    sid       = "TypicalSlots"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.traffic.arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["traffic/typical/*"]
+    }
   }
 }
 
@@ -119,6 +130,12 @@ data "aws_iam_policy_document" "traffic" {
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.traffic.arn}/${var.traffic_key}"]
   }
+  statement {
+    # every reading, and the index of stretches the readings refer to
+    sid       = "KeepReadings"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.traffic.arn}/traffic/history/*", "${aws_s3_bucket.traffic.arn}/traffic/history-index/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "traffic" {
@@ -164,6 +181,8 @@ resource "aws_cloudwatch_event_rule" "traffic" {
   name                = "${local.name}-traffic-refresh"
   description         = "Publish the LTA road-speed grid to S3"
   schedule_expression = var.traffic_schedule
+  # pause it, e.g. while LTA's call quota for the key is used up
+  state = var.traffic_refresh_enabled ? "ENABLED" : "DISABLED"
 }
 
 resource "aws_cloudwatch_event_target" "traffic" {
@@ -179,4 +198,100 @@ resource "aws_lambda_permission" "traffic_schedule" {
   function_name = aws_lambda_function.traffic[0].function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.traffic[0].arn
+}
+
+# ---- Typical traffic ------------------------------------------------------------------
+# Once a night, from the kept readings: a grid per weekday and weekend slot
+# (backend/traffic_profile.py), which plans use for departures without a live
+# reading close enough.
+
+resource "aws_cloudwatch_log_group" "profile_fn" {
+  count             = local.traffic_enabled ? 1 : 0
+  name              = "/aws/lambda/${local.name}-traffic-profile"
+  retention_in_days = var.log_retention_days
+}
+
+resource "aws_iam_role" "profile" {
+  count              = local.traffic_enabled ? 1 : 0
+  name               = "${local.name}-traffic-profile"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+}
+
+data "aws_iam_policy_document" "profile" {
+  count = local.traffic_enabled ? 1 : 0
+  statement {
+    sid       = "Logs"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.profile_fn[0].arn}:*"]
+  }
+  statement {
+    sid       = "ListReadings"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.traffic.arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["traffic/history/*"]
+    }
+  }
+  statement {
+    sid       = "ReadReadings"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.traffic.arn}/traffic/history/*"]
+  }
+  statement {
+    sid       = "PublishProfile"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.traffic.arn}/traffic/typical/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "profile" {
+  count  = local.traffic_enabled ? 1 : 0
+  name   = "${local.name}-traffic-profile"
+  role   = aws_iam_role.profile[0].id
+  policy = data.aws_iam_policy_document.profile[0].json
+}
+
+resource "aws_lambda_function" "profile" {
+  count            = local.traffic_enabled ? 1 : 0
+  function_name    = "${local.name}-traffic-profile"
+  role             = aws_iam_role.profile[0].arn
+  runtime          = "python3.12"
+  handler          = "traffic_profile.handler"
+  filename         = local.lambda_zip
+  source_code_hash = fileexists(local.lambda_zip) ? filebase64sha256(local.lambda_zip) : null
+  # four weeks of readings: about 8,000 small files, read 16 at a time
+  memory_size = 1024
+  timeout     = 600
+
+  environment {
+    variables = {
+      TRAFFIC_BUCKET = aws_s3_bucket.traffic.bucket
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.profile_fn, aws_iam_role_policy.profile]
+}
+
+resource "aws_cloudwatch_event_rule" "profile" {
+  count               = local.traffic_enabled ? 1 : 0
+  name                = "${local.name}-traffic-profile"
+  description         = "Build typical traffic from the kept LTA readings"
+  schedule_expression = var.traffic_profile_schedule
+}
+
+resource "aws_cloudwatch_event_target" "profile" {
+  count = local.traffic_enabled ? 1 : 0
+  rule  = aws_cloudwatch_event_rule.profile[0].name
+  arn   = aws_lambda_function.profile[0].arn
+}
+
+resource "aws_lambda_permission" "profile_schedule" {
+  count         = local.traffic_enabled ? 1 : 0
+  statement_id  = "AllowEventBridge"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.profile[0].function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.profile[0].arn
 }

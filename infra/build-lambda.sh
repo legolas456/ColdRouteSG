@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Package backend/ for Lambda (Python 3.12 on x86_64): the app, both handlers
+# Package backend/ for Lambda (Python 3.12 on x86_64): the app, its handlers
 # and Linux wheels of requirements-lambda.txt, as infra/build/backend.zip.
 # Works on macOS and Linux without Docker. Uses uv if installed, else pip.
 set -euo pipefail
@@ -22,7 +22,8 @@ else
 fi
 
 echo "==> Adding the backend"
-cp -R "$ROOT/backend/app" "$ROOT/backend/lambda_handler.py" "$ROOT/backend/traffic_refresh.py" "$PKG/"
+# the app and every handler next to it (lambda_handler.py, traffic_refresh.py, traffic_profile.py, ...)
+cp -R "$ROOT/backend/app" "$ROOT"/backend/*.py "$PKG/"
 find "$PKG" -name __pycache__ -type d -prune -exec rm -rf {} +
 # the local .env (with the LTA key) must never ship; Lambda gets its settings from Terraform
 rm -f "$PKG/.env" "$PKG/app/.env"

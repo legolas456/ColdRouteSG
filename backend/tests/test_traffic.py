@@ -1,12 +1,14 @@
 import asyncio
+import gzip
 import json
 import sys
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
 import pytest
+from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
 
 import traffic_refresh
@@ -27,6 +29,7 @@ from app.services.traffic import (
     fetch_speed_bands,
     grid_from_rows,
     load_baseline,
+    Reading,
     parse_stretch,
     read_live_grid,
     read_published_grid,
@@ -339,6 +342,22 @@ def test_a_page_that_keeps_failing_gives_up_after_every_attempt():
     assert sum(1 for r in seen if r.url.params["$skip"] == "500") == traffic.PAGE_ATTEMPTS
 
 
+def test_a_used_up_quota_is_said_and_not_retried():
+    # LTA's answer once the AccountKey's call quota is used up (seen 29 Oct 2026)
+    fault = {"fault": {"faultstring": "Rate limit quota violation. Quota limit  exceeded.", "detail": {"errorcode": "policies.ratelimit.QuotaViolation"}}}
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(500, json=fault)
+
+    with pytest.raises(TrafficUnavailable, match="quota"):
+        asyncio.run(read_live_grid("key", client=httpx.AsyncClient(transport=httpx.MockTransport(handle))))
+    # one call per page of the batch, none of them repeated
+    skips = [r.url.params["$skip"] for r in seen]
+    assert len(skips) == len(set(skips)) <= traffic.PAGES_PER_BATCH
+
+
 @pytest.mark.parametrize("status", [400, 404])
 def test_a_client_error_is_not_retried(status):
     seen: list[httpx.Request] = []
@@ -408,9 +427,12 @@ def test_read_live_grid_end_to_end():
 
 
 class FakeS3:
+    """Keeps every object put, and refuses to replace one when asked If-None-Match, as S3 does."""
+
     def __init__(self, body: bytes | None = None):
         self.body = body
-        self.put: dict | None = None
+        self.objects: dict[str, dict] = {}
+        self.puts = 0
 
     def get_object(self, Bucket, Key):
         if self.body is None:
@@ -423,7 +445,10 @@ class FakeS3:
         return {"Body": Body()}
 
     def put_object(self, **kwargs):
-        self.put = kwargs
+        if kwargs.get("IfNoneMatch") == "*" and kwargs["Key"] in self.objects:
+            raise ClientError({"Error": {"Code": "PreconditionFailed", "Message": "exists"}}, "PutObject")
+        self.puts += 1
+        self.objects[kwargs["Key"]] = kwargs
 
 
 def test_read_published_grid():
@@ -480,22 +505,97 @@ def test_api_says_why_traffic_is_unavailable(monkeypatch):
 # ---- scheduled refresh ------------------------------------------------------------
 
 
-def test_refresh_publishes_the_grid_to_s3(monkeypatch):
-    grid = grid_from_rows(ROWS, FETCHED_AT)
+MEASURED_AT = datetime(2026, 10, 27, 8, 25, tzinfo=SGT)
 
+
+def _refresh(monkeypatch, s3: FakeS3, rows=ROWS, measured_at=MEASURED_AT) -> dict:
     async def fake_read(key):
         assert key == "lta-key"
-        return grid
+        return Reading(rows, measured_at)
 
     monkeypatch.setattr(traffic_refresh, "get_settings", lambda: Settings(lta_account_key="lta-key", traffic_bucket="bucket", traffic_key="traffic/grid.json"))
-    monkeypatch.setattr(traffic_refresh, "read_live_grid", fake_read)
+    monkeypatch.setattr(traffic_refresh, "read_live", fake_read)
+    return traffic_refresh.handler({}, None, s3=s3)
+
+
+def test_refresh_publishes_the_grid_to_s3(monkeypatch):
     s3 = FakeS3()
-    summary = traffic_refresh.handler({}, None, s3=s3)
-    assert s3.put["Bucket"] == "bucket" and s3.put["Key"] == "traffic/grid.json"
-    assert s3.put["ContentType"] == "application/json"
-    assert "max-age=60" in s3.put["CacheControl"]
-    assert json.loads(s3.put["Body"]) == grid
-    assert summary == {"fetchedAt": grid["fetchedAt"], "stretches": grid["stretches"], "cells": len(grid["cells"])}
+    summary = _refresh(monkeypatch, s3)
+    put = s3.objects["traffic/grid.json"]
+    assert put["Bucket"] == "bucket"
+    assert put["ContentType"] == "application/json"
+    assert "max-age=60" in put["CacheControl"]
+    grid = json.loads(put["Body"])
+    assert grid["measuredAt"] == "2026-10-27T08:25:00+08:00"
+    assert grid["cells"] == grid_from_rows(ROWS, FETCHED_AT)["cells"]
+    assert summary["stretches"] == grid["stretches"] and summary["cells"] == len(grid["cells"])
+
+
+def test_refresh_keeps_the_reading(monkeypatch):
+    s3 = FakeS3()
+    summary = _refresh(monkeypatch, s3)
+    # filed under LTA's own time, in Singapore time
+    assert summary["kept"] == "traffic/history/2026/10/27/0825.json.gz"
+    record = json.loads(gzip.decompress(s3.objects[summary["kept"]]["Body"]))
+    index = json.loads(s3.objects[record["index"]]["Body"])
+    assert record["index"].startswith(traffic.HISTORY_INDEX_PREFIX)
+    assert record["measuredAt"] == "2026-10-27T08:25:00+08:00"
+    # the reading's own grid cells, which typical traffic is built from
+    assert record["cells"] == json.loads(s3.objects["traffic/grid.json"]["Body"])["cells"]
+    # one band digit per routing stretch, in the index's LinkID order, with where each one is
+    routing = [s for s in map(parse_stretch, ROWS) if s and s.for_routing]
+    assert index["links"] == sorted(s.link_id for s in routing)
+    assert len(record["bands"]) == len(index["links"])
+    for s in routing:
+        n = index["links"].index(s.link_id)
+        assert record["bands"][n] == str(s.band)
+        assert index["cell"][n] == list(cell_of(*s.mid))
+        assert index["category"][n] == s.category
+        assert index["km"][n] == pytest.approx(max(s.km, 0.01), abs=0.001)
+
+
+def test_the_index_is_written_once_and_readings_by_time(monkeypatch):
+    s3 = FakeS3()
+    first = _refresh(monkeypatch, s3)
+    # the next run sees the same LTA reading again: the same key, and the index is not rewritten
+    again = _refresh(monkeypatch, s3)
+    assert again["kept"] == first["kept"]
+    assert s3.puts == 3 + 2  # grid, index, reading; then grid and reading
+    later = _refresh(monkeypatch, s3, measured_at=MEASURED_AT + timedelta(minutes=5))
+    assert later["kept"] == "traffic/history/2026/10/27/0830.json.gz"
+    assert sum(1 for key in s3.objects if key.startswith(traffic.HISTORY_INDEX_PREFIX)) == 1
+
+
+def test_a_stretch_missing_from_a_reading_is_a_zero():
+    routing = [s for s in map(parse_stretch, ROWS) if s and s.for_routing]
+    index = traffic.history_index(routing)
+    without_pie = [s for s in routing if s.link_id != ROWS[0]["LinkID"]]
+    key, record = traffic.history_record(without_pie, index, "index-key", FETCHED_AT, None)
+    n = index["links"].index(ROWS[0]["LinkID"])
+    assert record["bands"][n] == "0" and record["bands"].count("0") == 1
+    # without LTA's own time, the reading is filed under when it was fetched
+    assert key == "traffic/history/2026/10/27/0830.json.gz" and record["measuredAt"] is None
+
+
+def test_a_reading_with_other_stretches_gets_its_own_index(monkeypatch):
+    s3 = FakeS3()
+    first = _refresh(monkeypatch, s3)
+    later = _refresh(monkeypatch, s3, rows=[r for r in ROWS if r is not ROWS[0]], measured_at=MEASURED_AT + timedelta(minutes=5))
+    first_index = json.loads(gzip.decompress(s3.objects[first["kept"]]["Body"]))["index"]
+    later_index = json.loads(gzip.decompress(s3.objects[later["kept"]]["Body"]))["index"]
+    assert first_index != later_index
+    assert ROWS[0]["LinkID"] not in json.loads(s3.objects[later_index]["Body"])["links"]
+
+
+def test_an_index_that_cannot_be_written_is_an_error(monkeypatch):
+    class Broken(FakeS3):
+        def put_object(self, **kwargs):
+            if kwargs.get("IfNoneMatch"):
+                raise ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "PutObject")
+            super().put_object(**kwargs)
+
+    with pytest.raises(ClientError):
+        _refresh(monkeypatch, Broken())
 
 
 def test_refresh_needs_a_bucket(monkeypatch):

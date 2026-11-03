@@ -67,7 +67,7 @@ Live road speeds need an LTA DataMall AccountKey, which must never reach the bro
 
 | | Scheduled grid (planned) | On request (simplest) |
 | --- | --- | --- |
-| Runs | `backend/traffic_refresh.handler` as a Lambda, triggered by an EventBridge schedule `rate(5 minutes)` | The existing FastAPI Lambda (`backend/lambda_handler.py`), route `GET /api/traffic/grid` |
+| Runs | `backend/traffic_refresh.handler` as a Lambda, triggered by an EventBridge schedule `rate(10 minutes)` (a reading is 288 calls of the key's roughly 3,000 an hour) | The existing FastAPI Lambda (`backend/lambda_handler.py`), route `GET /api/traffic/grid` |
 | Environment | `LTA_ACCOUNT_KEY`, `TRAFFIC_BUCKET`, optionally `TRAFFIC_KEY` (default `traffic/speed-grid.json`) | `LTA_ACCOUNT_KEY` |
 | Permissions | `s3:PutObject` on the grid's key | none beyond the function's own |
 | Console reads | the S3 object (public read, or through CloudFront), with bucket CORS allowing the console's origin | the API route, which must not need a sign-in token (it is public data) and must allow the console's origin in CORS |
@@ -75,9 +75,11 @@ Live road speeds need an LTA DataMall AccountKey, which must never reach the bro
 
 Both need `backend/app/data/speed_baseline.json` in the package: each road stretch's speed at night, which the delay factors are measured against. Without it every stretch falls back to one speed per road category, which reads junctions and bends as traffic; the grid then reports `"nightShare": 0`. To rebuild it, save a few raw readings between 2 and 5 am (`python -m app.services.traffic --out grid.json --raw night1.json`, from `backend/`, 20 minutes apart), then run `python -m app.services.traffic --baseline night*.json --out app/data/speed_baseline.json`.
 
+The Terraform in `infra/` also runs `backend/traffic_profile.handler` each night (02:30 Singapore time), which builds typical traffic for every weekday and weekend 15-minute slot from the kept readings; the console asks for it (`/api/traffic/typical`) when no live reading covers a departure.
+
 Then set `VITE_TRAFFIC_URL` for the production build (in `frontend/.env.production`, or as a variable in `deploy.yml`) and redeploy the console. Until it is set, the console plans with free-flowing drive times and shows the Road speeds section as "Off".
 
-Cost: the LTA API is free; the schedule is about 8,600 short Lambda runs and S3 writes a month.
+Cost: the LTA API is free; the schedule is about 4,300 short Lambda runs a month, each writing the grid and a kept reading to S3, plus one nightly typical-traffic build.
 
 ## Still open
 

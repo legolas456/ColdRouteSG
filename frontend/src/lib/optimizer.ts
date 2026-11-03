@@ -338,5 +338,6 @@ export function optimise(
     elapsedMs: performance.now() - t0,
     highestRiskId,
     trafficAt: traffic ? traffic.at : null,
+    trafficKind: traffic ? (traffic.typical ? 'typical' : 'live') : null,
   }
 }

@@ -17,9 +17,9 @@ import { Timeline } from './components/Timeline'
 import { Button, Segmented, StatusPill } from './components/ui'
 import { DEPARTURE, DEPOT, PROFILES, RECORDED_AT, SAMPLE_STOPS } from './data/sample'
 import { AUTH_ENABLED, currentUser, signOutUser } from './lib/auth'
-import { camerasNear, liveConditions, recordedConditions, type Conditions, type DataMode } from './lib/conditions'
+import { camerasNear, liveConditions, recordedConditions, wantsTypical, type Conditions, type DataMode } from './lib/conditions'
 import { copyToast, HISTORY_ENABLED, onSessionExpired, plannedRun, reopenRun, saveRun, type SavedRun } from './lib/history'
-import { ensureLive, isLoading, refreshLive, sgMinutes, useLiveFeeds } from './lib/live'
+import { ensureLive, isLoading, refreshLive, sgMinutes, typicalTraffic, useLiveFeeds } from './lib/live'
 import { validDepot } from './lib/depot'
 import { optimise } from './lib/optimizer'
 import { MAX_STOPS } from './lib/places'
@@ -199,7 +199,12 @@ export default function App() {
       timers.current = []
       const conditions: Promise<Conditions> =
         dataMode === 'live'
-          ? ensureLive().then((f) => liveConditions(stops, f, sgMinutes(f.fetchedAt ?? Date.now()), departure))
+          ? ensureLive().then(async (f) => {
+              const now = sgMinutes(f.fetchedAt ?? Date.now())
+              // no live reading stands for this departure: the typical traffic of its slot may
+              const typical = wantsTypical(f.traffic, now, departure) ? await typicalTraffic(departure) : undefined
+              return liveConditions(stops, f, now, departure, typical)
+            })
           : Promise.resolve(recordedConditions(stops))
       // real drive times for stops outside the bundled snapshot (one OSRM call)
       const read = Promise.all([conditions, ensureMatrix([depot, ...stops])]).then(([c, roadsOk]): Conditions =>

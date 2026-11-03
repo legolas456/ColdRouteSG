@@ -30,15 +30,33 @@ variable "lta_account_key" {
 }
 
 variable "traffic_schedule" {
-  description = "How often the traffic refresh runs; LTA updates its speed bands every 5 minutes."
+  description = "How often the traffic refresh runs. LTA updates every 5 minutes, but a reading is 288 calls and the key's quota is about 3,000 calls an hour, so every 10 minutes (1,728 an hour) leaves room."
   type        = string
-  default     = "rate(5 minutes)"
+  default     = "rate(10 minutes)"
+}
+
+variable "traffic_refresh_enabled" {
+  description = "Run the traffic refresh on its schedule. Turn off to pause it, e.g. while LTA's call quota for the key is used up."
+  type        = bool
+  default     = true
+}
+
+variable "traffic_profile_schedule" {
+  description = "When typical traffic is rebuilt from the kept readings; the default is 02:30 Singapore time."
+  type        = string
+  default     = "cron(30 18 * * ? *)"
 }
 
 variable "traffic_key" {
   description = "S3 key of the published road-speed grid."
   type        = string
   default     = "traffic/speed-grid.json"
+}
+
+variable "traffic_history_days" {
+  description = "How long the kept LTA readings (the typical-traffic history) stay in S3."
+  type        = number
+  default     = 180
 }
 
 variable "extra_origins" {

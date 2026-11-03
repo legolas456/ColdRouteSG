@@ -58,6 +58,7 @@ describe('optimise with live road speeds', () => {
     expect(after.recommended.order).toEqual(before.recommended.order)
     expect(after.recommended.cost).toBe(before.recommended.cost)
     expect(after.trafficAt).toBeNull()
+    expect(after.trafficKind).toBeNull()
     for (const row of after.recommended.rows) {
       expect(row.trafficMinutes).toBe(0)
       expect(row.risk.T).toBe(0)
@@ -78,6 +79,14 @@ describe('optimise with live road speeds', () => {
       expect(row.legKm).toBe(freeRow.legKm)
     })
     expect(slow.trafficAt).toBe(8 * 60 + 30)
+    expect(slow.trafficKind).toBe('live')
+  })
+
+  it('records typical traffic as typical, timed at its slot', () => {
+    const typical = { ...cover(() => 1.5), at: 8 * 60 + 45, typical: { dayType: 'weekday' as const, slot: '0845', readings: 12, days: 4 } }
+    const r = optimise(depot, run, 540, driveOnly, [], typical)
+    expect(r.trafficKind).toBe('typical')
+    expect(r.trafficAt).toBe(8 * 60 + 45)
   })
 
   it('sends the fastest route west first when the roads east of the depot are jammed', () => {

@@ -36,3 +36,20 @@ resource "aws_s3_bucket_public_access_block" "traffic" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+# Every reading is kept (about 13 KB each, 288 a day) for the typical-traffic
+# profile; old ones expire. The stretch index they refer to does not.
+resource "aws_s3_bucket_lifecycle_configuration" "traffic" {
+  bucket = aws_s3_bucket.traffic.id
+
+  rule {
+    id     = "expire-traffic-history"
+    status = "Enabled"
+    filter {
+      prefix = "traffic/history/"
+    }
+    expiration {
+      days = var.traffic_history_days
+    }
+  }
+}
