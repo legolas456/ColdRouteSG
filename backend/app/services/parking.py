@@ -27,7 +27,7 @@ AGENCIES = ("URA", "LTA")
 
 def parse_carpark(row: dict[str, Any]) -> Optional[dict[str, Any]]:
     """A URA or LTA carpark's car lots, or None for HDB, other lot types and bad rows."""
-    if row.get("Agency") not in AGENCIES or row.get("LotType") != "C":
+    if not isinstance(row, dict) or row.get("Agency") not in AGENCIES or row.get("LotType") != "C":
         return None
     try:
         lat, lng = (float(x) for x in str(row.get("Location") or "").split())
@@ -57,7 +57,11 @@ async def fetch_carparks(account_key: str, client: httpx.AsyncClient) -> list[di
         if response.status_code >= 400 and b"QuotaViolation" in response.content:
             raise TrafficUnavailable("LTA DataMall's call quota for this AccountKey is used up; carparks return when it resets.")
         response.raise_for_status()
-        value = response.json().get("value")
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise TrafficUnavailable("LTA DataMall returned a carpark page that is not JSON.") from exc
+        value = body.get("value") if isinstance(body, dict) else None
         if not isinstance(value, list):
             raise TrafficUnavailable("LTA DataMall returned an unexpected carpark response.")
         rows.extend(value)
@@ -77,13 +81,16 @@ def carpark_feed(rows: list[dict[str, Any]], fetched_at: datetime) -> dict[str, 
 
 
 def publish_carparks(s3: Any, bucket: str, feed: dict[str, Any]) -> None:
-    s3.put_object(
-        Bucket=bucket,
-        Key=PARKING_KEY,
-        Body=json.dumps(feed, separators=(",", ":")).encode("utf-8"),
-        ContentType="application/json",
-        CacheControl="public, max-age=60",
-    )
+    try:
+        s3.put_object(
+            Bucket=bucket,
+            Key=PARKING_KEY,
+            Body=json.dumps(feed, separators=(",", ":")).encode("utf-8"),
+            ContentType="application/json",
+            CacheControl="public, max-age=60",
+        )
+    except Exception as exc:  # noqa: BLE001 - S3 refused it; the previous feed stays
+        raise TrafficUnavailable(f"The carparks could not be published ({exc.__class__.__name__}).") from exc
 
 
 def read_published_carparks(s3: Any, bucket: str) -> dict[str, Any]:

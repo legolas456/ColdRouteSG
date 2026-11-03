@@ -108,12 +108,37 @@ export function plannedRun(input: {
   }
 }
 
+export const LEGACY_RUN = 'This run was saved by the older planner, so it can only be listed here, not reopened'
+
+/**
+ * Only runs saved by this console can be reopened: plans from the older
+ * /api/routes/optimize endpoint share the table but have no windows, cargo or
+ * profile.
+ */
+export function canReopen(saved: SavedRun): boolean {
+  const r = saved.request as Partial<SavedRun['request']> | undefined
+  return Boolean(
+    r?.departure_time &&
+      r.profile &&
+      r.depot &&
+      Array.isArray(r.stops) &&
+      r.stops.every((s) => s.window_start && s.window_end && s.cargo && typeof s.service_minutes === 'number'),
+  )
+}
+
+/** What "Make a copy" says: a copy is a draft until it is optimised. */
+export const copyToast = (savesOnOptimise: boolean) =>
+  savesOnOptimise
+    ? 'Copy made · it is saved to your runs when you optimise it'
+    : 'Copy made · you can edit it now'
+
 /**
  * A saved run back as the console's own depot and stops. The sample's stops keep
  * their recorded details; any other stop gets its forecast area and nearest
  * carpark again, as when it was first added.
  */
 export async function reopenRun(saved: SavedRun): Promise<{ depot: Depot; stops: Stop[]; departure: number; profile: ProfileId }> {
+  if (!canReopen(saved)) throw new Error(LEGACY_RUN)
   const r = saved.request
   const departure = parseHm(r.departure_time)
   const sameSpot = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6
