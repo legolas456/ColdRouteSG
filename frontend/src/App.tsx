@@ -18,7 +18,7 @@ import { Button, Segmented, StatusPill } from './components/ui'
 import { DEPARTURE, DEPOT, PROFILES, RECORDED_AT, SAMPLE_STOPS } from './data/sample'
 import { AUTH_ENABLED, currentUser, signOutUser } from './lib/auth'
 import { camerasNear, liveConditions, recordedConditions, wantsTypical, type Conditions, type DataMode } from './lib/conditions'
-import { HISTORY_ENABLED, plannedRun, reopenRun, saveRun, type SavedRun } from './lib/history'
+import { copyToast, HISTORY_ENABLED, plannedRun, reopenRun, saveRun, type SavedRun } from './lib/history'
 import { ensureLive, isLoading, refreshLive, sgMinutes, typicalTraffic, useLiveFeeds } from './lib/live'
 import { validDepot } from './lib/depot'
 import { optimise } from './lib/optimizer'
@@ -342,7 +342,7 @@ export default function App() {
     const url = new URL(location.href)
     for (const k of ['share', 'view', 'stop']) url.searchParams.delete(k)
     history.replaceState(null, '', url)
-    setToast('Saved to your runs as “Morning run (copy)” · you can edit it now')
+    setToast(copyToast(HISTORY_ENABLED && userRef.current?.account === 'cognito'))
   }
 
   const selectedStop = selectedId ? stopById[selectedId] : null
@@ -503,11 +503,22 @@ export default function App() {
 
   // a saved run comes back as a draft: its stops and times, planned again on today's data
   const openSavedRun = async (run: SavedRun) => {
-    const saved = await reopenRun(run)
+    let saved: Awaited<ReturnType<typeof reopenRun>>
+    try {
+      saved = await reopenRun(run)
+    } catch (e) {
+      setToast((e as Error).message)
+      return
+    }
     timers.current.forEach(clearTimeout)
     runToken.current++
+    // opened from a shared link: it becomes the user's own editable run
+    setReadOnly(false)
+    const url = new URL(location.href)
+    for (const k of ['share', 'view', 'stop']) url.searchParams.delete(k)
+    history.replaceState(null, '', url)
     setSavedDepot(saved.depot)
-    setStops(saved.stops)
+    setSavedStops(saved.stops)
     setDeparture(saved.departure)
     setProfile(saved.profile)
     setSelectedId(null)
