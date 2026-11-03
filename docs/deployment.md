@@ -67,13 +67,13 @@ There was no CI before October 2026. There were no workflows, no `amplify.yml` a
 
 Live road speeds need an LTA DataMall AccountKey, which must never reach the browser or the repo. Two ways to serve the grid the console reads (`VITE_TRAFFIC_URL`), both in `ap-southeast-1`:
 
-| | Scheduled grid (planned) | On request (simplest) |
+| | Scheduled grid (what `infra/` runs) | On request (simplest) |
 | --- | --- | --- |
 | Runs | `backend/traffic_refresh.handler` as a Lambda, triggered by an EventBridge schedule `rate(10 minutes)` (a reading is 288 calls of the key's roughly 3,000 an hour) | The existing FastAPI Lambda (`backend/lambda_handler.py`), route `GET /api/traffic/grid` |
 | Environment | `LTA_ACCOUNT_KEY`, `TRAFFIC_BUCKET`, optionally `TRAFFIC_KEY` (default `traffic/speed-grid.json`) | `LTA_ACCOUNT_KEY` |
-| Permissions | `s3:PutObject` on the grid's key | none beyond the function's own |
-| Console reads | the S3 object (public read, or through CloudFront), with bucket CORS allowing the console's origin | the API route, which must not need a sign-in token (it is public data) and must allow the console's origin in CORS |
-| Timeout | 60 s (it reads 288 LTA pages, 16 at a time with retries: 3–6 s on 27 Oct 2026, up to 30 s seen with 8 at a time) | 30 s at API Gateway; the first request after a cold start does the same reading, so a slow LTA can time it out |
+| Permissions | `s3:PutObject` on the grid's key, on `traffic/history/*` and `traffic/history-index/*` (every reading kept, and the stretch index they refer to) and on `parking/carparks.json` | none beyond the function's own |
+| Console reads | the API route `GET /api/traffic/grid`, whose Lambda reads the private S3 object | the API route, which must not need a sign-in token (it is public data) and must allow the console's origin in CORS |
+| Timeout | 90 s (it reads 288 LTA pages, 16 at a time with retries: 3–6 s on 27 Oct 2026, up to 30 s seen with 8 at a time) | 30 s at API Gateway; the first request after a cold start does the same reading, so a slow LTA can time it out |
 
 Both need `backend/app/data/speed_baseline.json` in the package: each road stretch's speed at night, which the delay factors are measured against. Without it every stretch falls back to one speed per road category, which reads junctions and bends as traffic; the grid then reports `"nightShare": 0`. To rebuild it, save a few raw readings between 2 and 5 am (`python -m app.services.traffic --out grid.json --raw night1.json`, from `backend/`, 20 minutes apart), then run `python -m app.services.traffic --baseline night*.json --out app/data/speed_baseline.json`.
 

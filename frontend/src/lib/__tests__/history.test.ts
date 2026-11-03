@@ -132,6 +132,20 @@ describe('the history API', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('lists runs a page at a time, older ones after the last of the page', async () => {
+    const { listRuns } = await load()
+    signedIn()
+    const route = (id: string) => ({ route_id: id }) as unknown as SavedRun
+    const fetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ routes: [route('b'), route('a#+1')], next: 'a#+1' })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ routes: [route('0')], next: null })))
+    expect(await listRuns(2)).toEqual({ runs: [route('b'), route('a#+1')], next: 'a#+1' })
+    // the cursor is a route id, so it is encoded
+    expect(await listRuns(2, 'a#+1')).toEqual({ runs: [route('0')], next: null })
+    expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([`${API}/api/routes/history?limit=2`, `${API}/api/routes/history?limit=2&after=a%23%2B1`])
+  })
+
   it('encodes route ids, which hold # and +', async () => {
     const { deleteRun } = await load()
     signedIn()

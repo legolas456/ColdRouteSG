@@ -37,8 +37,9 @@ resource "aws_s3_bucket_public_access_block" "traffic" {
   restrict_public_buckets = true
 }
 
-# Every reading is kept (about 13 KB each, 288 a day) for the typical-traffic
-# profile; old ones expire. The stretch index they refer to does not.
+# Every reading is kept (about 13 KB each, 144 a day at the 10-minute
+# schedule) for the typical-traffic profile; old ones expire. The stretch
+# index they refer to does not.
 resource "aws_s3_bucket_lifecycle_configuration" "traffic" {
   bucket = aws_s3_bucket.traffic.id
 

@@ -258,7 +258,7 @@ resource "aws_lambda_function" "profile" {
   filename      = local.lambda_zip
   # changes when the package's sources do; the package is built during apply (build.tf)
   source_code_hash = local.backend_package_hash
-  # four weeks of readings: about 8,000 small files, read 16 at a time
+  # four weeks of readings: about 4,000 small files (144 a day), read 16 at a time
   memory_size = 1024
   timeout     = 600
 

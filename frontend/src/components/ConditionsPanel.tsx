@@ -2,9 +2,9 @@ import clsx from 'clsx'
 import { Cctv, CloudRain, CloudSun, Gauge, Loader2, Maximize2, RefreshCw, SquareParking, TriangleAlert, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { RECORDED_AT, RECORDED_DATE } from '../data/sample'
-import { camerasNear, freshLtaCarparks, MAX_WALK_KM, type Conditions, type DataMode } from '../lib/conditions'
+import { camerasNear, freshLtaCarparks, liveCarparks, liveParkingFor, lotsLabel, MAX_WALK_KM, parkingSource, type Conditions, type DataMode } from '../lib/conditions'
 import { nearest } from '../lib/geo'
-import { isLoading, sgMinutes, TRAFFIC_URL, type Camera, type Feed, type LiveFeeds } from '../lib/live'
+import { isLoading, PARKING_URL, sgMinutes, TRAFFIC_URL, type Camera, type Feed, type LiveFeeds } from '../lib/live'
 import { hm } from '../lib/time'
 import { SLOW_FACTOR } from '../lib/traffic'
 import type { Stop } from '../lib/types'
@@ -159,7 +159,8 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
       )}
       <div className="space-y-2 px-3 pb-3">
         <WeatherSection feed={feeds.weather} stops={stops} />
-        <ParkingSection feed={feeds.carparks} lta={feeds.ltaCarparks} ltaFresh={freshLtaCarparks(feeds) !== null} stops={stops} />
+        <ParkingSection feeds={feeds} stops={stops} />
+        <LtaParkingSection feeds={feeds} />
         <RoadSpeedSection feed={feeds.traffic} use={conditions.traffic ? (typical ? 'typical' : 'live') : null} />
         <CameraSection feed={feeds.cameras} stops={stops} onView={onViewCamera} />
       </div>
@@ -293,11 +294,16 @@ function WeatherSection({ feed, stops }: { feed: LiveFeeds['weather']; stops: St
   )
 }
 
-function ParkingSection({ feed, lta, ltaFresh, stops }: { feed: LiveFeeds['carparks']; lta: LiveFeeds['ltaCarparks']; ltaFresh: boolean; stops: Stop[] }) {
-  const c = feed.data
-  const atStops = useMemo(() => (c ? stops.map((s) => ({ stop: s, ...nearest(c.carparks, s)! })).filter((r) => r.item) : []), [c, stops])
+/**
+ * HDB's free lots, and each stop's carpark as a live plan would choose it: the
+ * nearest HDB or (fresh) URA or mall carpark within walking distance.
+ */
+function ParkingSection({ feeds, stops }: { feeds: LiveFeeds; stops: Stop[] }) {
+  const c = feeds.carparks.data
+  const parks = useMemo(() => liveCarparks(feeds), [feeds])
+  const atStops = useMemo(() => stops.map((stop) => ({ stop, park: liveParkingFor(stop, parks) })), [stops, parks])
   return (
-    <Section icon={SquareParking} title="Carparks" source="HDB availability" feed={feed} updated={c?.updated}>
+    <Section icon={SquareParking} title="Carparks" source="HDB availability" feed={feeds.carparks} updated={c?.updated}>
       {c && (
         <>
           <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-md bg-line">
@@ -305,53 +311,82 @@ function ParkingSection({ feed, lta, ltaFresh, stops }: { feed: LiveFeeds['carpa
             <Stat label="Free lots" value={fmt(c.freeLots)} />
             <Stat label="Free" value={`${((c.freeLots / c.totalLots) * 100).toFixed(1)}%`} />
           </dl>
-          {lta?.data && lta.data.carparks.length > 0 && (
-            <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
-              {ltaFresh ? (
-                <>
-                  Plus <span className="num">{fmt(lta.data.carparks.length)}</span> URA and mall carparks with{' '}
-                  <span className="num">{fmt(lta.data.carparks.reduce((sum, p) => sum + p.free, 0))}</span> free lots (LTA,{' '}
-                  <span className="num">{hm(lta.data.updated)}</span>). A stop uses whichever carpark is nearest.
-                </>
-              ) : (
-                <>
-                  LTA&apos;s URA and mall carparks are from <span className="num">{hm(lta.data.updated)}</span>, too old to use, so stops use the HDB
-                  carparks.
-                </>
-              )}
-            </p>
-          )}
           {atStops.length > 0 && (
             <>
-              <div className="mt-2 text-[11px] text-fg-3">Nearest HDB carpark to each stop</div>
+              <div className="mt-2 text-[11px] text-fg-3">Nearest carpark to each stop</div>
               <ul className="mt-1 space-y-0.5">
-                {atStops.map(({ stop, item, km }) => {
-                  const pct = Math.round((item.free / item.total) * 100)
-                  const far = km > MAX_WALK_KM
-                  return (
-                    <li
-                      key={stop.id}
-                      className={clsx('grid grid-cols-[minmax(0,88px)_1fr_auto] items-baseline gap-2 text-[11.5px]', far && 'text-fg-4')}
-                      title={far ? `${item.address}: over ${MAX_WALK_KM * 1000} m away, so the plan keeps the stop's own loading bay` : item.address}
-                    >
-                      <span className="truncate font-medium">{stop.short}</span>
-                      <span className={clsx('truncate', !far && 'text-fg-3')}>
-                        <span className="num">{item.no}</span> · {distanceLabel(km)}
-                      </span>
-                      {far ? (
-                        <span>own loading bay</span>
+                {atStops.map(({ stop, park }) => (
+                  <li
+                    key={stop.id}
+                    className={clsx('grid grid-cols-[minmax(0,88px)_1fr_auto] items-baseline gap-2 text-[11.5px]', !park && 'text-fg-4')}
+                    title={
+                      park
+                        ? `${park.name} · ${parkingSource(park)}`
+                        : `No live carpark within ${MAX_WALK_KM * 1000} m, so the plan keeps the stop's own loading bay`
+                    }
+                  >
+                    <span className="truncate font-medium">{stop.short}</span>
+                    <span className={clsx('truncate', park && 'text-fg-3')}>
+                      {park ? (
+                        <>
+                          <span className="num">{park.code}</span> · {distanceLabel(park.distanceKm)}
+                        </>
                       ) : (
-                        <span className={clsx('num', pct < 15 ? 'text-bad' : 'text-fg-2')}>
-                          {item.free}/{item.total} free
-                        </span>
+                        `none within ${MAX_WALK_KM * 1000} m`
                       )}
-                    </li>
-                  )
-                })}
+                    </span>
+                    {park ? (
+                      <span className={clsx('num', park.freePct < 15 ? 'text-bad' : 'text-fg-2')}>{lotsLabel(park)}</span>
+                    ) : (
+                      <span>own loading bay</span>
+                    )}
+                  </li>
+                ))}
               </ul>
             </>
           )}
         </>
+      )}
+    </Section>
+  )
+}
+
+/** LTA's URA and mall carparks, with a status of their own: they load, fail and age apart from HDB's. */
+function LtaParkingSection({ feeds }: { feeds: LiveFeeds }) {
+  const feed = feeds.ltaCarparks ?? { status: 'idle' }
+  const lta = feed.data
+  const fresh = freshLtaCarparks(feeds) !== null
+  return (
+    <Section
+      icon={SquareParking}
+      title="URA and mall carparks"
+      source="LTA DataMall"
+      feed={feed}
+      updated={lta?.updated}
+      failed={(error) => (
+        <p className="text-[12px] leading-relaxed text-fg-3">
+          {error?.endsWith('.') ? error : `The ColdRoute API did not answer (${error ?? 'no response'}).`} Stops use the HDB carparks.
+        </p>
+      )}
+      off={
+        PARKING_URL ? undefined : (
+          <p className="text-[12px] leading-relaxed text-fg-3">Not set up: these lots need the ColdRoute API, which holds the LTA key. Stops use the HDB carparks.</p>
+        )
+      }
+    >
+      {lta && (
+        <p className="text-[12px] leading-relaxed text-fg-2">
+          {fresh ? (
+            <>
+              <span className="num">{fmt(lta.carparks.length)}</span> carparks with <span className="num">{fmt(lta.carparks.reduce((sum, p) => sum + p.free, 0))}</span>{' '}
+              free lots. A stop uses whichever carpark is nearest, HDB or not.
+            </>
+          ) : (
+            <>
+              From <span className="num">{hm(lta.updated)}</span>, too old to use, so stops use the HDB carparks.
+            </>
+          )}
+        </p>
       )}
     </Section>
   )

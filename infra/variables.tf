@@ -78,7 +78,7 @@ variable "self_sign_up" {
 }
 
 variable "protect_data" {
-  description = "Deletion protection for the user pool and route history, and keep the traffic bucket on destroy. Turn on for the team's real stack."
+  description = "Deletion protection for the user pool and route history, and keep the traffic bucket on destroy while it holds objects. It protects the data: destroy still removes everything else. Turn on for the team's real stack."
   type        = bool
   default     = false
 }

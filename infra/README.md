@@ -34,9 +34,11 @@ terraform init
 terraform apply
 ```
 
+The commands in the rest of this page run in `infra/` too.
+
 That is the whole deploy. Apply creates the resources, packages `backend/` for the Lambda functions (`build-lambda.sh`) and `planner/` for the planner (`build-planner.sh`), builds the console with this stack's API and Cognito settings and uploads it to Amplify (`scripts/deploy-frontend.sh`). `terraform output` then lists the console URL, the API URL and the Cognito IDs.
 
-For the team's real stack, set `protect_data = true`: deletion protection on the user pool and route history, point-in-time recovery for the table, and the bucket is kept on destroy.
+For the team's real stack, set `protect_data = true`: deletion protection on the user pool and route history, point-in-time recovery for the table, and a bucket that holds objects is not deleted. It keeps the data, not the stack: `terraform destroy` still removes everything else before it stops at those.
 
 ### Publish the first traffic grid
 
@@ -87,7 +89,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "$API/api/admin/me"
 ## Update and remove
 
 - Code change: `terraform apply` again. It rebuilds only what changed: the Lambda package (and every function) when a backend source changes, the console when a frontend source or one of its settings changes. With nothing changed it reports "No changes"; test files and Python caches never count as changes.
-- Remove everything: `terraform destroy` (refused for the user pool and table while `protect_data = true`).
+- Remove everything: `terraform destroy`. With `protect_data = true` it removes the rest and then stops at the user pool, the route-history table and the traffic bucket (while it holds readings); set it to `false` and apply first to remove those too.
 
 ## Things to know
 

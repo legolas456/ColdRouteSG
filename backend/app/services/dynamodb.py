@@ -140,13 +140,30 @@ def save_route_history(
     return str(item["route_id"])
 
 
+def route_history_page(user_id: str, limit: int = 50, after: str | None = None) -> tuple[list[dict[str, Any]], str | None]:
+    """A page of the user's runs, newest first, and the route id the next page starts after (None on the last).
+
+    One more run than `limit` is read, so a page that ends with the oldest run
+    offers no empty page after it. The cursor is only a route id: the partition
+    is always the caller's own.
+    """
+    query: dict[str, Any] = {
+        "KeyConditionExpression": Key("user_id").eq(user_id),
+        "ScanIndexForward": False,
+        "Limit": limit + 1,
+    }
+    if after:
+        query["ExclusiveStartKey"] = {"user_id": user_id, "route_id": after}
+    response = _table().query(**query)
+    items = response.get("Items", [])
+    page = items[:limit]
+    # more than a page, or DynamoDB stopped early (a 1 MB response)
+    more = bool(page) and (len(items) > limit or bool(response.get("LastEvaluatedKey")))
+    return [_json_safe(item) for item in page], (str(page[-1]["route_id"]) if more else None)
+
+
 def list_route_history(user_id: str, limit: int = 50) -> list[dict[str, Any]]:
-    response = _table().query(
-        KeyConditionExpression=Key("user_id").eq(user_id),
-        ScanIndexForward=False,
-        Limit=limit,
-    )
-    return [_json_safe(item) for item in response.get("Items", [])]
+    return route_history_page(user_id, limit)[0]
 
 
 def get_route_history_item(user_id: str, route_id: str) -> dict[str, Any] | None:
