@@ -158,7 +158,11 @@ export async function reopenRun(saved: SavedRun): Promise<{ depot: Depot; stops:
 export const saveRun = (run: PlannedRun) =>
   api<{ route_id: string }>('/api/routes/history', { method: 'POST', body: JSON.stringify(run) }).then((r) => r.route_id)
 
-export const listRuns = (limit = 20) => api<{ routes: SavedRun[] }>(`/api/routes/history?limit=${limit}`).then((r) => r.routes)
+/** A page of the user's runs, newest first, and the `after` for the next page (null on the last). */
+export const listRuns = (limit = 20, after?: string) =>
+  api<{ routes: SavedRun[]; next?: string | null }>(`/api/routes/history?limit=${limit}${after ? `&after=${encodeURIComponent(after)}` : ''}`).then(
+    (r) => ({ runs: r.routes, next: r.next ?? null }),
+  )
 
 export const deleteRun = (routeId: string) => api<void>(`/api/routes/history/${encodeURIComponent(routeId)}`, { method: 'DELETE' })
 

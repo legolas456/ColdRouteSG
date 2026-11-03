@@ -8,6 +8,7 @@ import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 from botocore.exceptions import ClientError
@@ -29,12 +30,20 @@ class FakeTable:
     def put_item(self, Item):
         self.items[(Item["user_id"], Item["route_id"])] = Item
 
-    def query(self, KeyConditionExpression, ScanIndexForward=True, Limit=None):
+    def query(self, KeyConditionExpression, ScanIndexForward=True, Limit=None, ExclusiveStartKey=None):
+        """As DynamoDB pages a query: from after ExclusiveStartKey, and a LastEvaluatedKey whenever Limit is reached."""
         user_id = KeyConditionExpression.get_expression()["values"][1]
         rows = sorted((v for (u, _), v in self.items.items() if u == user_id), key=lambda i: i["route_id"])
         if not ScanIndexForward:
             rows.reverse()
-        return {"Items": rows[:Limit]}
+        if ExclusiveStartKey:
+            assert ExclusiveStartKey["user_id"] == user_id
+            ids = [r["route_id"] for r in rows]
+            start = ExclusiveStartKey["route_id"]
+            rows = rows[ids.index(start) + 1 :] if start in ids else [r for r in rows if (r["route_id"] < start) != ScanIndexForward]
+        page = rows[:Limit] if Limit else rows
+        last = {"LastEvaluatedKey": {"user_id": user_id, "route_id": page[-1]["route_id"]}} if Limit and len(page) == Limit else {}
+        return {"Items": page, **last}
 
     def get_item(self, Key):
         item = self.items.get((Key["user_id"], Key["route_id"]))
@@ -167,8 +176,29 @@ def test_a_user_lists_reopens_and_deletes_only_their_own_runs(table):
     # another driver's run is not found, rather than forbidden: its existence is not revealed
     assert call("GET", f"/api/routes/history/{first['route_id']}", OTHER)[0] == 404
 
+    # nor can another driver delete it: the delete only ever looks in their own runs
+    call("DELETE", f"/api/routes/history/{first['route_id']}", OTHER)
+    assert call("GET", f"/api/routes/history/{first['route_id']}", DRIVER)[0] == 200
+
     assert call("DELETE", f"/api/routes/history/{first['route_id']}", DRIVER)[0] == 204
     assert [r["route_id"] for r in call("GET", "/api/routes/history", DRIVER)[1]["routes"]] == [second["route_id"]]
+
+
+def test_runs_come_a_page_at_a_time(table):
+    ids = [call("POST", "/api/routes/history", DRIVER, run())[1]["route_id"] for _ in range(5)]
+    call("POST", "/api/routes/history", OTHER, run())
+    newest_first = ids[::-1]
+
+    _, page = call("GET", "/api/routes/history", DRIVER, query="limit=2")
+    assert [r["route_id"] for r in page["routes"]] == newest_first[:2] and page["next"] == newest_first[1]
+    _, page = call("GET", "/api/routes/history", DRIVER, query=f"limit=2&after={quote(page['next'], safe='')}")
+    assert [r["route_id"] for r in page["routes"]] == newest_first[2:4]
+    _, page = call("GET", "/api/routes/history", DRIVER, query=f"limit=2&after={quote(page['next'], safe='')}")
+    # the last page offers no empty one after it, and another driver's run never shows
+    assert [r["route_id"] for r in page["routes"]] == newest_first[4:] and page["next"] is None
+    # a page that ends exactly with the oldest run
+    _, page = call("GET", "/api/routes/history", DRIVER, query="limit=5")
+    assert len(page["routes"]) == 5 and page["next"] is None
 
 
 def test_without_verified_claims_nothing_is_read_or_saved(table):

@@ -8,7 +8,7 @@ from app.services.dynamodb import (
     delete_route_history_item,
     get_route_history_item,
     is_aws_storage_error,
-    list_route_history,
+    route_history_page,
     save_planned_run,
     save_route_history,
 )
@@ -60,11 +60,15 @@ def save_planned(payload: PlannedRun, request: Request):
 
 
 @router.get("/history")
-def history(request: Request, limit: int = Query(50, ge=1, le=100)):
+def history(
+    request: Request,
+    limit: int = Query(50, ge=1, le=100),
+    after: str | None = Query(None, max_length=200, description="The `next` of the previous page"),
+):
     current_user = get_current_user(request)
 
     try:
-        items = list_route_history(current_user["user_id"], limit=limit)
+        items, next_after = route_history_page(current_user["user_id"], limit=limit, after=after)
     except Exception as exc:
         if not is_aws_storage_error(exc):
             raise
@@ -74,7 +78,7 @@ def history(request: Request, limit: int = Query(50, ge=1, le=100)):
             detail="Route history is temporarily unavailable.",
         ) from exc
 
-    return {"routes": items, "count": len(items)}
+    return {"routes": items, "count": len(items), "next": next_after}
 
 
 @router.get("/history/{route_id}")

@@ -60,6 +60,9 @@ function Status({ error, onRetry }: { error: string | null; onRetry: () => void 
 /** The signed-in user's saved runs, newest first: reopen one, or delete it. */
 export function RunsDialog({ onClose, onOpen }: { onClose: () => void; onOpen: (run: SavedRun) => Promise<void> }) {
   const [runs, setRuns] = useState<SavedRun[] | null>(null)
+  // where the next page of older runs starts; null when there are no more
+  const [next, setNext] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -68,9 +71,18 @@ export function RunsDialog({ onClose, onOpen }: { onClose: () => void; onOpen: (
     setError(null)
     setRuns(null)
     listRuns(20)
-      .then(setRuns)
+      .then((page) => (setRuns(page.runs), setNext(page.next)))
       .catch((e: Error) => setError(e.message))
   }, [])
+
+  const loadMore = () => {
+    if (!next) return
+    setLoadingMore(true)
+    listRuns(20, next)
+      .then((page) => (setRuns((rs) => [...(rs ?? []), ...page.runs]), setNext(page.next)))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoadingMore(false))
+  }
   useEffect(() => load(), [load])
 
   const remove = (id: string) => {
@@ -130,6 +142,13 @@ export function RunsDialog({ onClose, onOpen }: { onClose: () => void; onOpen: (
               </li>
             )
           })}
+          {next && (
+            <li className="flex justify-center px-2 pt-2">
+              <Button size="sm" disabled={loadingMore} onClick={loadMore}>
+                {loadingMore ? <Loader2 size={13} className="animate-spin" /> : 'Show older runs'}
+              </Button>
+            </li>
+          )}
         </ul>
       )}
     </Dialog>
