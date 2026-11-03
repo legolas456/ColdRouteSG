@@ -6,7 +6,7 @@ The whole AWS stack as code, so anyone can create it in their own account, and t
 | --- | --- |
 | Console | Amplify Hosting app `coldroute-console`, branch `main`, uploaded by `scripts/deploy-frontend.sh` (no Git connection, as before) |
 | Sign-in | Cognito user pool (email sign-in, an admin creates users), console app client without a secret, `admin` group |
-| API | API Gateway HTTP API. `GET/POST/DELETE /api/routes/*` and `GET /api/admin/*` need a Cognito token, which API Gateway checks before Lambda runs; everything else (public data, `/api/traffic/grid`, `/api/health`) is open. All of it goes to the FastAPI Lambda `coldroute-api` (Python 3.12). CORS allows the console and `extra_origins`. |
+| API | API Gateway HTTP API. It fails closed: every request needs a Cognito token, which API Gateway checks before Lambda runs, except the public reads (`GET /`, `/api/health`, `/api/data/*`, `/api/traffic/*`) and the browser's `OPTIONS` preflight. All of it goes to the FastAPI Lambda `coldroute-api` (Python 3.12). CORS allows the console and `extra_origins`. |
 | Route history | DynamoDB `coldroute-route-history`, key `user_id` + `route_id`, on demand |
 | Live traffic | EventBridge every 5 minutes, then Lambda `coldroute-traffic-refresh`, which reads LTA and writes the road-speed grid to the private S3 bucket `coldroute-traffic-<account>`. The API serves it at `/api/traffic/grid`. Only created when an LTA key is given. |
 | Monitoring | Log groups with 14-day retention (both functions, API access log), CloudWatch dashboard `coldroute` (API latency p50/p95, requests, errors, the traffic refresh), optional monthly budget alert |
@@ -77,6 +77,7 @@ API=$(terraform output -raw api_url)
 curl -s "$API/api/health"                                   # 200
 curl -s "$API/api/traffic/grid" | head -c 200               # the grid, once published
 curl -s -X POST "$API/api/routes/optimize"                  # 401 {"message":"Unauthorized"}
+curl -s "$API/anything-else"                                # 401 too: no route is public by default
 ```
 
 With a token (the console client allows password sign-in for scripts):
