@@ -5,7 +5,7 @@ ColdRoute SG is a local-first prototype for **cold-chain delivery optimisation i
 Project background, the preliminary proposal, product design, brand and to-dos are in [`docs/`](docs/README.md).
 New to the team? Start with [`docs/contributing.md`](docs/contributing.md): which demo to use, what's real or mocked, local setup and a safe first PR.
 
-**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify; GitHub Actions redeploys it on every merge to `main`, see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. **Live data** (top bar) plans with the live NEA forecast and HDB carpark availability from data.gov.sg; the default **Recorded** mode replays a rainy sample morning. Stops come from a real OneMap address search, with OSRM drive times and roads. Live traffic comes from LTA road speeds when the traffic service is running (see [Live traffic](#live-traffic-lta-traffic-speed-bands)); otherwise drive times assume free-flowing traffic and the app says so. Accounts are mocked, and the optimiser runs in the browser.
+**Live demo:** https://main.daledp6z7ncmz.amplifyapp.com/ (the dispatcher console on AWS Amplify; GitHub Actions redeploys it on every merge to `main`, see [`docs/deployment.md`](docs/deployment.md)). The road geometry is real OSRM data. **Live data** (top bar) plans with the live NEA forecast and HDB carpark availability from data.gov.sg; the default **Recorded** mode replays a rainy sample morning. Stops come from a real OneMap address search, with OSRM drive times and roads. Live traffic comes from LTA road speeds when the traffic service is running (see [Live traffic](#live-traffic-lta-traffic-speed-bands)); otherwise drive times assume free-flowing traffic and the app says so. Sign-in uses Cognito accounts that an admin creates, and every plan a signed-in user makes is saved to their route history in DynamoDB; the optimiser runs in the browser.
 
 The app does **not require any API key or registration** to run locally. Live road speeds are optional and need a free LTA DataMall AccountKey on the backend.
 
@@ -162,7 +162,7 @@ Open:
 
 `http://localhost:5173`
 
-The console runs on its own. It uses OneMap search, OSRM (a bundled snapshot for the sample run, live calls for new stops), live data.gov.sg feeds read straight from the browser (or the recorded sample morning) and an in-browser optimiser, so the backend is optional for the demo. `VITE_API_BASE_URL` (in `.env.production`) is kept for when the UI switches to the FastAPI endpoints. Try `?state=results` (open on the plan), `?data=live` (live feeds) or `?theme=dark`.
+The console runs on its own. It uses OneMap search, OSRM (a bundled snapshot for the sample run, live calls for new stops), live data.gov.sg feeds read straight from the browser (or the recorded sample morning) and an in-browser optimiser, so the backend is optional for the demo. Without `VITE_API_BASE_URL` and the `VITE_COGNITO_*` settings there is only the demo account and nothing is saved; with them (set by `infra/`, see [`infra/README.md`](infra/README.md)), sign-in is real and plans go to the route history. Try `?state=results` (open on the plan), `?data=live` (live feeds) or `?theme=dark`.
 
 ## 3. Optional convenience launchers
 
@@ -337,23 +337,18 @@ pytest
 
 # AWS status
 
-The frontend is on **Amplify Hosting**, deployed by GitHub Actions on every merge to `main` (see [`docs/deployment.md`](docs/deployment.md)). An earlier API Gateway + Lambda copy of the backend (`backend/lambda_handler.py`) runs in a teammate's account, but the new console doesn't call it. There is no:
+[`infra/`](infra/README.md) creates the whole stack with Terraform:
 
-- DynamoDB
-- Cognito
-- S3
-- EventBridge
-
-A later cloud version can map the local components as follows:
-
-| Local component | Later AWS equivalent |
+| Part | On AWS |
 |---|---|
-| FastAPI | ECS/Fargate or Lambda + Mangum |
-| In-memory/cache calls | DynamoDB / ElastiCache if needed |
-| Scheduled public-data refresh | EventBridge + Lambda |
-| React/Vite | Amplify Hosting or S3 + CloudFront |
-| User accounts | Cognito |
-| Logs | CloudWatch |
+| Console (React/Vite) | Amplify Hosting (see [`docs/deployment.md`](docs/deployment.md)) |
+| Sign-in | Cognito user pool, invite-only; the `admin` group also sees the team's activity |
+| API | API Gateway HTTP API, which checks the Cognito token, in front of FastAPI on Lambda (Mangum) |
+| Saved runs | DynamoDB route history, keyed by the signed-in user |
+| Live traffic | EventBridge runs a Lambda that publishes the LTA road-speed grid to S3 |
+| Logs and metrics | CloudWatch, with a dashboard |
+
+An earlier, hand-made copy of the backend (`backend/lambda_handler.py`) runs in a teammate's account; the console does not use it.
 
 # Notes for the report
 
