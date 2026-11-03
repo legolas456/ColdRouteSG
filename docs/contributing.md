@@ -4,7 +4,7 @@ ColdRoute SG is the CS5224 Cloud Computing Group 36 prototype for planning tempe
 
 ## Which website should I use?
 
-Use **[the current dispatcher console](https://main.daledp6z7ncmz.amplifyapp.com/)**. It is built from `frontend/` on `main`, and GitHub Actions uploads new frontend builds to AWS Amplify.
+Use **[the current dispatcher console](https://main.d1f8mppryelp5v.amplifyapp.com/)**. It is built from `frontend/` on `main` and deployed with the AWS stack by `terraform apply` (`infra/`).
 
 The [older site with `production` in its address](https://production.d3afn54umnn6ms.amplifyapp.com/) is the pre-redesign demo. Its branch name does not make it the current release. Do not judge the current code against that UI. Deployment history and ownership are in [deployment.md](deployment.md).
 
