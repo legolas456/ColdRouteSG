@@ -6,27 +6,29 @@ How the live demo gets to AWS, where the keys are, and how to change it.
 
 | | |
 | --- | --- |
-| URL | https://main.daledp6z7ncmz.amplifyapp.com/ (keep the `.com`) |
-| What | The dispatcher console from `frontend/` on `main` (static build, no backend calls) |
-| Host | AWS Amplify Hosting, app `coldroute-sg` (`daledp6z7ncmz`), branch `main`, region `ap-southeast-1` |
-| AWS account | `hxk123123123` (`768396624500`), Xuankun's account on the AWS Free plan |
-| How | **GitHub Actions.** Merging to `main` builds `frontend/` and uploads it to Amplify. Amplify itself isn't connected to GitHub: the workflow pushes each build as a manual deployment. |
+| URL | https://main.d1f8mppryelp5v.amplifyapp.com/ (keep the `.com`) |
+| What | The dispatcher console from `frontend/` on `main`, with the AWS stack in `infra/` behind it: Cognito sign-in, saved runs, live LTA traffic |
+| Host | AWS Amplify Hosting, app `coldroute-console` (`d1f8mppryelp5v`), branch `main`, region `ap-southeast-1` |
+| AWS account | Jay's account, the team's production stack since 2 Nov 2026 |
+| How | **`terraform apply`** in `infra/` builds the console with the stack's settings and uploads it to Amplify ([`infra/README.md`](../infra/README.md)). Merging to `main` does not deploy by itself. |
+
+The earlier app, `coldroute-sg` (`daledp6z7ncmz`) in Xuankun's account on the AWS Free plan, no longer updates on merges. `deploy.yml` can still deploy to it by hand.
 
 ## How it works
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
 | [`checks.yml`](../.github/workflows/checks.yml) | Every PR, and pushes to `main` | Frontend `npm ci && npm run build`, backend `pytest`. No secrets. |
-| [`deploy.yml`](../.github/workflows/deploy.yml) | Pushes to `main` that touch `frontend/**`, the deploy script or the workflow; or **Run workflow** in the Actions tab | Runs [`scripts/deploy-frontend.sh`](../scripts/deploy-frontend.sh): build, zip `frontend/dist`, `create-deployment` → upload → `start-deployment`, wait for the job, then write the URL to the run summary. |
+| [`deploy.yml`](../.github/workflows/deploy.yml) | **Run workflow** in the Actions tab only | Deploys to the earlier app (`daledp6z7ncmz`): runs [`scripts/deploy-frontend.sh`](../scripts/deploy-frontend.sh), which builds, zips `frontend/dist`, runs `create-deployment` → upload → `start-deployment`, waits for the job, then writes the URL to the run summary. |
 
-So for teammates: **open a PR, wait for Checks to go green, merge. The site updates about two minutes later.** Docs-only or backend-only merges don't redeploy. To redeploy anyway, open Actions → Deploy → Run workflow.
+So for teammates: **open a PR, wait for Checks to go green, merge.** Whoever holds the Terraform state (Jay) then runs `terraform apply` in `infra/` to put `main` live.
 
 Deploys run one at a time. A newer merge waits for the running deploy to finish.
 
 To see which commit is live, look for `<meta name="coldroute-build" content="<sha> <build time>">` in the page source, or run:
 
 ```bash
-curl -s https://main.daledp6z7ncmz.amplifyapp.com/ | grep coldroute-build
+curl -s https://main.d1f8mppryelp5v.amplifyapp.com/ | grep coldroute-build
 ```
 
 ## Keys
