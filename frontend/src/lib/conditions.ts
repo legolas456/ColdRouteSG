@@ -117,6 +117,17 @@ export const MAX_WALK_KM = 0.6
  */
 export const LTA_PARKING_MAX_AGE_MIN = 30
 
+/** The carparks a live plan chooses from: HDB's (data.gov.sg) and, while fresh, LTA's URA and mall carparks. */
+export function liveCarparks(feeds: Pick<LiveFeeds, 'carparks' | 'ltaCarparks' | 'fetchedAt'>): (LiveCarpark | LtaCarpark)[] {
+  return [...(feeds.carparks.data?.carparks ?? []), ...(freshLtaCarparks(feeds)?.carparks ?? [])]
+}
+
+/** The carpark a stop uses on live data: the nearest within walking distance, or null to keep the stop's own. */
+export function liveParkingFor(stop: Point, parks: (LiveCarpark | LtaCarpark)[]): Carpark | null {
+  const park = nearest(parks, stop)
+  return park && park.km <= MAX_WALK_KM ? liveCarpark(park.item, stop) : null
+}
+
 /** LTA's URA and mall carparks while their lots are fresh enough to plan with, else null. */
 export function freshLtaCarparks(feeds: Pick<LiveFeeds, 'ltaCarparks' | 'fetchedAt'>) {
   const lta = feeds.ltaCarparks?.data
@@ -147,15 +158,14 @@ export function liveConditions(stops: Stop[], feeds: LiveFeeds, now: number, dep
   // HDB carparks (data.gov.sg) and, while fresh, URA and mall carparks (LTA): the nearest counts
   const lta = feeds.ltaCarparks?.data
   const fresh = freshLtaCarparks(feeds)
-  const parks: (LiveCarpark | LtaCarpark)[] = [...(feeds.carparks.data?.carparks ?? []), ...(fresh?.carparks ?? [])]
+  const parks = liveCarparks(feeds)
   const out = stops.map((s) => {
     const area = nearest(w.areas, s)?.item
-    const park = nearest(parks, s)
     return {
       ...s,
       area: area?.area ?? s.area,
       forecast: area?.forecast ?? s.forecast,
-      parking: park && park.km <= MAX_WALK_KM ? liveCarpark(park.item, s) : s.parking,
+      parking: liveParkingFor(s, parks) ?? s.parking,
     }
   })
   const notes: string[] = []
