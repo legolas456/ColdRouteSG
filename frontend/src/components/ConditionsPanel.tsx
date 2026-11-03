@@ -61,6 +61,8 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
 
   const loading = isLoading(feeds)
   const fetched = feeds.fetchedAt ? hm(sgMinutes(feeds.fetchedAt)) : null
+  // typical traffic for the departure's slot, when no live reading stood for it
+  const typical = conditions.traffic?.typical ? { ...conditions.traffic.typical, at: conditions.traffic.at } : null
 
   return (
     <div
@@ -110,8 +112,14 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
             <>Live data could not be read, so the plan uses the recorded morning for now.</>
           ) : (
             <>
-              The plan reads the NEA forecast{conditions.traffic ? ', HDB free lots and LTA road speeds' : ' and HDB free lots'} fetched at{' '}
-              <span className="num">{hm(conditions.at)}</span>. Re-optimise to pick up newer data; the feeds below refresh every 5 minutes.
+              The plan reads the NEA forecast{conditions.traffic && !typical ? ', HDB free lots and LTA road speeds' : ' and HDB free lots'} fetched at{' '}
+              <span className="num">{hm(conditions.at)}</span>
+              {typical && (
+                <>
+                  , and typical {typical.dayType} LTA road speeds for <span className="num">{hm(typical.at)}</span>
+                </>
+              )}
+              . Re-optimise to pick up newer data; the feeds below refresh every 5 minutes.
             </>
           )}
         </p>
@@ -145,7 +153,7 @@ export function ConditionsPanel({ mode, setMode, feeds, conditions, stops, onRef
       <div className="space-y-2 px-3 pb-3">
         <WeatherSection feed={feeds.weather} stops={stops} />
         <ParkingSection feed={feeds.carparks} stops={stops} />
-        <RoadSpeedSection feed={feeds.traffic} usedByPlan={conditions.traffic !== null} />
+        <RoadSpeedSection feed={feeds.traffic} use={conditions.traffic ? (typical ? 'typical' : 'live') : null} />
         <CameraSection feed={feeds.cameras} stops={stops} onView={onViewCamera} />
       </div>
     </div>
@@ -398,7 +406,8 @@ function CameraSection({ feed, stops, onView }: { feed: LiveFeeds['cameras']; st
   )
 }
 
-function RoadSpeedSection({ feed, usedByPlan }: { feed: LiveFeeds['traffic']; usedByPlan: boolean }) {
+/** The live reading, and whether the plan used it, typical traffic for its departure instead, or neither. */
+function RoadSpeedSection({ feed, use }: { feed: LiveFeeds['traffic']; use: 'live' | 'typical' | null }) {
   const g = feed.data
   return (
     <Section
@@ -429,9 +438,11 @@ function RoadSpeedSection({ feed, usedByPlan }: { feed: LiveFeeds['traffic']; us
             <Stat label={`Slow (${SLOW_FACTOR}× or worse)`} value={`${Math.round(g.slowShare * 100)}%`} />
           </dl>
           <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
-            {usedByPlan
+            {use === 'live'
               ? 'The plan stretches each drive by how much slower the roads along it are now than at night.'
-              : 'Not used for this plan: see the note above.'}
+              : use === 'typical'
+                ? 'Not used for this plan, which leaves too far from this reading: it uses typical traffic for its departure (see the note above).'
+                : 'Not used for this plan: see the note above.'}
           </p>
         </>
       )}
