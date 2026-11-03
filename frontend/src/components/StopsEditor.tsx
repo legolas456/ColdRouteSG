@@ -311,14 +311,15 @@ function StopRow({
           <TimePicker
             label="Opens"
             value={stop.windowStart}
-            onChange={(windowStart) =>
-              // opening at or after the close keeps the window's length
+            onChange={(picked) => {
+              // leave room for a closing time; opening at or after the close keeps the window's length
+              const windowStart = Math.min(picked, LAST_SLOT - 15)
               onChange(
                 windowStart < stop.windowEnd
                   ? { windowStart }
                   : { windowStart, windowEnd: Math.min(LAST_SLOT, windowStart + Math.max(30, stop.windowEnd - stop.windowStart)) },
               )
-            }
+            }}
           />
           <TimePicker label="Closes" value={stop.windowEnd} after={stop.windowStart} onChange={(windowEnd) => onChange({ windowEnd })} />
           <MinutesPicker label="Unload" value={stop.service} onChange={(service) => onChange({ service })} />

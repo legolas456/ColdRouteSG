@@ -100,7 +100,9 @@ function ComboField({ label, variant, value, display, choices, parse, onChange, 
       input.current?.focus()
       return
     }
-    onChange(choices[i].value)
+    const choice = choices[i]
+    if (!choice) return
+    onChange(choice.value)
     setDraft(null)
     close()
     input.current?.blur()
