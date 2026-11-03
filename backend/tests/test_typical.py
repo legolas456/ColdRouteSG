@@ -86,14 +86,25 @@ def test_a_slot_takes_each_cells_median():
         [[30, 18, 1.0, 0.4], [31, 17, 3.0, 0.3]],
         # one jammed morning does not make the slot jammed: the median, not the mean (1.7)
         [[30, 18, 3.0, 0.4], [31, 17, 2.5, 0.3]],
-        [[30, 18, 1.1, 0.4]],  # this reading lacks the second cell
+        [[30, 18, 1.1, 0.4], [31, 17, 2.0, 0.3]],
     ]
     grid = build_slot(readings, "weekday", "0845", days=3, built_at=NOW)
-    assert grid["cells"] == [[30, 18, 1.1, 0.4], [31, 17, 2.75, 0.3]]
+    assert grid["cells"] == [[30, 18, 1.1, 0.4], [31, 17, 2.5, 0.3]]
     assert grid["readings"] == 3 and grid["days"] == 3
     assert grid["dayType"] == "weekday" and grid["slot"] == "0845" and grid["slotMinutes"] == 15
     # only the second cell is slow (SLOW_FACTOR, 1.2, or worse)
     assert grid["slowShare"] == pytest.approx(0.3 / 0.7, abs=0.001)
+
+
+def test_a_cell_needs_three_readings_of_its_own():
+    readings = [
+        [[30, 18, 1.0, 0.4], [31, 17, 3.0, 0.3]],
+        [[30, 18, 1.2, 0.4], [31, 17, 3.0, 0.3]],
+        [[30, 18, 1.1, 0.4]],  # the jammed cell is in only two readings
+    ]
+    grid = build_slot(readings, "weekday", "0845", days=3, built_at=NOW)
+    assert grid["cells"] == [[30, 18, 1.1, 0.4]]
+    assert grid["roadKm"] == 0.4 and grid["slowShare"] == 0.0
     # the console's grid parser needs a time and a grid origin
     assert grid["fetchedAt"] == "2026-10-29T23:00:00+08:00" and grid["origin"] == [103.55, 1.15]
 
@@ -204,7 +215,11 @@ def test_the_api_says_when_there_is_no_traffic_service(monkeypatch):
     assert response.status_code == 503 and "TRAFFIC_BUCKET" in response.json()["detail"]
 
 
-TYPICAL_READINGS = [[[30, 15, 1.0, 1.0], [31, 17, 2.4, 0.3]], [[30, 15, 2.2, 1.0], [31, 17, 2.6, 0.3]], [[30, 15, 1.8, 1.0]]]
+TYPICAL_READINGS = [
+    [[30, 15, 1.0, 1.0], [31, 17, 2.4, 0.3]],
+    [[30, 15, 2.2, 1.0], [31, 17, 2.6, 0.3]],
+    [[30, 15, 1.8, 1.0], [31, 17, 2.5, 0.3]],
+]
 
 
 def test_typical_grid_matches_the_reviewed_snapshot():

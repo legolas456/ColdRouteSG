@@ -37,7 +37,8 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
   const prevId = result.recommended.order[rec.seq - 2]
   const from = prevId ? (names[prevId] ?? prevId) : depotName
   const park = stop.parking
-  // the plan used LTA road speeds; otherwise drive times are OSRM's free-flow estimate
+  // the plan used LTA road speeds (live, or typical for that time); otherwise
+  // drive times are OSRM's free-flow estimate
   const live = result.trafficAt !== null
 
   const factors = [
@@ -58,7 +59,7 @@ export function StopCard({ stop, result, names, departure, rain, depotName, came
     {
       key: 'T' as const,
       label: 'Traffic',
-      source: live ? 'LTA live' : 'Not measured',
+      source: result.trafficKind === 'typical' ? 'LTA typical' : live ? 'LTA live' : 'Not measured',
       now: live ? `+${Math.round(rec.trafficMinutes)} min on approach` : `${Math.round(rec.legMinutes)} min approach`,
       was: live ? `+${Math.round(base.trafficMinutes)} min on approach` : `${Math.round(base.legMinutes)} min approach`,
     },
