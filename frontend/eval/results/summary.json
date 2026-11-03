@@ -1,0 +1,1103 @@
+{
+  "generated": "2026-11-03T20:15:54.869Z",
+  "setup": {
+    "scenarios": 60,
+    "types": [
+      "easy",
+      "tight",
+      "rain",
+      "mixed",
+      "combined"
+    ],
+    "sizes": [
+      5,
+      10,
+      15
+    ],
+    "seeds": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "departure": "09:00",
+    "depot": "Jurong Cold Store",
+    "pool_points": 43,
+    "drive_times": "OSRM table service, router.project-osrm.org (OpenStreetMap data), free-flow driving, fetched 2026-11-03",
+    "traffic": "none (free-flow OSRM times, factor 1)",
+    "weights": {
+      "balanced": {
+        "drive": 0.3,
+        "late": 0.3,
+        "weather": 0.1,
+        "parking": 0.1,
+        "cold": 0.2
+      },
+      "pharma": {
+        "drive": 0.15,
+        "late": 0.35,
+        "weather": 0.1,
+        "parking": 0.05,
+        "cold": 0.35
+      }
+    },
+    "tie_minutes": 0.5,
+    "node": "v22.18.0"
+  },
+  "summary": {
+    "all": {
+      "runs": 60,
+      "plans": {
+        "shortest": {
+          "late_total": 16578.3,
+          "late_stops_total": 97,
+          "late_median": 0,
+          "late_worst": 2030.6,
+          "runs_with_late_stop": 23,
+          "exposure_total": 81443.7,
+          "rain_unload_total": 99.6,
+          "drive_total": 6661.6,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 0,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 60,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 60,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 60,
+            "loss": 0
+          }
+        },
+        "edf": {
+          "late_total": 1094.1,
+          "late_stops_total": 19,
+          "late_median": 0,
+          "late_worst": 503.6,
+          "runs_with_late_stop": 8,
+          "exposure_total": 87418.9,
+          "rain_unload_total": 135,
+          "drive_total": 11308.9,
+          "extra_drive_pct_median": 61.8,
+          "extra_drive_pct_worst": 131.3,
+          "late_reduction_pct_vs_shortest": 93.4,
+          "exposure_reduction_pct_vs_shortest": -7.3,
+          "rain_reduction_pct_vs_shortest": -35.5,
+          "vs_shortest_late": {
+            "win": 23,
+            "tie": 37,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 16,
+            "tie": 0,
+            "loss": 44
+          },
+          "vs_shortest_rain": {
+            "win": 5,
+            "tie": 48,
+            "loss": 7
+          }
+        },
+        "balanced": {
+          "late_total": 56.3,
+          "late_stops_total": 10,
+          "late_median": 0,
+          "late_worst": 23.5,
+          "runs_with_late_stop": 8,
+          "exposure_total": 54589.3,
+          "rain_unload_total": 120.2,
+          "drive_total": 7480.4,
+          "extra_drive_pct_median": 1.3,
+          "extra_drive_pct_worst": 70.2,
+          "late_reduction_pct_vs_shortest": 99.7,
+          "exposure_reduction_pct_vs_shortest": 33,
+          "rain_reduction_pct_vs_shortest": -20.7,
+          "vs_shortest_late": {
+            "win": 23,
+            "tie": 37,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 36,
+            "tie": 20,
+            "loss": 4
+          },
+          "vs_shortest_rain": {
+            "win": 5,
+            "tie": 49,
+            "loss": 6
+          }
+        },
+        "pharma": {
+          "late_total": 9.1,
+          "late_stops_total": 4,
+          "late_median": 0,
+          "late_worst": 3.7,
+          "runs_with_late_stop": 4,
+          "exposure_total": 54142.7,
+          "rain_unload_total": 138.2,
+          "drive_total": 7687.5,
+          "extra_drive_pct_median": 6.2,
+          "extra_drive_pct_worst": 78,
+          "late_reduction_pct_vs_shortest": 99.9,
+          "exposure_reduction_pct_vs_shortest": 33.5,
+          "rain_reduction_pct_vs_shortest": -38.8,
+          "vs_shortest_late": {
+            "win": 23,
+            "tie": 37,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 41,
+            "tie": 15,
+            "loss": 4
+          },
+          "vs_shortest_rain": {
+            "win": 5,
+            "tie": 48,
+            "loss": 7
+          }
+        }
+      }
+    },
+    "constrained": {
+      "runs": 48,
+      "plans": {
+        "shortest": {
+          "late_total": 16578.3,
+          "late_stops_total": 97,
+          "late_median": 0,
+          "late_worst": 2030.6,
+          "runs_with_late_stop": 23,
+          "exposure_total": 72672.4,
+          "rain_unload_total": 99.6,
+          "drive_total": 5335.9,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 0,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 48,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 48,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 48,
+            "loss": 0
+          }
+        },
+        "edf": {
+          "late_total": 1094.1,
+          "late_stops_total": 19,
+          "late_median": 0,
+          "late_worst": 503.6,
+          "runs_with_late_stop": 8,
+          "exposure_total": 75273.4,
+          "rain_unload_total": 135,
+          "drive_total": 9042.7,
+          "extra_drive_pct_median": 62.9,
+          "extra_drive_pct_worst": 131.3,
+          "late_reduction_pct_vs_shortest": 93.4,
+          "exposure_reduction_pct_vs_shortest": -3.6,
+          "rain_reduction_pct_vs_shortest": -35.5,
+          "vs_shortest_late": {
+            "win": 23,
+            "tie": 25,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 16,
+            "tie": 0,
+            "loss": 32
+          },
+          "vs_shortest_rain": {
+            "win": 5,
+            "tie": 36,
+            "loss": 7
+          }
+        },
+        "balanced": {
+          "late_total": 56.3,
+          "late_stops_total": 10,
+          "late_median": 0,
+          "late_worst": 23.5,
+          "runs_with_late_stop": 8,
+          "exposure_total": 46129.3,
+          "rain_unload_total": 120.2,
+          "drive_total": 6146.4,
+          "extra_drive_pct_median": 5.3,
+          "extra_drive_pct_worst": 70.2,
+          "late_reduction_pct_vs_shortest": 99.7,
+          "exposure_reduction_pct_vs_shortest": 36.5,
+          "rain_reduction_pct_vs_shortest": -20.7,
+          "vs_shortest_late": {
+            "win": 23,
+            "tie": 25,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 33,
+            "tie": 11,
+            "loss": 4
+          },
+          "vs_shortest_rain": {
+            "win": 5,
+            "tie": 37,
+            "loss": 6
+          }
+        },
+        "pharma": {
+          "late_total": 9.1,
+          "late_stops_total": 4,
+          "late_median": 0,
+          "late_worst": 3.7,
+          "runs_with_late_stop": 4,
+          "exposure_total": 45678.5,
+          "rain_unload_total": 138.2,
+          "drive_total": 6342,
+          "extra_drive_pct_median": 10.7,
+          "extra_drive_pct_worst": 78,
+          "late_reduction_pct_vs_shortest": 99.9,
+          "exposure_reduction_pct_vs_shortest": 37.1,
+          "rain_reduction_pct_vs_shortest": -38.8,
+          "vs_shortest_late": {
+            "win": 23,
+            "tie": 25,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 37,
+            "tie": 7,
+            "loss": 4
+          },
+          "vs_shortest_rain": {
+            "win": 5,
+            "tie": 36,
+            "loss": 7
+          }
+        }
+      }
+    },
+    "easy": {
+      "runs": 12,
+      "plans": {
+        "shortest": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 8771.3,
+          "rain_unload_total": 0,
+          "drive_total": 1325.7,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 0,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "edf": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 12145.5,
+          "rain_unload_total": 0,
+          "drive_total": 2266.2,
+          "extra_drive_pct_median": 60.4,
+          "extra_drive_pct_worst": 107.6,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": -38.5,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 0,
+            "loss": 12
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "balanced": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 8460,
+          "rain_unload_total": 0,
+          "drive_total": 1334,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 4.1,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 3.5,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 3,
+            "tie": 9,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "pharma": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 8464.3,
+          "rain_unload_total": 0,
+          "drive_total": 1345.5,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 11.5,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 3.5,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 4,
+            "tie": 8,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        }
+      }
+    },
+    "tight": {
+      "runs": 12,
+      "plans": {
+        "shortest": {
+          "late_total": 8736,
+          "late_stops_total": 48,
+          "late_median": 520.8,
+          "late_worst": 1902.4,
+          "runs_with_late_stop": 11,
+          "exposure_total": 21966.6,
+          "rain_unload_total": 0,
+          "drive_total": 1359.5,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 0,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "edf": {
+          "late_total": 893.3,
+          "late_stops_total": 13,
+          "late_median": 0,
+          "late_worst": 503.6,
+          "runs_with_late_stop": 4,
+          "exposure_total": 20497,
+          "rain_unload_total": 0,
+          "drive_total": 2316.1,
+          "extra_drive_pct_median": 68.5,
+          "extra_drive_pct_worst": 105.8,
+          "late_reduction_pct_vs_shortest": 89.8,
+          "exposure_reduction_pct_vs_shortest": 6.7,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 11,
+            "tie": 1,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 8,
+            "tie": 0,
+            "loss": 4
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "balanced": {
+          "late_total": 24,
+          "late_stops_total": 4,
+          "late_median": 0,
+          "late_worst": 15.1,
+          "runs_with_late_stop": 4,
+          "exposure_total": 11215.4,
+          "rain_unload_total": 0,
+          "drive_total": 1772.3,
+          "extra_drive_pct_median": 25.1,
+          "extra_drive_pct_worst": 70.2,
+          "late_reduction_pct_vs_shortest": 99.7,
+          "exposure_reduction_pct_vs_shortest": 48.9,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 11,
+            "tie": 1,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 11,
+            "tie": 1,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "pharma": {
+          "late_total": 3.7,
+          "late_stops_total": 1,
+          "late_median": 0,
+          "late_worst": 3.7,
+          "runs_with_late_stop": 1,
+          "exposure_total": 11050.1,
+          "rain_unload_total": 0,
+          "drive_total": 1855.1,
+          "extra_drive_pct_median": 35.1,
+          "extra_drive_pct_worst": 78,
+          "late_reduction_pct_vs_shortest": 100,
+          "exposure_reduction_pct_vs_shortest": 49.7,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 11,
+            "tie": 1,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 12,
+            "tie": 0,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        }
+      }
+    },
+    "rain": {
+      "runs": 12,
+      "plans": {
+        "shortest": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 8588.8,
+          "rain_unload_total": 88.7,
+          "drive_total": 1318.7,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 0,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "edf": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 13297.1,
+          "rain_unload_total": 64,
+          "drive_total": 2428.1,
+          "extra_drive_pct_median": 81.5,
+          "extra_drive_pct_worst": 131.3,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": -54.8,
+          "rain_reduction_pct_vs_shortest": 27.8,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 0,
+            "loss": 12
+          },
+          "vs_shortest_rain": {
+            "win": 5,
+            "tie": 5,
+            "loss": 2
+          }
+        },
+        "balanced": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 8565.8,
+          "rain_unload_total": 53,
+          "drive_total": 1327,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 2.9,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0.3,
+          "rain_reduction_pct_vs_shortest": 40.2,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 4,
+            "tie": 5,
+            "loss": 3
+          },
+          "vs_shortest_rain": {
+            "win": 4,
+            "tie": 8,
+            "loss": 0
+          }
+        },
+        "pharma": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 8531.3,
+          "rain_unload_total": 59,
+          "drive_total": 1334.1,
+          "extra_drive_pct_median": 0.4,
+          "extra_drive_pct_worst": 9.9,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0.7,
+          "rain_reduction_pct_vs_shortest": 33.5,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 5,
+            "tie": 4,
+            "loss": 3
+          },
+          "vs_shortest_rain": {
+            "win": 4,
+            "tie": 8,
+            "loss": 0
+          }
+        }
+      }
+    },
+    "mixed": {
+      "runs": 12,
+      "plans": {
+        "shortest": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 12660.4,
+          "rain_unload_total": 0,
+          "drive_total": 1336.6,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 0,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "edf": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 16909.5,
+          "rain_unload_total": 0,
+          "drive_total": 2203.5,
+          "extra_drive_pct_median": 55.3,
+          "extra_drive_pct_worst": 122.5,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": -33.6,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 0,
+            "loss": 12
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "balanced": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 12102.7,
+          "rain_unload_total": 0,
+          "drive_total": 1369.9,
+          "extra_drive_pct_median": 0.3,
+          "extra_drive_pct_worst": 8.5,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 4.4,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 7,
+            "tie": 5,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "pharma": {
+          "late_total": 0,
+          "late_stops_total": 0,
+          "late_median": 0,
+          "late_worst": 0,
+          "runs_with_late_stop": 0,
+          "exposure_total": 11828.4,
+          "rain_unload_total": 0,
+          "drive_total": 1411.3,
+          "extra_drive_pct_median": 4.6,
+          "extra_drive_pct_worst": 10.9,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 6.6,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 9,
+            "tie": 3,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        }
+      }
+    },
+    "combined": {
+      "runs": 12,
+      "plans": {
+        "shortest": {
+          "late_total": 7842.3,
+          "late_stops_total": 49,
+          "late_median": 484.6,
+          "late_worst": 2030.6,
+          "runs_with_late_stop": 12,
+          "exposure_total": 29456.6,
+          "rain_unload_total": 10.9,
+          "drive_total": 1321.1,
+          "extra_drive_pct_median": 0,
+          "extra_drive_pct_worst": 0,
+          "late_reduction_pct_vs_shortest": 0,
+          "exposure_reduction_pct_vs_shortest": 0,
+          "rain_reduction_pct_vs_shortest": 0,
+          "vs_shortest_late": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 12,
+            "loss": 0
+          }
+        },
+        "edf": {
+          "late_total": 200.8,
+          "late_stops_total": 6,
+          "late_median": 0,
+          "late_worst": 141,
+          "runs_with_late_stop": 4,
+          "exposure_total": 24569.9,
+          "rain_unload_total": 71,
+          "drive_total": 2095,
+          "extra_drive_pct_median": 52.1,
+          "extra_drive_pct_worst": 98.1,
+          "late_reduction_pct_vs_shortest": 97.4,
+          "exposure_reduction_pct_vs_shortest": 16.6,
+          "rain_reduction_pct_vs_shortest": -551.4,
+          "vs_shortest_late": {
+            "win": 12,
+            "tie": 0,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 8,
+            "tie": 0,
+            "loss": 4
+          },
+          "vs_shortest_rain": {
+            "win": 0,
+            "tie": 7,
+            "loss": 5
+          }
+        },
+        "balanced": {
+          "late_total": 32.3,
+          "late_stops_total": 6,
+          "late_median": 0,
+          "late_worst": 23.5,
+          "runs_with_late_stop": 4,
+          "exposure_total": 14245.4,
+          "rain_unload_total": 67.2,
+          "drive_total": 1677.2,
+          "extra_drive_pct_median": 26.7,
+          "extra_drive_pct_worst": 45.6,
+          "late_reduction_pct_vs_shortest": 99.6,
+          "exposure_reduction_pct_vs_shortest": 51.6,
+          "rain_reduction_pct_vs_shortest": -516.5,
+          "vs_shortest_late": {
+            "win": 12,
+            "tie": 0,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 11,
+            "tie": 0,
+            "loss": 1
+          },
+          "vs_shortest_rain": {
+            "win": 1,
+            "tie": 5,
+            "loss": 6
+          }
+        },
+        "pharma": {
+          "late_total": 5.4,
+          "late_stops_total": 3,
+          "late_median": 0,
+          "late_worst": 3.5,
+          "runs_with_late_stop": 3,
+          "exposure_total": 14268.7,
+          "rain_unload_total": 79.2,
+          "drive_total": 1741.5,
+          "extra_drive_pct_median": 27.7,
+          "extra_drive_pct_worst": 52.5,
+          "late_reduction_pct_vs_shortest": 99.9,
+          "exposure_reduction_pct_vs_shortest": 51.6,
+          "rain_reduction_pct_vs_shortest": -626.6,
+          "vs_shortest_late": {
+            "win": 12,
+            "tie": 0,
+            "loss": 0
+          },
+          "vs_shortest_exposure": {
+            "win": 11,
+            "tie": 0,
+            "loss": 1
+          },
+          "vs_shortest_rain": {
+            "win": 1,
+            "tie": 4,
+            "loss": 7
+          }
+        }
+      }
+    }
+  },
+  "targets": {
+    "balanced": {
+      "late_reduction_pct": 99.7,
+      "late_met": true,
+      "exposure_reduction_pct": 36.5,
+      "exposure_met": true,
+      "extra_drive_pct_median": 5.3,
+      "drive_met": true
+    },
+    "pharma": {
+      "late_reduction_pct": 99.9,
+      "late_met": true,
+      "exposure_reduction_pct": 37.1,
+      "exposure_met": true,
+      "extra_drive_pct_median": 10.7,
+      "drive_met": true
+    }
+  },
+  "timing": {
+    "5": {
+      "plans": 40,
+      "ms_median": 0.6,
+      "ms_max": 5.3,
+      "orders_scored_median": 120,
+      "search": "exhaustive"
+    },
+    "10": {
+      "plans": 40,
+      "ms_median": 9.1,
+      "ms_max": 20.3,
+      "orders_scored_median": 2695,
+      "search": "local search from 4 starts"
+    },
+    "15": {
+      "plans": 40,
+      "ms_median": 53.6,
+      "ms_max": 77.5,
+      "orders_scored_median": 8188,
+      "search": "local search from 4 starts"
+    }
+  },
+  "exact": {
+    "5": {
+      "checked": 40,
+      "finished": 40,
+      "search_found_optimum": 40,
+      "worst_gap_pct": 0,
+      "mean_gap_pct": 0
+    },
+    "10": {
+      "checked": 40,
+      "finished": 40,
+      "search_found_optimum": 39,
+      "worst_gap_pct": 1.75,
+      "mean_gap_pct": 0.044
+    }
+  },
+  "ablation": {
+    "weather": {
+      "runs": 48,
+      "order_changed": 6,
+      "late_total": 56.8,
+      "late_total_full": 56.3,
+      "exposure_total": 46070.8,
+      "exposure_total_full": 46129.3,
+      "rain_unload_total": 181.8,
+      "rain_unload_total_full": 120.2,
+      "drive_total": 6136,
+      "drive_total_full": 6146.4
+    },
+    "cold": {
+      "runs": 48,
+      "order_changed": 27,
+      "late_total": 12.7,
+      "late_total_full": 56.3,
+      "exposure_total": 52373.1,
+      "exposure_total_full": 46129.3,
+      "rain_unload_total": 133,
+      "rain_unload_total_full": 120.2,
+      "drive_total": 5992.4,
+      "drive_total_full": 6146.4
+    },
+    "parking": {
+      "runs": 48,
+      "order_changed": 0,
+      "late_total": 56.3,
+      "late_total_full": 56.3,
+      "exposure_total": 46129.3,
+      "exposure_total_full": 46129.3,
+      "rain_unload_total": 120.2,
+      "rain_unload_total_full": 120.2,
+      "drive_total": 6146.4,
+      "drive_total_full": 6146.4
+    },
+    "late": {
+      "runs": 48,
+      "order_changed": 15,
+      "late_total": 2263.4,
+      "late_total_full": 56.3,
+      "exposure_total": 45162.2,
+      "exposure_total_full": 46129.3,
+      "rain_unload_total": 142.1,
+      "rain_unload_total_full": 120.2,
+      "drive_total": 5827.8,
+      "drive_total_full": 6146.4
+    }
+  },
+  "sensitivity": {
+    "drive x0.8": {
+      "runs": 60,
+      "order_changed": 11,
+      "late_change_min": -12,
+      "exposure_change_pct": -0.3,
+      "drive_change_pct": 0.6
+    },
+    "drive x1.2": {
+      "runs": 60,
+      "order_changed": 3,
+      "late_change_min": 1.4,
+      "exposure_change_pct": 0.1,
+      "drive_change_pct": -0.1
+    },
+    "late x0.8": {
+      "runs": 60,
+      "order_changed": 0,
+      "late_change_min": 0,
+      "exposure_change_pct": 0,
+      "drive_change_pct": 0
+    },
+    "late x1.2": {
+      "runs": 60,
+      "order_changed": 4,
+      "late_change_min": -38,
+      "exposure_change_pct": 0.7,
+      "drive_change_pct": 0.5
+    },
+    "weather x0.8": {
+      "runs": 60,
+      "order_changed": 2,
+      "late_change_min": 0.9,
+      "exposure_change_pct": 0,
+      "drive_change_pct": -0.1
+    },
+    "weather x1.2": {
+      "runs": 60,
+      "order_changed": 1,
+      "late_change_min": 0,
+      "exposure_change_pct": 0,
+      "drive_change_pct": 0
+    },
+    "parking x0.8": {
+      "runs": 60,
+      "order_changed": 0,
+      "late_change_min": 0,
+      "exposure_change_pct": 0,
+      "drive_change_pct": 0
+    },
+    "parking x1.2": {
+      "runs": 60,
+      "order_changed": 0,
+      "late_change_min": 0,
+      "exposure_change_pct": 0,
+      "drive_change_pct": 0
+    },
+    "cold x0.8": {
+      "runs": 60,
+      "order_changed": 6,
+      "late_change_min": -25.3,
+      "exposure_change_pct": 1.3,
+      "drive_change_pct": -0.3
+    },
+    "cold x1.2": {
+      "runs": 60,
+      "order_changed": 7,
+      "late_change_min": 0.9,
+      "exposure_change_pct": -0.6,
+      "drive_change_pct": 0.4
+    }
+  }
+}
