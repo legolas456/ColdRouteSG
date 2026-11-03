@@ -63,6 +63,9 @@ resource "terraform_data" "console" {
       AWS_REGION     = var.region
       # settings come from here, not from a local .env.deploy.local
       DEPLOY_ENV_FILE = "/dev/null"
+      # upload with the provider's credentials, into the provider's account
+      COLDROUTE_PROFILE_FALLBACK = "0"
+      EXPECT_AWS_ACCOUNT         = data.aws_caller_identity.current.account_id
     }, var.aws_profile == null ? {} : { AWS_PROFILE = var.aws_profile })
   }
 }
