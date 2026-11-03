@@ -6,12 +6,13 @@
 
 locals {
   # what anyone may read without signing in: the root and health check, the
-  # data.gov.sg routes and the LTA road-speed grid
+  # data.gov.sg routes, the LTA road-speed grid and the URA and mall carparks
   public_routes = [
     "GET /",
     "GET /api/health",
     "GET /api/data/{proxy+}",
     "GET /api/traffic/{proxy+}",
+    "GET /api/parking/{proxy+}",
   ]
 }
 
