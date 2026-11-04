@@ -2,8 +2,8 @@
 
 Does ColdRoute's recommended order actually trade a little driving for fewer late
 stops, less cargo exposure and less unloading in rain? This compares it with the
-shortest route and with a by-hand baseline on 60 fixed scenarios, using the
-console's own planning code (`src/lib/optimizer.ts`).
+shortest route, a by-hand baseline and a planner that only respects booked slots,
+on 60 fixed scenarios, using the console's own planning code (`src/lib/optimizer.ts`).
 
 ```bash
 cd frontend
@@ -27,7 +27,8 @@ server (one request).
   everything (`scenarios.ts`, mulberry32):
   - `easy`: open 09:00–18:00, no rain, all chilled. The control: little to trade.
   - `tight`: half the stops get a booked 30–60 min slot, placed on the arrival
-    times of a *random* order, so a route with no late stop always exists.
+    times of a *random* order, so a route with no late stop always exists (the
+    script checks that order also reaches every stop by 18:00).
   - `rain`: one heavy cell (two for 10+ stops) over stops' areas, lasting
     60–120 min, starting at a random time in the first half of the run. It is not
     placed where any planner arrives.
@@ -41,7 +42,8 @@ server (one request).
 | Plan | How |
 |---|---|
 | `shortest` | `optimise().baseline`: exact shortest drive (exhaustive ≤ 8 stops, Held–Karp ≤ 15) |
-| `edf` | Earliest deadline first, the order a careful dispatcher might pick by hand. Equal deadlines keep the entered order, so it only means something on `tight` and `combined`. |
+| `edf` | Earliest deadline first, the order a careful dispatcher might pick by hand. Stops with the same deadline (every stop without a slot closes at 18:00) go nearest first. |
+| `slots` | `optimise()` with only the drive and lateness terms (0.5 each): what a general route planner that respects time windows does. The main comparison, since it shows what the rain and cargo terms add. |
 | `balanced`, `pharma` | `optimise().recommended` with the profile weights in `src/lib/profiles.ts` |
 
 The weights and reference scales were fixed before this run, and nothing was tuned
@@ -55,9 +57,10 @@ on these scenarios. So all 60 are reported, with no development/held-out split.
 - drive minutes, and extra driving versus `shortest`
 - planning time
 
-Lateness, rain and exposure are also terms of the objective, so this measures how
-large the trade-off is, not that the weights are "right". The `easy` control and
-the `edf` baseline are what keep the comparison fair.
+Rain-exposed minutes are measured, while the objective counts a whole unload as wet
+once any of it overlaps rain. Lateness, rain and exposure are also terms of the
+objective, so this measures how large the trade-off is, not that the weights are
+"right". The `easy` control and the `slots` baseline are what keep the comparison fair.
 
 ## Extra checks
 
@@ -74,12 +77,15 @@ the `edf` baseline are what keep the comparison fair.
 | File | Contents |
 |---|---|
 | `results/runs.csv` | One row per scenario × plan, with the stop order |
-| `results/summary.json` | Totals, medians, worst cases, win/tie/loss vs shortest (tie < 0.5 min), targets, timing, exact check, ablation, sensitivity |
+| `results/summary.json` | Per group (`all`, `constrained`, `slotted` = tight + combined, and each type): totals, medians, IQR, worst cases, changes versus `slots`, win/tie/loss versus `shortest` and `slots` (tie < 0.5 min) with a two-sided sign test; targets, timing, exact check, ablation, sensitivity |
 | `results/exact-check.csv` | Search cost vs exact cost per run and profile |
 | `results/pool.csv` | The delivery points |
 
 ## Limits
 
 The stand-in customers are real addresses, not real orders; the slots, cargo mix,
-unloading times and rain are generated. There's no traffic and one vehicle. Timing
-is Node 22 on one laptop, not the planner Lambda.
+unloading times and rain are generated. There is about one stop per NEA area, so a
+rain cell usually covers one or two stops. There's no traffic and one vehicle.
+Timing is Node 22 on one laptop, not the planner Lambda.
+
+Drive times: OSRM, © OpenStreetMap contributors (ODbL).

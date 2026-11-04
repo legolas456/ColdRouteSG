@@ -1,10 +1,11 @@
 // Route-quality evaluation: `npm run eval` (see eval/README.md).
 //
-// Plans every scenario four ways with the console's own code (src/lib/optimizer.ts):
-// the exact shortest-drive route, earliest-deadline-first, ColdRoute Balanced and
-// ColdRoute Pharma. Then checks the search against an exact branch-and-bound
-// optimum, switches single cost terms off (ablation) and moves each weight by
-// ±20% (sensitivity). Writes eval/results/{runs.csv,summary.json,summary.md}.
+// Plans every scenario five ways with the console's own code (src/lib/optimizer.ts):
+// the exact shortest-drive route, earliest-deadline-first, slots-only (drive and
+// lateness terms only), ColdRoute Balanced and ColdRoute Pharma. Then checks the
+// search against an exact branch-and-bound optimum, switches single cost terms off
+// (ablation) and moves each weight by ±20% (sensitivity). Writes
+// eval/results/{runs.csv,summary.json,exact-check.csv,pool.csv}.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -95,12 +96,31 @@ const ctxFor = (sc: Scenario, weights: Weights) => ({
   traffic: null,
 })
 
-/** Earliest deadline first: what a careful dispatcher does without a tool. */
-const edfOrder = (stops: Stop[]) =>
-  stops
-    .slice()
-    .sort((a, b) => a.windowEnd - b.windowEnd || a.windowStart - b.windowStart)
-    .map((s) => s.id)
+/**
+ * Earliest deadline first: what a careful dispatcher does without a tool.
+ * Stops with the same deadline (every stop without a booked slot closes at
+ * 18:00) go nearest first, so EDF is not handicapped by the entered order.
+ */
+const edfOrder = (depot: { id: string; lng: number; lat: number }, stops: Stop[]) => {
+  const left = stops.slice()
+  const out: string[] = []
+  let at = depot
+  while (left.length) {
+    const due = Math.min(...left.map((s) => s.windowEnd))
+    const next = left
+      .filter((s) => s.windowEnd === due)
+      .reduce((a, b) => (travel(at, b).minutes < travel(at, a).minutes ? b : a))
+    out.push(next.id)
+    left.splice(left.indexOf(next), 1)
+    at = next
+  }
+  return out
+}
+/**
+ * What a general route planner does: the shortest drive that still meets the
+ * booked slots (drive and lateness only, no rain, parking or cargo terms).
+ */
+const SLOTS_ONLY: Weights = { drive: 0.5, late: 0.5, weather: 0, parking: 0, cold: 0 }
 
 // ---------- exact optimum (branch and bound) ----------
 
@@ -183,8 +203,28 @@ const renorm = (w: Weights): Weights => {
   const t = w.drive + w.late + w.weather + w.parking + w.cold
   return { drive: w.drive / t, late: w.late / t, weather: w.weather / t, parking: w.parking / t, cold: w.cold / t }
 }
+/** Two-sided sign test on wins and losses (ties dropped). */
+const signTest = (win: number, loss: number) => {
+  const n = win + loss
+  if (!n) return 1
+  let tail = 0
+  for (let i = 0; i <= Math.min(win, loss); i++) {
+    let c = 1
+    for (let j = 0; j < i; j++) c = (c * (n - j)) / (j + 1)
+    tail += c
+  }
+  return Math.min(1, (2 * tail) / 2 ** n)
+}
+const quartiles = (xs: number[]) => {
+  const a = xs.slice().sort((x, y) => x - y)
+  const q = (f: number) => {
+    const i = (a.length - 1) * f
+    return a[Math.floor(i)] + (a[Math.ceil(i)] - a[Math.floor(i)]) * (i - Math.floor(i))
+  }
+  return [r1(q(0.25)), r1(q(0.75))]
+}
 const KEYS = ['drive', 'late', 'weather', 'parking', 'cold'] as const
-const PLANS = ['shortest', 'edf', 'balanced', 'pharma'] as const
+const PLANS = ['shortest', 'edf', 'slots', 'balanced', 'pharma'] as const
 type PlanName = (typeof PLANS)[number]
 
 interface Run {
@@ -214,11 +254,12 @@ test('route-quality evaluation', { timeout: 60 * 60_000 }, async () => {
         const bal = optimise(sc.depot, sc.stops, DEPARTURE, PROFILES.balanced.weights, sc.rain, null)
         const pha = optimise(sc.depot, sc.stops, DEPARTURE, PROFILES.pharma.weights, sc.rain, null)
         expect(Math.abs(bal.baseline.drive - pha.baseline.drive)).toBeLessThan(1e-6)
-        const edf = simulate(edfOrder(sc.stops), ctxFor(sc, PROFILES.balanced.weights))
+        const edf = simulate(edfOrder(sc.depot, sc.stops), ctxFor(sc, PROFILES.balanced.weights))
+        const slots = optimise(sc.depot, sc.stops, DEPARTURE, SLOTS_ONLY, sc.rain, null).recommended
         runs.push({
           sc,
-          m: { shortest: metrics(bal.baseline, sc), edf: metrics(edf, sc), balanced: metrics(bal.recommended, sc), pharma: metrics(pha.recommended, sc) },
-          order: { shortest: bal.baseline.order, edf: edf.order, balanced: bal.recommended.order, pharma: pha.recommended.order },
+          m: { shortest: metrics(bal.baseline, sc), edf: metrics(edf, sc), slots: metrics(slots, sc), balanced: metrics(bal.recommended, sc), pharma: metrics(pha.recommended, sc) },
+          order: { shortest: bal.baseline.order, edf: edf.order, slots: slots.order, balanced: bal.recommended.order, pharma: pha.recommended.order },
           ms: { balanced: bal.elapsedMs, pharma: pha.elapsedMs },
           evaluated: { balanced: bal.evaluated, pharma: pha.evaluated },
         })
@@ -237,7 +278,11 @@ test('route-quality evaluation', { timeout: 60 * 60_000 }, async () => {
     }
 
   // ---------- summaries ----------
-  const groups: Record<string, Run[]> = { all: runs, constrained: runs.filter((r) => r.sc.type !== 'easy') }
+  const groups: Record<string, Run[]> = {
+    all: runs,
+    constrained: runs.filter((r) => r.sc.type !== 'easy'),
+    slotted: runs.filter((r) => r.sc.type === 'tight' || r.sc.type === 'combined'),
+  }
   for (const t of TYPES) groups[t] = runs.filter((r) => r.sc.type === t)
   const TIE = 0.5 // minutes
   const summary: Record<string, unknown> = {}
@@ -246,18 +291,20 @@ test('route-quality evaluation', { timeout: 60 * 60_000 }, async () => {
     const per: Record<string, unknown> = {}
     for (const p of PLANS) {
       const ms = rs.map((r) => r.m[p])
-      const wtl = (k: 'late' | 'exposure' | 'rainMinutes') => {
+      const wtl = (k: 'late' | 'exposure' | 'rainMinutes', vs: PlanName = 'shortest') => {
         let win = 0
         let tie = 0
         let loss = 0
         rs.forEach((r) => {
-          const d = r.m[p][k] - r.m.shortest[k]
+          const d = r.m[p][k] - r.m[vs][k]
           if (Math.abs(d) < TIE) tie++
           else if (d < 0) win++
           else loss++
         })
-        return { win, tie, loss }
+        return { win, tie, loss, sign_test_p: Number(signTest(win, loss).toPrecision(2)) }
       }
+      const vsSlots = rs.map((r) => pct(r.m[p].drive - r.m.slots.drive, r.m.slots.drive))
+      const expVsSlots = rs.map((r) => pct(r.m[p].exposure - r.m.slots.exposure, r.m.slots.exposure))
       const extra = rs.map((r) => pct(r.m[p].drive - r.m.shortest.drive, r.m.shortest.drive))
       per[p] = {
         late_total: r1(sum(ms.map((m) => m.late))),
@@ -270,6 +317,14 @@ test('route-quality evaluation', { timeout: 60 * 60_000 }, async () => {
         drive_total: r1(sum(ms.map((m) => m.drive))),
         extra_drive_pct_median: r1(median(extra)),
         extra_drive_pct_worst: r1(Math.max(...extra)),
+        extra_drive_pct_iqr: quartiles(extra),
+        extra_drive_pct_vs_slots_median: r1(median(vsSlots)),
+        exposure_change_pct_vs_slots_median: r1(median(expVsSlots)),
+        exposure_change_pct_vs_slots_iqr: quartiles(expVsSlots),
+        exposure_change_pct_vs_slots_total: r1(pct(sum(ms.map((m) => m.exposure)) - sum(rs.map((r) => r.m.slots.exposure)), sum(rs.map((r) => r.m.slots.exposure)))),
+        vs_slots_exposure: wtl('exposure', 'slots'),
+        vs_slots_rain: wtl('rainMinutes', 'slots'),
+        vs_slots_late: wtl('late', 'slots'),
         late_reduction_pct_vs_shortest: r1(pct(sum(base.map((m) => m.late)) - sum(ms.map((m) => m.late)), sum(base.map((m) => m.late)))),
         exposure_reduction_pct_vs_shortest: r1(pct(sum(base.map((m) => m.exposure)) - sum(ms.map((m) => m.exposure)), sum(base.map((m) => m.exposure)))),
         rain_reduction_pct_vs_shortest: r1(pct(sum(base.map((m) => m.rainMinutes)) - sum(ms.map((m) => m.rainMinutes)), sum(base.map((m) => m.rainMinutes)))),

@@ -165,6 +165,8 @@ export function makeScenario(pool: PoolPoint[], matrix: Matrix, type: ScenarioTy
     prev = s.id
   }
   const runLength = t - DEPARTURE
+  // the random order meets every slot by construction; it must also finish by closing time
+  if (Object.values(arrival).some((at) => at > OPEN.end)) throw new Error(`${type}-${size}-s${seed}: the random order arrives after ${OPEN.end / 60}:00`)
 
   if (type === 'tight' || type === 'combined') {
     for (const s of shuffle(r, stops).slice(0, Math.round(size / 2))) {
