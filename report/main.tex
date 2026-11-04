@@ -108,7 +108,7 @@ before the driver leaves. Receiving restaurants and clinics are not buyers. Cold
 navigate, track drivers or measure cargo temperature.
 
 \textbf{Purpose of the service.} ColdRoute (i)~fuses Singapore open data that a small operator would never integrate by
-itself---LTA DataMall speed bands and carparks, NEA two-hour forecasts, HDB carpark availability~\cite{lta,nea,hdb}---with
+itself---LTA DataMall speed bands and carparks, NEA two-hour forecasts, HDB carpark availability~\cite{lta,datagov}---with
 road travel times; (ii)~searches stop orders with a transparent, normalised objective whose weights reflect the cargo
 (Pharma, Balanced, Fastest); and (iii)~shows the recommended route side by side with the shortest-drive route, with
 plain-language reasons for every change. Runs are saved per dispatcher account so that teams can reopen and replan them.
@@ -123,7 +123,7 @@ priced for a two- or three-van operator.
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Named route-planning SaaS products, from official vendor pages accessed 4 Nov 2026~\cite{optimoroute,optimofeat,routific,onfleet,spoke}. Prices use each vendor's own unit and currency symbol and are not directly comparable. ``?'' = not stated on the vendor's pages.}
+\caption{Named route-planning SaaS products, from official vendor pages accessed 4 Nov 2026~\cite{vendors}. Prices use each vendor's own unit and currency symbol and are not directly comparable. ``?'' = not stated on the vendor's pages.}
 \label{tab:competitors}
 \setlength{\tabcolsep}{3pt}
 \begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{3.55cm}>{\centering\arraybackslash}p{1.1cm}>{\centering\arraybackslash}p{1.45cm}>{\centering\arraybackslash}p{1.15cm}>{\centering\arraybackslash}p{1.45cm}Y@{}}
@@ -218,7 +218,7 @@ Data transfer out & 0.06 & 2.08 & 20.23 \\
 \end{table}
 
 \textbf{Cloud cost model.} We derived the workload from the Terraform configuration and the team's measurements, then
-priced it with AWS's official price lists, for Singapore and, for Location Service, Sydney~\cite{awslambda,awsloc,awsapigw,awsddb,awss3,awsamplify,awscognito,awscw,awsxfer}
+priced it with AWS's official price lists, for Singapore and, for Location Service, Sydney~\cite{awsprice}
 (Table~\ref{tab:aws}). Two loads matter. The \emph{fixed} load is the traffic refresh (1\,GB, about 7\,s, every 10 minutes:
 4,320 runs per month) and the nightly typical-traffic build; it costs under a dollar. The \emph{per-use} load is dominated by
 routing: Amazon Location Service bills US\$0.50 per 1,000 Core routes, and a matrix bills every origin--destination cell
@@ -616,23 +616,10 @@ JWT authorizers and partition keys enforce ownership; how fixed reference scales
 \bibitem{sfa} Singapore Food Agency, ``Singapore Food Statistics 2025.'' \url{https://www.sfa.gov.sg/news-publications/newsroom/singapore-food-statistics-2025}
 \bibitem{sfaresp} Singapore Food Agency, ``Responsibilities of food establishment operators.'' \url{https://www.sfa.gov.sg/food-manufacturing-storage/operation-requirements-responsibilities/responsibilities-of-food-establishment-operators}
 \bibitem{lta} Land Transport Authority, ``LTA DataMall API User Guide'' (Traffic Speed Bands, Carpark Availability). \url{https://datamall.lta.gov.sg/content/dam/datamall/datasets/LTA_DataMall_API_User_Guide.pdf}
-\bibitem{nea} data.gov.sg, ``2-hour Weather Forecast.'' \url{https://api.data.gov.sg/v1/environment/2-hour-weather-forecast}
-\bibitem{hdb} data.gov.sg, ``HDB Carpark Availability.'' \url{https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view}
-\bibitem{optimoroute} OptimoRoute, ``Pricing.'' \url{https://optimoroute.com/pricing/}
-\bibitem{optimofeat} OptimoRoute, ``Features.'' \url{https://optimoroute.com/features/}
-\bibitem{routific} Routific, ``Pricing.'' \url{https://www.routific.com/pricing}
-\bibitem{onfleet} Onfleet, ``Pricing.'' \url{https://onfleet.com/pricing}
-\bibitem{spoke} Spoke, ``Spoke products and pricing.'' \url{https://help.spoke.com/en/articles/1925291-spoke-products-pricing}
+\bibitem{datagov} data.gov.sg, ``2-hour Weather Forecast'' and ``HDB Carpark Availability.'' \url{https://api.data.gov.sg/v1/environment/2-hour-weather-forecast}, \url{https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view}
+\bibitem{vendors} Vendor pricing and feature pages: OptimoRoute \url{https://optimoroute.com/pricing/}, \url{https://optimoroute.com/features/}; Routific \url{https://www.routific.com/pricing}; Onfleet \url{https://onfleet.com/pricing}; Spoke \url{https://help.spoke.com/en/articles/1925291-spoke-products-pricing}
 \bibitem{esg} Enterprise Singapore, ``Annual Report 2020--2021,'' p.\,27. \url{https://www.enterprisesg.gov.sg/-/media/esg/files/resources/publications/annual-reports/esg_ar2020_21.pdf}
-\bibitem{awslambda} AWS, ``Lambda pricing'' and Singapore price list. \url{https://aws.amazon.com/lambda/pricing/}
-\bibitem{awsloc} AWS, ``Amazon Location Service pricing.'' \url{https://aws.amazon.com/location/pricing/}
-\bibitem{awsapigw} AWS, ``API Gateway pricing.'' \url{https://aws.amazon.com/api-gateway/pricing/}
-\bibitem{awsddb} AWS, ``DynamoDB on-demand pricing.'' \url{https://aws.amazon.com/dynamodb/pricing/on-demand/}
-\bibitem{awss3} AWS, ``S3 pricing.'' \url{https://aws.amazon.com/s3/pricing/}
-\bibitem{awsamplify} AWS, ``Amplify pricing.'' \url{https://aws.amazon.com/amplify/pricing/}
-\bibitem{awscognito} AWS, ``Cognito pricing.'' \url{https://aws.amazon.com/cognito/pricing/}
-\bibitem{awscw} AWS, ``CloudWatch pricing.'' \url{https://aws.amazon.com/cloudwatch/pricing/}
-\bibitem{awsxfer} AWS, ``Data transfer price list, ap-southeast-1.'' \url{https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/ap-southeast-1/index.json}
+\bibitem{awsprice} AWS, pricing pages for Lambda, API Gateway, Amazon Location Service, DynamoDB, S3, Amplify, Cognito and CloudWatch, and the ap-southeast-1 data-transfer price list. \url{https://aws.amazon.com/pricing/}
 \bibitem{fx} US Federal Reserve, ``H.10 Foreign Exchange Rates'' (30 Oct 2026). \url{https://www.federalreserve.gov/releases/h10/current/}
 \bibitem{dell} Dell Singapore, ``PowerEdge R350.'' \url{https://www.dell.com/en-sg/shop/dell-poweredge-servers/poweredge-r350/spd/poweredge-r350/asper350_vi_vp}
 \bibitem{colo} IT Block, ``Single server colocation Singapore.'' \url{https://www.itblock.sg/single-server-colocation-singapore}
