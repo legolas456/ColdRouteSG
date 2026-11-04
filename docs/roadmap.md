@@ -8,8 +8,8 @@ Update this file in the same PR as the work. Tick items off; don't delete them.
 - [x] Python + FastAPI local MVP with public data.gov.sg feeds and OSRM (`backend/`).
 - [x] New dispatcher console (PR #1): workspace, three views, KPIs, explanations, timeline, Singapore map, share and account mocks, phone layout, light and dark.
 - [x] Project docs (this folder).
-- [x] New console deployed by hand to Amplify: https://main.daledp6z7ncmz.amplifyapp.com/ (`make deploy`, see [deployment.md](deployment.md)).
-- [x] CI with GitHub Actions: Checks on every PR, and every merge to `main` deploys the frontend to Amplify (see [deployment.md](deployment.md)).
+- [x] New console deployed by hand to Amplify (that app is now retired; the live site is deployed by `terraform apply`, see [deployment.md](deployment.md)).
+- [x] CI with GitHub Actions: Checks on every PR (deploys now come from `terraform apply`, see [deployment.md](deployment.md)).
 - [x] Live public feeds back in the new console: **Live data / Recorded** switch, the Conditions panel (NEA forecast, HDB carparks, LTA cameras), plans built on live rain and parking, Journey/Weather/Parking/Camera details on the stop card, late-delivery alert. The browser calls data.gov.sg directly; no backend needed.
 - [x] Real stops: OneMap address search (any building, street or postal code), real OSRM drive times and road geometry for new stops, **Load sample** / **Clear**, the run kept across reloads, at most 15 stops per run.
 - [x] Easier editing: times and unloading minutes are picked from lists (typing still works, **Custom…** for odd durations), and every `Segmented` switch is drawn as outlined buttons so the options read as clickable.

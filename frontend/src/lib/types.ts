@@ -141,6 +141,8 @@ export interface RoadsUsed {
   measured: number
   /** routes Location Service bills for: every cell of a matrix (a stop to itself too), and each route drawn */
   billed: number
+  /** pairs Location Service could not route, so the plan estimates them from straight-line distance */
+  failed?: number
 }
 
 /** What the cloud planner (planner/, POST /api/plan) answers. */

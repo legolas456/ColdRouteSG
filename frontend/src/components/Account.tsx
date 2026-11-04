@@ -151,7 +151,7 @@ export function AccountBar({ user, onSignIn, onSignOut, onRuns, onTeam }: Accoun
           <Avatar user={null} />
           <span className="min-w-0 flex-1">
             <span className="block text-[13px] leading-tight font-medium">Sign in</span>
-            <span className="block truncate text-[11.5px] text-fg-3">To dispatch runs and share them</span>
+            <span className="block truncate text-[11.5px] text-fg-3">To save runs and plan them on AWS</span>
           </span>
           <ChevronRight size={14} className="shrink-0 text-fg-3" />
         </button>

@@ -20,7 +20,7 @@ From the repo root (macOS / Linux, needs Python 3.9+, Node ≥ 20.19 and `make`;
 | `make frontend` / `make backend` | Just one of them (the console works without the backend) |
 | `make test` | Backend `pytest`, frontend optimiser unit tests and TypeScript check |
 | `make build` / `make preview` | Production build into `frontend/dist`, and serve it on http://localhost:4173 |
-| `make deploy` | Deploy by hand (CI normally does this on merge). Needs the `coldroute` AWS profile, see [`docs/deployment.md`](docs/deployment.md) |
+| `make deploy` | Upload a frontend build to an Amplify app of your own, by hand. The live site is deployed by `terraform apply` in `infra/`, see [`docs/deployment.md`](docs/deployment.md) |
 
 `make help` lists them all. Local env files (`backend/.env`, `.env.deploy.local`) are created from the `*.example` files and ignored by git. AWS keys never go in the repo. On Windows without `make`, use the manual steps below or `run_local.bat`.
 

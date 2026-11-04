@@ -10,7 +10,7 @@
 // are cached by position in DynamoDB.
 import { BatchGetItemCommand, BatchWriteItemCommand, type DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { CalculateRouteMatrixCommand, CalculateRoutesCommand, type GeoRoutesClient } from '@aws-sdk/client-geo-routes'
-import { ensureLegs, ensureMatrix, legsOf, mergeLegs, round5, setDriveTimes, simplify, type Point } from '../../frontend/src/lib/roads'
+import { ensureLegs, ensureMatrix, legsOf, mergeLegs, round5, setDriveTimes, simplify, travel, type Point } from '../../frontend/src/lib/roads'
 import type { DriveTime, RoadsUsed } from '../../frontend/src/lib/types'
 
 export interface RoadClients {
@@ -127,7 +127,15 @@ export async function ensureDriveTimes(points: Point[], c: RoadClients | null, n
     const got = cols ? [rows, cols] : [rows]
     setDriveTimes(points, got.flatMap((m) => m.times))
     await remember(got.flatMap((m) => m.pairs), c, now)
-    return { source: 'location', cached: cached.length, measured: got.reduce((n, m) => n + m.pairs.length, 0), billed: got.reduce((n, m) => n + m.cells, 0) }
+    // pairs Location Service returned no route for: the optimiser estimates them
+    const failed = points.reduce((n, a) => n + points.filter((b) => a.id !== b.id && !travel(a, b).real).length, 0)
+    return {
+      source: 'location',
+      cached: cached.length,
+      measured: got.reduce((n, m) => n + m.pairs.length, 0),
+      billed: got.reduce((n, m) => n + m.cells, 0),
+      ...(failed > 0 && { failed }),
+    }
   } catch (e) {
     console.error('Location Service drive times failed; falling back to OSRM', e)
     return { source: (await ensureMatrix(points)) ? 'osrm' : 'estimate', cached: 0, measured: 0, billed: 0 }

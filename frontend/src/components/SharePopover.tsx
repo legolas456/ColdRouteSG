@@ -1,14 +1,7 @@
 import clsx from 'clsx'
-import { Building2, Check, ChevronDown, Globe2, Link2 } from 'lucide-react'
+import { Check, Globe2, Link2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from './ui'
-
-type Access = 'workspace' | 'anyone'
-
-const ACCESS: Record<Access, { label: string; icon: typeof Globe2 }> = {
-  workspace: { label: 'Anyone at ColdRoute SG', icon: Building2 },
-  anyone: { label: 'Anyone with the link', icon: Globe2 },
-}
 
 interface Props {
   /** e.g. "Compare · MBFC" when the link can carry the current view */
@@ -18,9 +11,11 @@ interface Props {
   notify: (msg: string) => void
 }
 
-/** Small popover under the Share button: who can open it, which view, copy. */
+/**
+ * Small popover under the Share button: which view, copy. The link opens the
+ * sample run read-only; sharing a saved run of your own is not built yet.
+ */
 export function SharePopover({ viewLabel, buildLink, onClose, notify }: Props) {
-  const [access, setAccess] = useState<Access>('workspace')
   const [withView, setWithView] = useState(!!viewLabel)
   const [copied, setCopied] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -29,7 +24,6 @@ export function SharePopover({ viewLabel, buildLink, onClose, notify }: Props) {
   closeRef.current = onClose
 
   const link = buildLink(withView && !!viewLabel)
-  const Icon = ACCESS[access].icon
 
   useEffect(() => {
     // the wrapper also holds the Share button, so clicking it toggles instead of re-opening
@@ -69,31 +63,17 @@ export function SharePopover({ viewLabel, buildLink, onClose, notify }: Props) {
     <div
       ref={ref}
       role="dialog"
-      aria-label="Share this run"
+      aria-label="Share a preview"
       className="animate-rise absolute top-11 right-0 z-50 w-[360px] rounded-panel bg-panel p-4 shadow-float"
     >
-      <div className="text-[14px] font-semibold">Share this run</div>
-      <p className="mt-0.5 text-[12px] text-fg-3">Opens a read-only view of this plan.</p>
+      <div className="text-[14px] font-semibold">Share a preview</div>
+      <p className="mt-0.5 text-[12px] text-fg-3">Opens a read-only view of the sample run. Sharing your own saved runs is not built yet.</p>
 
       <div className="mt-3.5 flex items-center gap-2.5">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-ok-soft text-ok">
-          <Icon size={14} strokeWidth={1.8} />
+          <Globe2 size={14} strokeWidth={1.8} />
         </span>
-        <label className="relative flex min-w-0 items-center rounded-md text-[13px] font-medium hover:bg-hover">
-          <select
-            aria-label="Who can open the link"
-            value={access}
-            onChange={(e) => setAccess(e.target.value as Access)}
-            className="cursor-pointer appearance-none bg-transparent py-0.5 pr-5 pl-1 outline-none [field-sizing:content]"
-          >
-            {(Object.keys(ACCESS) as Access[]).map((a) => (
-              <option key={a} value={a}>
-                {ACCESS[a].label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={13} className="pointer-events-none absolute right-1 text-fg-3" />
-        </label>
+        <span className="text-[13px] font-medium">Anyone with the link</span>
         <span className="ml-auto shrink-0 text-[12px] text-fg-3">can view</span>
       </div>
 

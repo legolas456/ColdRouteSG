@@ -133,6 +133,15 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_rate_limit  = 50
   }
 
+  # planning bills Location Service for every new pair of stops (up to about
+  # 257 routes, US$0.13, for 15 new stops), so it gets a lower ceiling of its
+  # own; this is for all users together, not per user
+  route_settings {
+    route_key              = aws_apigatewayv2_route.plan.route_key
+    throttling_burst_limit = var.plan_throttle_burst
+    throttling_rate_limit  = var.plan_throttle_rate
+  }
+
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_access.arn
     format = jsonencode({

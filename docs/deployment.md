@@ -12,18 +12,15 @@ How the live demo gets to AWS, where the keys are, and how to change it.
 | AWS account | Jay's account, the team's production stack since 2 Nov 2026 |
 | How | **`terraform apply`** in `infra/` builds the console with the stack's settings and uploads it to Amplify ([`infra/README.md`](../infra/README.md)). Merging to `main` does not deploy by itself. |
 
-The earlier app, `coldroute-sg` (`daledp6z7ncmz`) in Xuankun's account on the AWS Free plan, no longer updates on merges. `deploy.yml` can still deploy to it by hand.
+The earlier app, `coldroute-sg` (`daledp6z7ncmz`) in Xuankun's account, is retired: nothing deploys to it any more. Do not use or cite it.
 
 ## How it works
 
 | Workflow | Runs on | Does |
 | --- | --- | --- |
-| [`checks.yml`](../.github/workflows/checks.yml) | Every PR, and pushes to `main` | Frontend `npm ci && npm run build`, backend `pytest`. No secrets. |
-| [`deploy.yml`](../.github/workflows/deploy.yml) | **Run workflow** in the Actions tab only | Deploys to the earlier app (`daledp6z7ncmz`): runs [`scripts/deploy-frontend.sh`](../scripts/deploy-frontend.sh), which builds, zips `frontend/dist`, runs `create-deployment` → upload → `start-deployment`, waits for the job, then writes the URL to the run summary. |
+| [`checks.yml`](../.github/workflows/checks.yml) | Every PR, and pushes to `main` | Frontend tests and build, planner typecheck, tests and build, backend `pytest`, `terraform fmt` and `validate`. No secrets. |
 
 So for teammates: **open a PR, wait for Checks to go green, merge.** Whoever holds the Terraform state (Jay) then runs `terraform apply` in `infra/` to put `main` live.
-
-Deploys run one at a time. A newer merge waits for the running deploy to finish.
 
 To see which commit is live, look for `<meta name="coldroute-build" content="<sha> <build time>">` in the page source, or run:
 
@@ -33,31 +30,22 @@ curl -s https://main.d1f8mppryelp5v.amplifyapp.com/ | grep coldroute-build
 
 ## Keys
 
-- Deploys use the IAM user **`coldroute-deployer`**, which has only the AWS managed policy `AdministratorAccess-Amplify`. Don't deploy with root keys.
-- Its access key is stored in two places:
-  - the **repository secrets** `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, used by `deploy.yml`;
-  - Xuankun's Mac, in `~/.aws/credentials` under the profile `coldroute`, used by `make deploy`.
+- The live stack is created and deployed with the credentials of whoever runs `terraform apply` (Jay's AWS profile). No AWS keys are stored in the repo or in GitHub.
+- The earlier `deploy.yml` workflow (removed) used the IAM user **`coldroute-deployer`** in Xuankun's account, with its key in the repository secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` and in a local `coldroute` profile. Nothing uses that key now: delete the two secrets (repository Settings → Secrets and variables → Actions) and deactivate the user's access key (IAM → Users → `coldroute-deployer` → Security credentials).
 - **Never commit keys.** `.gitignore` blocks `.env`, `*.local` and `*accessKeys*.csv`, but check `git status` before you push anyway.
-- To rotate or revoke: IAM → Users → `coldroute-deployer` → Security credentials. Create a new key, update both secrets (`gh secret set AWS_ACCESS_KEY_ID -R legolas456/ColdRouteSG`, and the same for `AWS_SECRET_ACCESS_KEY`) and the local profile, then deactivate and delete the old key.
 
-## Deploy by hand (fallback)
+## Deploy by hand (your own test app only)
 
-Use this if Actions is down, or to deploy a branch before you merge it.
-
-1. Install [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), then run `aws configure --profile coldroute` (region `ap-southeast-1`). Ask Xuankun for a key, or use your own AWS account (the script creates the app if it doesn't exist).
-2. `make env` creates `.env.deploy.local` from [`.env.deploy.example`](../.env.deploy.example). It holds the profile, region, app name and app ID, never the keys.
-3. `make deploy` to build and upload, or `make deploy-only` to upload the existing `frontend/dist`.
-
-A hand deploy shows up on the live site straight away. It gets replaced by the next deploy from `main`.
+`make deploy` builds the console and uploads it to an Amplify app named in `.env.deploy.local` (`make env` creates it from [`.env.deploy.example`](../.env.deploy.example)), using your own AWS profile. Use it for an app of your own, never for the live site, which `terraform apply` owns.
 
 ## History
 
-There was no CI before October 2026. There were no workflows, no `amplify.yml` and no secrets, and there are no AWS keys anywhere in the Git history. Older deployments are in legolas456's AWS account and aren't maintained:
+There was no CI before October 2026. Older deployments, in legolas456's AWS account, are retired and should not be used or cited:
 
 | What | Where | Notes |
 | --- | --- | --- |
-| Old frontend | https://production.d3afn54umnn6ms.amplifyapp.com/ | The pre-redesign UI, built on 10 Oct and uploaded by hand as `frontend/coldroute-frontend.zip` (commit `b2aab2b`, removed in `c1372c9`). |
-| Old backend | `https://h1mcomkkll.execute-api.ap-southeast-1.amazonaws.com/` | API Gateway + Lambda running FastAPI through Mangum (`backend/lambda_handler.py`), uploaded by hand from `backend/backend-source.zip`. `frontend/.env.production` still points at it, but the new console doesn't call the backend yet. |
+| Old frontend | `production.d3afn54umnn6ms.amplifyapp.com` | The pre-redesign UI, built on 10 Oct and uploaded by hand. |
+| Old backend | API Gateway `h1mcomkkll` in `ap-southeast-1` | FastAPI on Lambda through Mangum, uploaded by hand. Replaced by the stack in `infra/`. |
 
 ## Infrastructure as code
 
@@ -79,15 +67,11 @@ Both need `backend/app/data/speed_baseline.json` in the package: each road stret
 
 The Terraform in `infra/` also runs `backend/traffic_profile.handler` each night (02:30 Singapore time), which builds typical traffic for every weekday and weekend 15-minute slot from the kept readings; the console asks for it (`/api/traffic/typical`) when no live reading covers a departure.
 
-Then set `VITE_TRAFFIC_URL` for the production build (in `frontend/.env.production`, or as a variable in `deploy.yml`) and redeploy the console. Until it is set, the console plans with free-flowing drive times and shows the Road speeds section as "Off".
+`terraform apply` sets `VITE_TRAFFIC_URL` for the console build. Without it (a local build), the console plans with free-flowing drive times and shows the Road speeds section as "Off".
 
 Cost: the LTA API is free; the schedule is about 4,300 short Lambda runs a month, each writing the grid and a kept reading to S3, plus one nightly typical-traffic build.
 
 ## Still open
 
-We're `write` collaborators on `legolas456/ColdRouteSG`. We can push workflows and set Actions secrets, but only the owner can change the repository's Actions settings, webhooks and installed GitHub Apps.
-
 - [ ] Ask legolas456 to protect `main` so that the Checks must pass before a merge.
-- [ ] Optional: swap the long-lived key for a GitHub OIDC role (`aws-actions/configure-aws-credentials`), or switch to Amplify's own Git connection once the owner authorises the AWS Amplify GitHub App.
-- [ ] Deploy the backend from CI too, once the frontend calls it (roadmap section 5).
-- [ ] Deploy the live traffic service (see above) and set `VITE_TRAFFIC_URL` for the production build.
+- [ ] Delete the old deploy key (see Keys above).

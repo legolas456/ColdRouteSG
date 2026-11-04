@@ -6,7 +6,7 @@ ColdRoute SG is the CS5224 Cloud Computing Group 36 prototype for planning tempe
 
 Use **[the current dispatcher console](https://main.d1f8mppryelp5v.amplifyapp.com/)**. It is built from `frontend/` on `main` and deployed with the AWS stack by `terraform apply` (`infra/`).
 
-The [older site with `production` in its address](https://production.d3afn54umnn6ms.amplifyapp.com/) is the pre-redesign demo. Its branch name does not make it the current release. Do not judge the current code against that UI. Deployment history and ownership are in [deployment.md](deployment.md).
+Two older sites, one with `production` and one with `daledp6z7ncmz` in its address, are retired demos from before the final version. Do not use, test or cite them. Deployment history and ownership are in [deployment.md](deployment.md).
 
 ## What is real, and what is still a prototype?
 

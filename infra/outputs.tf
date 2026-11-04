@@ -57,6 +57,6 @@ output "dashboard_url" {
 }
 
 output "frontend_env" {
-  description = "Build-time settings for the console (frontend/.env.production or the Deploy workflow)."
+  description = "Build-time settings terraform apply passes to the console build."
   value       = local.frontend_env
 }

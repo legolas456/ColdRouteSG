@@ -8,6 +8,7 @@
 // straight lines. The cloud planner (planner/) fills the same tables from
 // Amazon Location Service instead, so this module stays free of React.
 import snapshot from '../data/osrm.json'
+import { ADDRESS_BOOK, DEPOT, SAMPLE_STOPS } from '../data/sample'
 
 export type Point = { id: string; lng: number; lat: number }
 
@@ -27,6 +28,13 @@ const legs: Record<string, [number, number][]> = { ...base.legs }
 // a stop id is only valid for the coordinates it was measured at
 const measuredAt: Record<string, string> = {}
 const where = (p: Point) => `${p.lng.toFixed(5)},${p.lat.toFixed(5)}`
+// where each id was last asked for: a reply for an older position is dropped
+const requestedAt: Record<string, string> = {}
+const ask = (points: Point[]) => points.forEach((p) => (requestedAt[p.id] = where(p)))
+const current = (p: Point, asked: string) => (requestedAt[p.id] ?? asked) === asked
+// the places the bundled snapshot was measured at; an id moved elsewhere loses them
+const bundledAt: Record<string, string> = Object.fromEntries([DEPOT, ...SAMPLE_STOPS, ...ADDRESS_BOOK].map((p) => [p.id, where(p)]))
+Object.assign(measuredAt, bundledAt)
 
 let version = 0
 const listeners = new Set<() => void>()
@@ -107,17 +115,21 @@ function invalidate(points: Point[]) {
  */
 export async function ensureMatrix(points: Point[]): Promise<boolean> {
   invalidate(points)
+  ask(points)
   if (allReal(points)) return true
+  const asked = points.map(where)
   try {
     const coords = points.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';')
     const t = await getJson(`${OSRM}/table/v1/driving/${coords}?annotations=duration,distance`)
     points.forEach((a, i) => {
+      // a newer request has moved this stop since: its row is stale
+      if (!current(a, asked[i])) return
       minutes[a.id] ??= {}
       km[a.id] ??= {}
       points.forEach((b, j) => {
         const d = t.durations?.[i]?.[j]
         const m = t.distances?.[i]?.[j]
-        if (d == null || m == null) return
+        if (d == null || m == null || !current(b, asked[j])) return
         minutes[a.id][b.id] = Math.round((d / 60) * 10) / 10
         km[a.id][b.id] = Math.round((m / 1000) * 10) / 10
       })
@@ -176,6 +188,7 @@ export async function ensureLegs(paths: Point[][]): Promise<boolean> {
   for (const path of paths) {
     const missing = path.slice(1).some((p, i) => !legs[`${path[i].id}>${p.id}`])
     if (!missing || path.length < 2) continue
+    const asked = path.map(where)
     try {
       const coords = path.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';')
       const r = await getJson(`${OSRM}/route/v1/driving/${coords}?overview=false&steps=true&geometries=geojson`)
@@ -188,7 +201,7 @@ export async function ensureLegs(paths: Point[][]): Promise<boolean> {
             if (!last || last[0] !== c[0] || last[1] !== c[1]) line.push(c)
           }
         }
-        if (line.length > 1 && path[i + 1]) {
+        if (line.length > 1 && path[i + 1] && current(path[i], asked[i]) && current(path[i + 1], asked[i + 1])) {
           legs[`${path[i].id}>${path[i + 1].id}`] = simplify(line, 0.00012).map(([x, y]) => [round5(x), round5(y)])
         }
       })
@@ -203,6 +216,7 @@ export async function ensureLegs(paths: Point[][]): Promise<boolean> {
 /** Drive times measured elsewhere (the cloud planner's Location Service matrix), used like OSRM's. */
 export function setDriveTimes(points: Point[], times: { from: string; to: string; minutes: number; km: number }[]) {
   invalidate(points)
+  ask(points)
   for (const t of times) {
     minutes[t.from] ??= {}
     km[t.from] ??= {}
@@ -211,6 +225,31 @@ export function setDriveTimes(points: Point[], times: { from: string; to: string
   }
   for (const p of points) measuredAt[p.id] = where(p)
   bump()
+}
+
+/**
+ * Puts back the bundled snapshot's drive times for every pair of these points
+ * that is still where the snapshot measured it. Live and cloud plans overwrite
+ * them (OSRM now, Location Service), so Recorded mode calls this to replay the
+ * recorded sample exactly.
+ */
+export function restoreRecordedTimes(points: Point[]) {
+  invalidate(points)
+  ask(points)
+  for (const a of points) {
+    if (bundledAt[a.id] !== where(a)) continue
+    for (const b of points) {
+      if (a.id === b.id || bundledAt[b.id] !== where(b)) continue
+      const m = base.minutes[a.id]?.[b.id]
+      const k = base.km[a.id]?.[b.id]
+      if (m === undefined || k === undefined) continue
+      minutes[a.id] ??= {}
+      km[a.id] ??= {}
+      minutes[a.id][b.id] = m
+      km[a.id][b.id] = k
+    }
+    measuredAt[a.id] = where(a)
+  }
 }
 
 /** Road geometry measured elsewhere, keyed "fromId>toId". */

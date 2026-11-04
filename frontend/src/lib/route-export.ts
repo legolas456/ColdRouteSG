@@ -61,3 +61,13 @@ export function routeCsv(
 
   return [HEADERS.map(cell).join(','), ...rows].join('\r\n') + '\r\n'
 }
+
+/** Saves a CSV in the browser (with a BOM, so Excel reads it as UTF-8). */
+export function downloadCsv(csv: string, filename: string) {
+  const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
