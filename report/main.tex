@@ -155,7 +155,7 @@ our measurements, not taken from a bill; user-study participants were mostly stu
 \textbf{Comment} & \textbf{Answer} \\
 \midrule
 Name competitors; make the difference precise & Table~\ref{tab:competitors}: four named products, with prices and what each page does not show \\
-Give the business model numbers & \Sd49 per vehicle; market ceilings (Table~\ref{tab:market}); cloud and on-premise costs (Section~2) \\
+Give the business model numbers & \Sd49 per active vehicle, 30-day pilot; market ceilings (Table~\ref{tab:market}); cloud and on-premise costs (Section~2) \\
 Set measurable acceptance criteria & Targets fixed before evaluation for route quality, usability and cost (Section~4) \\
 Explain how data at different scales is combined & Leg factors and stop conditions on one frozen snapshot (Section~3.4, Table~\ref{tab:fusion}) \\
 Normalise the terms; justify the weights & Fixed per-stop reference scales, profile weights and sensitivity test (Section~3.5, 4.2) \\
@@ -166,11 +166,14 @@ Normalise the terms; justify the weights & Fixed per-stop reference scales, prof
 % =====================================================================
 \section{Business Model and Cloud vs On-Premise Justification}
 % =====================================================================
-\textbf{Revenue model.} The course prototype is free. For a commercial pilot we propose a single subscription of
-\textbf{\Sd49 per active vehicle per month}, including the dispatcher account, saved runs and live data. A three-van
-operator would pay \Sd147/month---below OptimoRoute's per-driver price for three drivers and well below Onfleet's entry tier,
-which matches a narrower tool. A 30-day free pilot lets operators test it on real runs. The price is a hypothesis to be
-validated with operators, not a measured willingness to pay.
+\textbf{Revenue model.} The course prototype is free. For a commercial version we propose one subscription,
+\textbf{\Sd49 per active vehicle per month} after a 30-day free pilot, including the dispatcher account, saved runs and live
+data. A vehicle is active in a month if at least one run was planned for it. Pricing per vehicle matches the product, which
+plans one van at a time, and an idle van costs the customer nothing, as it costs us almost nothing. \Sd49 is about US\$38~\cite{fx},
+between OptimoRoute's Lite and Pro per-driver prices. A three-van operator pays \Sd147 (about US\$115), less than Routific's
+US\$150 tier for its roughly 660 orders a month (10 stops a van, 22 days) and far less than Onfleet's entry tier. ColdRoute
+manages less of the fleet than these tools, so the price assumes its cold-chain planning is worth as much to these buyers;
+the pilot would test that. It is a hypothesis, not a measured willingness to pay.
 
 \textbf{Market size.} Enterprise Singapore's Logistics Industry Digital Plan targets about 5,300 logistics SMEs~\cite{esg}. This is a broad,
 dated denominator, not a count of cold-chain operators, so we apply explicit eligibility filters
