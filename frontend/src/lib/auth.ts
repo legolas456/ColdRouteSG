@@ -16,7 +16,7 @@ if (AUTH_ENABLED) {
   Amplify.configure({ Auth: { Cognito: { userPoolId: USER_POOL_ID!, userPoolClientId: CLIENT_ID! } } })
 }
 
-/** "jay.kim@nus.edu" -> "Jay Kim", for accounts created without a name. */
+/** "tan.wei.ling@example.com" -> "Tan Wei Ling", for accounts created without a name. */
 export function nameFromEmail(email: string) {
   const local = email.split('@')[0] ?? ''
   const words = local.split(/[._\-+]+/).filter(Boolean)
