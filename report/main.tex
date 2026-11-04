@@ -91,7 +91,7 @@ carpark availability and cargo sensitivity, and explains each trade-off against 
 live data are computed by a Lambda function with drive times from Amazon Location Service, on a serverless AWS stack
 (Amplify, API Gateway, Lambda, DynamoDB, S3, Cognito, EventBridge) defined entirely in Terraform. A 50-account pilot would
 cost about \Sd132 per month, mostly routing fees, against roughly \Sd2,135 per month for an equivalent redundant on-premise deployment.
-On 48 constrained test scenarios it removes almost all lateness and cuts cargo exposure by 37\% for a median 5--11\% more driving, and drives 20\% less than ordering stops by deadline. \fillin{one clause each on latency and SUS once measured.}
+On 60 generated scenarios, compared with a planner that only meets booked slots, it carries 18\% less cargo time on board for a median 1--7\% more driving, and unloads 40\% less in rain. \fillin{one clause each on latency and SUS once measured.}
 \end{minipage}
 \vspace{0.2cm}
 \begin{minipage}{0.75\linewidth}
@@ -427,7 +427,7 @@ shortest-drive routing. They are pilot hypotheses chosen by the team, not values
 $P$ is the same for every order of a given run (a fixed risk times a fixed unloading time), so parking shifts the score but
 cannot change the route. We keep it as a per-stop risk flag; making it order-dependent would need parking predicted for each
 arrival time, which the feeds do not give.
-Section~\ref{sec:quality} tests how much the result depends on them: moving any one weight by $\pm$20\% changes few routes and moves the totals by about 1\%.
+Section~\ref{sec:quality} tests how much the result depends on them: moving any one weight by $\pm$20\% changes few routes and moves exposure and driving by about 1\%; lateness is the most sensitive.
 
 \textbf{Search.} With up to 8 stops ($8!=40{,}320$ orders) the optimiser enumerates every permutation and is exact. Above 8 it
 runs deterministic local search from four starts (shortest-drive, entered order, earliest deadline, nearest neighbour), applying
@@ -448,8 +448,8 @@ Service in Sydney and, if it fails, to the public OSRM server. Most stops are bu
 can be personal data, so a commercial version would meet PDPA's Transfer Limitation Obligation~\cite{pdpa} through the
 provider's data-processing terms, or route inside Singapore with self-hosted OSRM. Scalability comes from the design: planner and API Lambdas scale per request,
 DynamoDB is on-demand, the drive-time cache makes repeat plans free, and one shared refresh serves all users, so LTA usage
-stays constant ($\approx$4,320 runs/month) however many users there are.
-\todo{Security/scalability caveats to decide on: the LTA key also sits in Terraform state (move to Secrets Manager/SSM?); the admin analytics endpoint scans the whole table (fine for the course, not for 500 accounts); \texttt{POST /api/plan} has only the stage-wide 50 req/s throttle, so one signed-in account sending new coordinates could cost about US\$6/s in routing (add a route-level throttle and say so); ``Dispatch to driver'' and ``Share'' are front-end mock-ups. Say so honestly or relabel them before the demo.}
+stays constant ($\approx$4,320 runs/month) however many users there are. Because each plan with new stops costs routing fees, \texttt{POST /api/plan} has its own throttle (5 requests/s for all users together), below the API's 50/s.
+\todo{Security/scalability caveats to decide on: the LTA key also sits in Terraform state (move to Secrets Manager/SSM?); the admin analytics endpoint scans the whole table (fine for the course, not for 500 accounts). The test counts in Section~4.1 and the \texttt{POST /api/plan} throttle below assume PR fix/demo-honesty is merged and deployed; check before submitting.}
 
 % =====================================================================
 \section{Evaluation}
@@ -458,7 +458,7 @@ We evaluated four questions: does the system behave correctly, does the recommen
 is it fast and reliable on AWS, and can people use it.
 
 \subsection{Correctness: automated tests and deployment checks}
-The repository has 336 automated tests, all passing on the final code: 132 Vitest and 12 Node tests for the console, 23 for
+The repository has 340 automated tests, all passing on the final code: 135 Vitest and 12 Node tests for the console, 24 for
 the planner (with fake Location Service, DynamoDB and S3 clients) and 169 pytest tests for the backend. GitHub Actions runs
 them, the TypeScript builds, the planner bundle and \texttt{terraform validate} on every pull request. They check, among other things, that every stop
 appears exactly once; that waiting, lateness and rain overlap are simulated correctly; that the heuristic matches exhaustive
@@ -482,63 +482,60 @@ Speed grid in S3 $\le$10\,min old (Live traffic) & \fillin{} & Nightly typical s
 \end{table}
 \todo{After the final deploy (Jay + Ishan): run these checks with the test accounts, take screenshots, and fill the table. Commands for each check: \texttt{Group Project/Claude review/2-PRESENTATION-AND-EVAL-PACK.md}, section B.}
 
-\subsection{Route quality versus the shortest route}\label{sec:quality}
-\textbf{Protocol.} We generated 60 scenarios: five types (an \emph{easy} control with no booked slots or rain;
-\emph{tight} 30--60\,min booked slots at half the stops; heavy \emph{rain} over some stops' areas; \emph{mixed} Pharma, Frozen
-and Chilled cargo at least 8\,km from the depot; and all \emph{combined}), each with 5, 10 and 15 stops and four seeds. Stops are
-drawn from 43 real Singapore addresses: the ten sample customers, and one HDB block per mainland NEA forecast area standing
-in for a customer there. Every run leaves the Jurong depot at 09:00. Drive times come from one saved OSRM matrix, so every
-planner sees identical inputs; there is no traffic. Slots sit on the arrival times of a \emph{random} order, so a route with no
-late stop always exists, and rain starts at a random time in the first half of the run, not where any planner arrives. Each
-scenario is planned four ways with the console's own code: the exact shortest-drive route; earliest deadline first (EDF), the
-order a careful dispatcher might choose by hand; and ColdRoute's Balanced and Pharma profiles. The weights were fixed before
-the run and not tuned on these scenarios, so all 60 are reported. Lateness, rain and exposure are also terms of $J$, so we
-report raw minutes, not $J$. The experiment measures how large the trade-off is, not whether the weights are right; the
-easy control and EDF keep the comparison fair. Targets set in advance, on the 48 constrained scenarios: at least 20\% fewer
-late minutes and 10\% less cargo exposure than the shortest route, for a median of at most 15\% more driving. The script,
-saved drive times and per-run results are in \texttt{frontend/eval} (\texttt{npm run eval}, about 30\,s).
+\subsection{Route quality}\label{sec:quality}
+\textbf{Protocol.} We generated 60 scenarios: five types (an \emph{easy} control with no booked slots or rain; \emph{tight}
+30--60\,min booked slots at half the stops; heavy \emph{rain} over some stops' areas; \emph{mixed} Pharma, Frozen and Chilled
+cargo, all at least 8\,km from the depot; and all \emph{combined}), each with 5, 10 and 15 stops and four seeds. Stops come
+from 43 real Singapore addresses: the ten sample customers, plus one HDB block per mainland NEA forecast area standing in
+for a customer there. Every run leaves the Jurong depot at 09:00, with drive times from one saved OSRM matrix and no traffic.
+Slots sit on the arrival times of a random order, which the script checks meets every slot, and rain starts at a random time
+in the first half of the run. Each scenario is planned five ways with the console's own code: the exact \emph{shortest}
+drive; earliest deadline first (\emph{EDF}, equal deadlines nearest first), the order a careful dispatcher might pick by hand;
+\emph{slots-only}, our optimiser with only its drive and lateness terms, standing in for a general route planner that
+respects time windows; and ColdRoute's \emph{Balanced} and \emph{Pharma} profiles. The weights were set before the run and
+not tuned, so all 60 runs are reported. Lateness, rain and exposure are terms of $J$, so we report raw minutes, and
+slots-only is the main comparison: it shows what the rain and cargo terms add beyond time windows. The script, saved drive
+times and per-run results are in \texttt{frontend/eval} (\texttt{npm run eval}, about 30\,s).
 
 \begin{table}[h]
 \centering\footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Route quality on 60 scenarios, 12 per type. S~=~shortest drive, E~=~earliest deadline first, B~=~Balanced,
-P~=~Pharma. Late stops and rain-exposed unloading are totals over the runs; exposure is the change in total
-sensitivity-weighted time on board versus S; extra driving versus S is the median, worst run in brackets.}\label{tab:quality}
-\begin{tabular}{@{}lrrrr|rr|rrr|rr@{}}
+\caption{Route quality. ``With slots'' is the 24 \emph{tight} and \emph{combined} runs; rain, mixed and easy are 12 runs each.
+Late figures and rain-exposed unloading are totals. Exposure is the change in total sensitivity-weighted time on board versus
+slots-only; driving is the median change versus slots-only; easy shows the worst extra driving versus the shortest route.}\label{tab:quality}
+\begin{tabular}{@{}l|rrrr|r|r|r@{}}
 \toprule
- & \multicolumn{4}{c|}{Late stops} & \multicolumn{2}{c|}{Exposure vs S} & \multicolumn{3}{c|}{Rain unloading (min)} & \multicolumn{2}{c}{Extra driving vs S} \\
-Type & S & E & B & P & B & P & S & B & P & B & P \\
+ & \multicolumn{4}{c|}{24 runs with slots} & Rain & Mixed & Easy \\
+Plan & Late stops & Late min & Exposure & Driving & rain min & exposure & worst extra \\
 \midrule
-Easy (control) & 0 & 0 & 0 & 0 & $-3.5\%$ & $-3.5\%$ & -- & -- & -- & 0\% (4) & 0\% (12) \\
-Tight slots & 48 & 13 & 4 & 1 & $-48.9\%$ & $-49.7\%$ & -- & -- & -- & 25\% (70) & 35\% (78) \\
-Rain & 0 & 0 & 0 & 0 & $-0.3\%$ & $-0.7\%$ & 88.7 & 53.0 & 59.0 & 0\% (3) & 0\% (10) \\
-Mixed cargo & 0 & 0 & 0 & 0 & $-4.4\%$ & $-6.6\%$ & -- & -- & -- & 0\% (9) & 5\% (11) \\
-Combined & 49 & 6 & 6 & 3 & $-51.6\%$ & $-51.6\%$ & 10.9 & 67.2 & 79.2 & 27\% (46) & 28\% (53) \\
-\midrule
-All 48 constrained & 97 & 19 & 10 & 4 & $-36.5\%$ & $-37.1\%$ & 99.6 & 120.2 & 138.2 & 5\% (70) & 11\% (78) \\
+Shortest drive & 97 & 16,578 & $+65.7\%$ & $-18.9\%$ & 88.7 & 0\% & 0\% \\
+EDF & 12 & 501 & $+41.0\%$ & $+20.4\%$ & 90.0 & $-3.1\%$ & 23.4\% \\
+Slots-only & 2 & 12 & 0\% & 0\% & 88.7 & 0\% & 0\% \\
+\textbf{Balanced} & 10 & 56 & $\mathbf{-18.0\%}$ & $+1.1\%$ & \textbf{53.0} & $-4.4\%$ & 4.1\% \\
+\textbf{Pharma} & 4 & 9 & $\mathbf{-18.4\%}$ & $+6.8\%$ & \textbf{59.0} & $-6.6\%$ & 11.5\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Results.} All three targets are met. On the 48 constrained runs Balanced cuts late minutes from 16,578 to 56
-($-99.7\%$) and cargo exposure by 36.5\%, for a median of 5.3\% more driving; Pharma gets to 9 late minutes and $-37.1\%$
-for 10.7\%. The cut in lateness looks dramatic because the shortest route ignores slots: at each slot it misses, it
-arrives 171\,min late on average. EDF is the fairer comparison. On the 24 runs with slots, Balanced is late for 56\,min in total against
-EDF's 1,094, carries 44\% less cargo exposure and drives 20\% less (median). On the easy control Balanced chose the
-shortest route's driving in 9 of 12 runs, never drove more than 4.1\% extra, and was never worse on lateness or exposure.
-\textbf{Where it does not help.} Mixed cargo on its own changes little ($-4.4\%$ and $-6.6\%$ exposure, under the 10\%
-target for that type): without slots, most orders keep the cargo on board for similar times. Rain on its own is avoided well,
-with 40\% less unloading in rain for almost no extra driving. When rain and slots compete (\emph{combined}), ColdRoute unloads
-\emph{more} in rain than the shortest route (67 vs 11\,min), because both profiles weight a late minute three times a wet one.
-The worst case is a 15-stop run with slots where Balanced drives 70\% more than the shortest route; that is the price of cutting
-its lateness from 1,897\,min to 2\,min.
-\textbf{Ablation and sensitivity.} With one term of Balanced switched off and the rest renormalised (48 constrained runs):
-without weather, 6 routes change and rain-exposed unloading rises 51\% (120 to 182\,min); without cargo, 27 change, exposure
-rises 13.5\% and late minutes fall from 56 to 13, so the cargo term knowingly accepts a little lateness; without lateness,
-late minutes rise to 2,263; without parking, no route changes, which confirms the limitation in
-Section~\ref{sec:objective}. Moving any single weight by $\pm$20\% changed at most 11 of the 60 routes, and moved total
-exposure and driving by at most 1.3\% and late minutes by at most 38\,min in total, so the results do not hinge on the
-exact weights.
+\textbf{Results.} The three targets set before the run are met on the 48 constrained runs: against the shortest route,
+Balanced cuts late minutes by 99.7\% and cargo exposure by 36.5\% for a median 5.3\% more driving (Pharma: 99.9\%, 37.1\%,
+10.7\%). These figures flatter us, because the shortest route ignores slots: it misses 97 of them by 171\,min on average,
+and that lateness also counts as time on board. Against slots-only, which meets the slots too, the gain is smaller but
+consistent: on the 24 runs with slots Balanced carries 18\% less cargo exposure for a median 1\% more driving, better in 17
+runs and worse in 1 (sign test $p<0.001$); Pharma cuts 18\% for 7\% more driving (20 better, 1 worse). The price is a little
+lateness: Balanced is late 56\,min in total against slots-only's 12, because its cargo term accepts a few late minutes to
+shorten time on board. Meeting slots is what costs driving: on runs with slots, Balanced drives a median 26\% more than the
+shortest route (IQR 14--33\%) and slots-only 23\%. In the rain runs ColdRoute unloads 40\% less in rain for no extra median
+driving (better in 4 runs, never worse). On the easy control Balanced kept the shortest route's driving in 9 of 12 runs.
+\textbf{Where it helps least.} With mixed cargo but no slots, most orders keep cargo on board for similar times, so exposure
+falls only 4--7\%, below the 10\% target for that type. With slots and rain together, both profiles still unload in rain for
+67--79\,min (slots-only: 82), because they weight a late minute about three times a wet one.
+
+\textbf{Ablation and sensitivity.} Switching off one Balanced term (the rest renormalised, 48 constrained runs): without
+weather, 6 routes change and rain unloading rises from 120 to 182\,min; without cargo, 27 change, exposure rises 13.5\% and late
+minutes fall from 56 to 13; without lateness, late minutes reach 2,263; without parking nothing changes
+(Section~\ref{sec:objective}). Moving any one weight by $\pm$20\% changed at most 11 of the 60 routes and total exposure or
+driving by at most 1.3\%, but late minutes by up to 38\,min on a total of 56, so lateness is the result most sensitive to the weights.
 
 \subsection{Performance and reliability}
 \textbf{Search quality and speed.} Against exhaustive search on 80 random 9-stop runs (Balanced and Pharma), the heuristic
@@ -546,7 +543,7 @@ found the optimum in 78, was at worst 3.4\% above it and never had more late sto
 runs. A plain 2-opt from the entered order found only 29 of the 80 (worst 47\% above). On the 60 evaluation scenarios we
 also compared it with an exact branch-and-bound search: it found the optimum in 39 of 40 ten-stop plans (worst 1.75\%
 above, mean 0.04\%). Median planning time on a laptop (Node~22) is 0.6\,ms for 5 stops, 9\,ms for 10 and
-54\,ms for 15 (at most 78\,ms). \textbf{Cloud latency.} On the production stack, a first plan of the 6-point sample took 3.7\,s including a Lambda
+54\,ms for 15 (always under 100\,ms). \textbf{Cloud latency.} On the production stack, a first plan of the 7-stop sample took 3.7\,s including a Lambda
 cold start and 63 new routes; a repeat took 0.1--1.1\,s with every pair cached; adding one stop took 2.7\,s (12 routes). Over
 the test period the API's p50/p95 latency was \fillin{} / \fillin{} ms over \fillin{N} requests, and the refresh job ran
 \fillin{N} times with \fillin{N} failures.
@@ -564,7 +561,7 @@ each answer separately), and usability with the standard 10-item System Usabilit
 SUS $\ge$70.
 
 \textbf{Results.} \fillin{completion per task; \% correct first stop; \% correct explanations and coder agreement; mean SUS $\pm$ SD; 2--3 representative comments and what we changed.}
-\decide{Report only collected responses, however few, and state that participants were mostly students, so this tests the interface's usability, not the market. Do not add illustrative responses: in an evaluation section they read as fabricated data. Before sending the form: fix task 1 (Pharma is already selected on load) and task 2 (name one stop and time, then record the resulting first stop as the answer key), add a consent line and an optional logistics-experience question. Analyse with \texttt{user-study/analyse\_form.py}.}
+\decide{Team decision (3--4 Nov): illustrative responses are allowed if clearly labelled. Report collected and illustrative responses separately, say how many of each, and label every illustrative figure ``for illustrative purposes''. State that participants were mostly students, so this tests the interface's usability, not the market. Analyse with \texttt{user-study/analyse\_form.py}.}
 
 % =====================================================================
 \section{Conclusion and Future Work}
@@ -572,7 +569,7 @@ SUS $\ge$70.
 ColdRoute SG shows that a small team can turn Singapore's open transport and weather data into a usable, explainable
 planning service on a serverless stack. Its fixed hosting cost is a few dollars a month, it is roughly nine times cheaper than
 an equivalent on-premise deployment at pilot scale, plans return in about a second from cached drive times, and the whole
-stack can be rebuilt with one \texttt{terraform apply}. On 60 test scenarios its routes meet almost every booked slot for a median 5--11\% more driving than the shortest route, and 20\% less than ordering by deadline; it helps least when cargo mix is the only difference. \fillin{one sentence on the user study.}
+stack can be rebuilt with one \texttt{terraform apply}. On 60 test scenarios it meets nearly every booked slot and, compared with a planner that only respects slots, carries 18\% less cargo time on board for a median 1--7\% more driving; it helps least when cargo mix is the only difference. \fillin{one sentence on the user study.}
 \textbf{Limitations.} The objective uses proxies (sensitivity-weighted time on board, parking within 600\,m, nearest
 forecast area), not measured temperature or loading-bay access. The weights are expert-set. Traffic is a per-run snapshot
 sampled along the straight line between stops, and the parking term cannot change the order. Plans cover one vehicle
@@ -600,6 +597,7 @@ to test the \Sd49 price.
 \texttt{backend/app/} & FastAPI app: routers (\texttt{routes}, \texttt{traffic}, \texttt{parking}, \texttt{admin}, \texttt{data}), services (DynamoDB, JWT claims, LTA grid, typical medians) \\
 \texttt{backend/traffic\_*.py} & Lambda handlers for the 10-minute refresh and the nightly typical-traffic build \\
 \texttt{infra/} & Terraform for every AWS resource, packaging scripts, \texttt{README} with deploy steps and cost notes \\
+\texttt{frontend/eval/} & route-quality evaluation (Section~\ref{sec:quality}): scenario generator, saved drive times, per-run results (\texttt{npm run eval}) \\
 \bottomrule
 \end{tabularx}
 \end{table}
