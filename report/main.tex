@@ -231,7 +231,7 @@ making 20 plans per day and meeting about 120 uncached pairs per day (one 10-sto
 is a 1\,GB planner invocation of about 1\,s. We assume 200\,ms API calls, 8\,KiB saved plans and 5\,MiB of frontend download
 per account-day, exclude free tiers and convert at US\$1\,=\,\Sd1.2776~\cite{fx}. Routing dominates, so the result is
 most sensitive to the 120 new pairs: at 30 (mostly repeat customers) the pilot's routing falls from US\$90 to about US\$22.
-\todo{The biggest assumption is 120 uncached drive-time pairs per account-day; check it against the dashboard's ``routes billed per plan'' after the test day. Replace the model with real numbers after the final deploy: AWS Billing/Cost Explorer screenshot for the test period, real Lambda billed durations (CloudWatch), item sizes. Say whether any AWS credits or free tier were used. Owner: whoever owns the AWS account (Jay).}
+\todo{The biggest assumption is 120 uncached drive-time pairs per account-day. Check it during the deployment test: each cloud plan reports how many new routes it fetched, so count them over a realistic day of plans (Manus, with the test accounts). No AWS bill is needed: with no paying customers it is close to zero and mostly free tier, which is why the table models paying customers with the free tier excluded, as stated.}
 
 \textbf{On-premise equivalent.} The same service with comparable availability would need two servers in separately powered
 sites (active/standby), running the web app, API, scheduled collectors, replicated PostgreSQL and a self-hosted identity
@@ -534,10 +534,10 @@ runs. A plain 2-opt from the entered order found only 29 of the 80 (worst 47\% a
 also compared it with an exact branch-and-bound search: it found the optimum in 39 of 40 ten-stop plans (worst 1.75\%
 above, mean 0.04\%). Median planning time on a laptop (Node~22) is 0.6\,ms for 5 stops, 9\,ms for 10 and
 54\,ms for 15 (always under 100\,ms). \textbf{Cloud latency.} On the production stack, a first plan of the 7-stop sample took 3.7\,s including a Lambda
-cold start and 63 new routes; a repeat took 0.1--1.1\,s with every pair cached; adding one stop took 2.7\,s (12 routes). Over
-the test period the API's p50/p95 latency was \fillin{} / \fillin{} ms over \fillin{N} requests, and the refresh job ran
-\fillin{N} times with \fillin{N} failures.
-\todo{Take a CloudWatch dashboard screenshot after the test day (API p50/p95, plan time, routes billed, refresh). Optional: a small load test (5--20 concurrent signed-in plans with k6) to report p95 under load.}
+cold start and 63 new routes; a repeat took 0.1--1.1\,s with every pair cached; adding one stop took 2.7\,s (12 routes). On the
+test day, timed from a laptop outside AWS, \fillin{N} signed-in plans took a median of \fillin{} s and at most \fillin{} s, and the
+live road-speed grid was never more than \fillin{} minutes old.
+\todo{Manus measures these during the deployment test with the test accounts: time each plan from the browser and read the grid's age every few minutes. CloudWatch is not needed for these numbers; a dashboard screenshot is optional if there is space. Optional: a small load test on the cached sample (no routing fees) for latency under load.}
 
 \subsection{User evaluation}
 \textbf{Method.} \fillin{N} participants used the deployed console signed out, in Recorded mode, without help, and then
@@ -660,7 +660,7 @@ JWT authorizers and partition keys enforce ownership; how fixed reference scales
 \item \textbf{Chien's original:} kept unchanged on branch \texttt{docs/final-report-draft}; this draft is on \texttt{docs/final-report-v1}. His \texttt{materials.tex} and \texttt{planning\_notes.tex} are untouched.
 \item \textbf{Older drafts:} \texttt{Final.docx}, the slides and Lian's backend reference describe an earlier version (camera-based traffic, backend greedy optimiser, SNS alarms, Python 3.11). This draft follows the final code; update the slides to match.
 \item \textbf{Sources for every number:} Manus's fact sheets in \texttt{Group Project/Manus notes/November - current/claude-review-pack/4-evidence/} (not in this repo). \texttt{03-cost-cloud-vs-onprem.md} predates the cloud planner (\#26); the cost numbers here supersede it. Review notes: \texttt{Group Project/Claude review/}.
-\item \textbf{Spec checklist:} (1) business case \checkmark\ (2) business model + on-prem comparison \checkmark\ (3) architecture, algorithm, requirements, user journey \checkmark\ (4) system evaluation: route quality done (frontend/eval); deployment checks, CloudWatch and user study still need results (5) conclusion \checkmark\ (6) code explanation + public URL: make repo public; assumptions stated \checkmark; diagrams \checkmark; AI declaration: each member.
+\item \textbf{Spec checklist:} (1) business case \checkmark\ (2) business model + on-prem comparison \checkmark\ (3) architecture, algorithm, requirements, user journey \checkmark\ (4) system evaluation: route quality done (frontend/eval); deployment checks, live timings and user study still need results (5) conclusion \checkmark\ (6) code explanation + public URL: make repo public; assumptions stated \checkmark; diagrams \checkmark; AI declaration: each member.
 \end{itemize}
 \fi
 \end{document}
