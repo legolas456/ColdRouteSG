@@ -540,9 +540,9 @@ signed-in test account, 18 repeat plans of the cached sample over two runs took 
 planner; at most 1.2\,s). Plans adding one or two stops new to the cache took 1.0--2.7\,s for 16--38 new pairs (17--40 billed
 routes); repeating such a plan took 0.26\,s and billed nothing. Billing matched the cost model: one new stop on the 8-point
 sample is $2\times8=16$ new pairs, billed as 17 matrix routes plus up to 2 for road lines. Read every 5 minutes over
-\fillin{2} hours, our copy of the road-speed grid was at most \fillin{10} minutes old, and LTA's own timestamp at most
-\fillin{} minutes; the console treats a reading over 20 minutes old as stale and falls back to typical traffic.
-\todo{Grid freshness: a 2-hour poll started 5 Nov 15:47 (every 5 min); fill the two numbers from it. Optional if space: a small load test on the cached sample (no routing fees) for latency under load.}
+2 hours (24 reads, none failed), our copy of the road-speed grid was at most 10 minutes old and LTA's own timestamp at most
+18 minutes. The console judges staleness by LTA's timestamp and falls back to typical traffic past 20 minutes, so in
+this window it never did, though with only about 2 minutes to spare.
 
 \subsection{User evaluation}
 \textbf{Method.} \fillin{N} participants used the deployed console signed out, in Recorded mode, without help, and then
