@@ -79,7 +79,7 @@ carpark availability and cargo sensitivity, and explains each trade-off against 
 live data are computed by a Lambda function with drive times from Amazon Location Service, on a serverless AWS stack
 (Amplify, API Gateway, Lambda, DynamoDB, S3, Cognito, EventBridge) defined entirely in Terraform. A 50-account pilot would
 cost about \Sd132 per month, mostly routing fees, against roughly \Sd2,135 per month for an equivalent redundant on-premise deployment.
-On 60 generated scenarios, compared with a planner that only meets booked slots, it carries 18\% less cargo time on board for a median 1--7\% more driving, and unloads 40\% less in rain. \fillin{one clause each on latency and SUS once measured.}
+On 60 generated scenarios, compared with a planner that only meets booked slots, it carries 18\% less cargo time on board for a median 1--7\% more driving, and unloads 40\% less in rain. On the deployed stack a signed-in plan returns in about 0.35\,s when its drive times are cached. \fillin{one clause on the user study.}
 \end{minipage}
 \vspace{0.2cm}
 \begin{minipage}{0.75\linewidth}
@@ -223,8 +223,8 @@ priced it with AWS's official price lists, for Singapore and, for Location Servi
 4,320 runs per month) and the nightly typical-traffic build; it costs under a dollar. The \emph{per-use} load is dominated by
 routing: Amazon Location Service bills US\$0.50 per 1,000 Core routes~\cite{awsloc}, and a matrix bills every origin--destination cell
 (a new stop in a run of $n$ points costs about $2n$ routes). Every pair is cached in DynamoDB for 30 days, so replans and
-recurring customers cost little; the team measured 63 routes for a first plan of the 7-stop sample (8 points), none for a
-repeat and 12 for one new stop. Drawing the two plans' road lines adds one or two routes per plan unless the planner
+recurring customers cost little; on the deployed stack the first plan of the 7-stop sample (8 points) billed 63 routes, a
+repeat none, and one new stop 17 (its row and column) plus up to 2 for road lines. Drawing the two plans' road lines adds one or two routes per plan unless the planner
 instance still holds them in memory; the table excludes this, and at worst (two per plan) it adds US\$30 (pilot) and
 US\$300 (growth) per month. Scenarios: \emph{demo} has 10 accounts and 5 plans each; \emph{pilot} 50 and \emph{growth} 500 accounts, each
 making 20 plans per day and meeting about 120 uncached pairs per day (one 10-stop run of entirely new addresses). Each plan
@@ -357,9 +357,10 @@ Lambda, Cognito and DynamoDB backend with a greedy optimiser; its saved-run and 
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.8\linewidth]{figures/console-compare.jpg}
-\caption{The deployed console in \emph{Compare} view on the recorded sample (Pharma): ColdRoute's order (solid) against the
-shortest route (dashed), the rain cells it plans around, the trade-off metrics and the stop timeline with the rain period.}\label{fig:ui}
+\includegraphics[width=\linewidth]{figures/console-compare.jpg}
+\caption{The deployed console in \emph{Compare} view on the recorded sample (Pharma, signed out, so planned in the browser):
+ColdRoute's order (solid) against the shortest route (dashed), the rain cells it plans around, the trade-off metrics and the
+stop timeline. Here ColdRoute has no late stop (shortest: one, 82\,min late) and 19\% less cargo exposure for 19\,min more driving.}\label{fig:ui}
 \end{figure}
 
 \subsection{User journey}
@@ -464,10 +465,10 @@ recorded demo route stays fixed. After deployment we ran an end-to-end checklist
 \toprule
 \textbf{Check} & \textbf{Result} & \textbf{Check} & \textbf{Result} \\
 \midrule
-Console loads from Amplify URL over HTTPS & Pass & Signed-out requests to all 6 protected routes return 401 & Pass \\
-Sign-in and first-login password change (3 accounts) & Pass & User B reading user A's run gets 404; B's delete changes nothing & Pass \\
+Console loads from Amplify URL over HTTPS & Pass & Signed-out requests to 6 protected routes (incl.\ \texttt{/api/plan}) return 401 & Pass \\
+Sign-in and first-login password change (3 accounts) & Pass & User B reading user A's run gets 404; B's delete of it is accepted (204) but removes nothing & Pass \\
 Optimise $\rightarrow$ run saved, listed, reopened, deleted & Pass & Admin sees team activity; dispatchers get 403 & Pass \\
-Speed grid in S3 refreshed every 10\,min (Live traffic) & Pass & Typical slots published nightly (02:30) & Pass \\
+Speed grid in S3 refreshed every 10\,min (Live traffic) & Pass & Typical slots published at 02:30 (e.g.\ weekday 09:00: 10 readings, 5 days) & Pass \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -533,13 +534,14 @@ found the optimum in 78, was at worst 3.4\% above it and never had more late sto
 runs. A plain 2-opt from the entered order found only 29 of the 80 (worst 47\% above). On the 60 evaluation scenarios we
 also compared it with an exact branch-and-bound search: it found the optimum in 39 of 40 ten-stop plans (worst 1.75\%
 above, mean 0.04\%). Median planning time on a laptop (Node~22) is 0.6\,ms for 5 stops, 9\,ms for 10 and
-54\,ms for 15 (always under 100\,ms). \textbf{Cloud latency.} On the production stack, the first plan of the 7-stop sample took 3.7\,s including a Lambda
-cold start and 63 new routes. On 5~November 2026, timed end to end from a laptop in Singapore with a signed-in test account,
-9 repeat plans of the cached sample took a median of 0.40\,s (at most 1.1\,s; 0.33\,s inside the planner), and plans adding one
-to three never-planned stops took 0.9--2.7\,s for 16--38 new routes; repeating such a plan took 0.26\,s and billed nothing.
-Billing matched the cost model: one new stop on the 8-point sample was measured as $2\times8=16$ new pairs and billed 17--19
-routes including road lines. The live road-speed grid, read every 5 minutes over \fillin{2} hours, was never more than
-\fillin{} minutes old.
+54\,ms for 15 (always under 100\,ms). \textbf{Cloud latency.} On the production stack (3~Nov), the first plan of the 7-stop sample took 3.7\,s including a Lambda
+cold start and 63 new routes. On 5~November 2026, timed end to end from a laptop in Singapore with a
+signed-in test account, 18 repeat plans of the cached sample over two runs took a median of 0.35\,s (0.29\,s inside the
+planner; at most 1.2\,s). Plans adding one or two stops new to the cache took 1.0--2.7\,s for 16--38 new pairs (17--40 billed
+routes); repeating such a plan took 0.26\,s and billed nothing. Billing matched the cost model: one new stop on the 8-point
+sample is $2\times8=16$ new pairs, billed as 17 matrix routes plus up to 2 for road lines. Read every 5 minutes over
+\fillin{2} hours, our copy of the road-speed grid was at most \fillin{10} minutes old, and LTA's own timestamp at most
+\fillin{} minutes; the console treats a reading over 20 minutes old as stale and falls back to typical traffic.
 \todo{Grid freshness: a 2-hour poll started 5 Nov 15:47 (every 5 min); fill the two numbers from it. Optional if space: a small load test on the cached sample (no routing fees) for latency under load.}
 
 \subsection{User evaluation}
@@ -561,7 +563,7 @@ SUS $\ge$70.
 % =====================================================================
 ColdRoute SG shows that a small team can turn Singapore's open transport and weather data into a usable, explainable
 planning service on a serverless stack. Its fixed hosting cost is a few dollars a month, it is roughly nine times cheaper than
-an equivalent on-premise deployment at pilot scale, plans return in about a second from cached drive times, and the whole
+an equivalent on-premise deployment at pilot scale, signed-in plans return in about 0.35\,s from cached drive times, and the whole
 stack can be rebuilt with one \texttt{terraform apply}. On 60 test scenarios it meets nearly every booked slot and, compared with a planner that only respects slots, carries 18\% less cargo time on board for a median 1--7\% more driving; it helps least when cargo mix is the only difference. \fillin{one sentence on the user study.}
 \textbf{Limitations.} The objective uses proxies (sensitivity-weighted time on board, parking within 600\,m, nearest
 forecast area), not measured temperature or loading-bay access. The weights are expert-set. Traffic is a per-run snapshot
@@ -596,7 +598,7 @@ to test the \Sd49 price.
 \end{table}
 
 \textbf{Run locally:} \texttt{make setup \&\& make dev} starts the API on port 8000 and the console on port 5173; \texttt{make test}
-runs all tests. The console works without the backend in Recorded mode. Live LTA traffic needs a DataMall key in
+runs the backend and console tests (the planner's are in \texttt{planner/}, \texttt{npm test}). The console works without the backend in Recorded mode. Live LTA traffic needs a DataMall key in
 \texttt{backend/.env}. \textbf{Deploy:} copy \texttt{infra/terraform.tfvars.example}, set the LTA key, then run
 \texttt{terraform init \&\& terraform apply}. Terraform prints the console URL, API URL and Cognito IDs; dispatcher accounts
 are created in Cognito by an administrator.
