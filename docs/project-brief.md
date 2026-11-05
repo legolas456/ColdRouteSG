@@ -37,8 +37,9 @@ The value is the **decision layer**: turning live, messy data into a delivery or
 
 | Part | State |
 | --- | --- |
-| Frontend (`frontend/`) | New dispatcher console, merged in PR #1. React + TypeScript + Tailwind + MapLibre. Runs without the backend: it calls OneMap, OSRM and data.gov.sg straight from the browser (with a bundled sample run for the demo), and the optimiser runs in the browser (all 5,040 orders of 7 stops). |
-| Backend (`backend/`) | Python + FastAPI local MVP using public data.gov.sg feeds (weather, HDB carparks, traffic cameras) and OSRM. Not wired to the new frontend yet. No AWS yet. |
-| Cloud | Proposed serverless AWS architecture (Amplify, Cognito, API Gateway + Lambda, DynamoDB, S3, EventBridge, CloudWatch). The new console is on Amplify Hosting, deployed by GitHub Actions on every merge to `main`. See [deployment.md](deployment.md). |
+| Frontend (`frontend/`) | New dispatcher console, merged in PR #1. React + TypeScript + Tailwind + MapLibre. Runs without the backend: it calls OneMap, OSRM and data.gov.sg straight from the browser (with a bundled sample run for the demo), and the optimiser can run in the browser (all 5,040 orders of 7 stops). |
+| Backend (`backend/`) | Python + FastAPI on AWS Lambda: saved runs, the admin view, LTA road speeds and URA and mall carparks for the console. |
+| Cloud planner (`planner/`) | The console's optimiser on AWS Lambda, for signed-in users on Live data, with drive times from Amazon Location Service. |
+| Cloud | A serverless AWS stack (Amplify, Cognito, API Gateway + Lambda, DynamoDB, S3, EventBridge, CloudWatch, Amazon Location Service), created and deployed by `terraform apply` in `infra/`. See [deployment.md](deployment.md). |
 
 See [roadmap.md](roadmap.md) for what's next.

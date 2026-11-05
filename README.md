@@ -382,4 +382,4 @@ An earlier copy of this backend, deployed by hand in a teammate's AWS account be
 
 # Design note
 
-The local MVP deliberately separates **external data acquisition** from **delivery optimisation**. The external services provide context, while ColdRoute SG owns the route-scoring logic and user interface. This makes it easier to explain what technical value the project itself contributes.
+ColdRoute SG deliberately separates **external data acquisition** from **delivery optimisation**. The external services provide context, while the project owns the route-scoring logic and user interface. This makes it easier to explain what technical value the project itself contributes.

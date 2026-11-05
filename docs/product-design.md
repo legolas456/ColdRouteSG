@@ -17,7 +17,7 @@ It is a B2B SaaS product. It should still feel as polished as a consumer app.
 4. **Risk is easy to scan.** Same tags, colours and order everywhere. Red is only for real problems.
 5. **Be honest about trade-offs and freshness.** Say how many extra minutes we drive. Show when each feed was updated. Label mocked or simulated data.
 6. **Fast entry for 5–15 stops.** Search, paste and address book beat long forms.
-7. **Close the loop.** Adjust, re-optimise, see what changed, dispatch.
+7. **Close the loop.** Adjust, re-optimise, see what changed, export for the driver.
 
 ## The dispatcher flow
 
@@ -27,7 +27,7 @@ One workspace per run, driven by state. No step-by-step wizard. The dispatcher n
 | --- | --- | --- | --- |
 | Draft | Run settings and stop list, inline editing, checks | Stops as pins, no route | **Optimise** |
 | Optimising | Staged progress: conditions, matrix, shortest route, risk search, explanations | Route draws in | Disabled |
-| Optimised | KPIs vs shortest route, "Why this route", stop order with reasons | ColdRoute route; shortest route on demand | **Dispatch to driver**, Re-optimise |
+| Optimised | KPIs vs shortest route, "Why this route", stop order with reasons | ColdRoute route; shortest route on demand | **Export for driver**, Re-optimise |
 | Live *(not built)* | Progress and alerts | Van position, rain | Accept suggestion |
 | Completed *(not built)* | Plan vs actual | Actual track | Duplicate run |
 
@@ -40,7 +40,7 @@ One workspace per run, driven by state. No step-by-step wizard. The dispatcher n
 - **Stop card.** Click a stop on the map or in the list: why it's here, and how its risk compares with the shortest route.
 - **Timeline.** One row per stop: delivery window, unloading block, lateness, rain periods.
 - **Map.** Focused on Singapore. Layers: showers, carparks, traffic, shortest route.
-- **Share and account (mocked).** A share link opens a read-only view. Dispatch asks you to sign in.
+- **Share and export.** A share link opens a read-only view of the sample run. **Export for driver** downloads the plan as a CSV, with no sign-in needed.
 - **Phone layout.** Map with a bottom sheet. Light and dark modes follow the system.
 
 ## Explanations
@@ -89,7 +89,7 @@ Always show the current mode and snapshot time: the pill in the top bar does thi
 | 0:30–1:15 | Optimise, then Compare: late −1, exposure down, drive +8 min | Risk-aware beats shortest |
 | 1:15–1:45 | Stop card for MBFC, rain on the timeline | Explainable and credible |
 | 1:45–2:15 | Change a condition, re-optimise, see what changed | Reacts rationally to conditions |
-| 2:15–2:40 | Share link, dispatch | A real product |
+| 2:15–2:40 | Share link, export for the driver | A real product |
 | 2:40–3:00 | Architecture, latency, cost per optimisation | Cloud computing |
 
 **Demo data:** signed-in user Fiona Lim (Admin), depot Jurong Cold Store, seven real Singapore customer locations. Keep demo names fictional and places real.

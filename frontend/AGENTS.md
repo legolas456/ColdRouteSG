@@ -47,9 +47,9 @@ npm run data:sg-mask # re-fetch the Singapore outline used to dim the neighbours
 
 ### Buttons and actions
 
-- **One solid primary per screen.** Draft: **Optimise route**. Optimised: **Dispatch to driver**. Shared view: **Make a copy**.
+- **One solid primary per screen.** Draft: **Optimise route**. Optimised: **Export for driver**. Shared view: **Make a copy**.
 - `Button` variants: `primary` (that one action), `tonal` (the panel's main action when the screen already has a primary, e.g. **Re-optimise**), `secondary` (default), `ghost` (quiet toolbar actions). Sizes: `md` (32 px) and `sm` (28 px).
-- **Placement.** Run-level actions (Share, Dispatch) go in the top bar. Plan-level actions (Optimise, Re-optimise, Edit stops) go at the top of the panel, under the title. The bottom of the panel is only for the account. Don't add sticky action footers.
+- **Placement.** Run-level actions (Share, Export for driver) go in the top bar. Plan-level actions (Optimise, Re-optimise, Edit stops) go at the top of the panel, under the title. The bottom of the panel is only for the account. Don't add sticky action footers.
 
 ### Switches and controls
 
