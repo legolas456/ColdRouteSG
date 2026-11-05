@@ -1,7 +1,7 @@
 # ColdRoute SG — dispatcher console (frontend)
 
 A single-screen dispatcher console for planning one cold-chain van run in Singapore. The flow is:
-**draft the run → optimise → read why → dispatch**.
+**draft the run → optimise → read why → export for the driver**.
 
 ## Screenshots
 
@@ -45,7 +45,7 @@ No API key is needed. For live road speeds, run the backend with an LTA key (see
 | Stop card | Click any stop: ETA, window, unloading time, a "Why here" explanation, the details behind it (Journey from the previous stop, NEA weather, the carpark used and its free lots, the nearest LTA camera in Live mode, which opens the same camera viewer), and every risk factor compared with the shortest route. |
 | Timeline | Delivery windows, unloading blocks, waits, lateness and the rain periods over this run's stops on one time axis. In Compare view it also shows the shortest route as ghost blocks. |
 | Share | **Share** opens a small popover under the button. It has three parts: who can open the link (anyone at ColdRoute SG, or anyone with the link; both can view only), an option to open the link on your current view (e.g. Compare · MBFC), and **Copy link**. |
-| Shared view | Opening a `?share=` link shows a read-only snapshot with a "shared with you" banner and a **View only** status. Edit, re-optimise and dispatch are hidden. **Make a copy** turns it into your own editable run. |
+| Shared view | Opening a `?share=` link shows a read-only snapshot with a "shared with you" banner and a **View only** status. Edit, re-optimise and export are hidden. **Make a copy** turns it into your own editable run. |
 | Account | The bottom of the panel shows who is signed in. Click it for the account menu: **Your runs** and, for admins, **Team activity**, then **Sign out**. Signed out, it offers **Sign in**. Built with `VITE_COGNITO_USER_POOL_ID` and `VITE_COGNITO_CLIENT_ID` (from `terraform output frontend_env`), that is a real sign-in with the account an admin created (`src/lib/auth.ts`); the first sign-in asks for a new password. The demo account (Fiona Lim, Admin) is always offered and never leaves the browser. Each plan a real account makes is saved to its route history through `VITE_API_BASE_URL` (`src/lib/history.ts`); **Your runs** reopens or deletes a saved run, and **Team activity** shows every dispatcher's saved plans. **Dispatch to driver** asks you to sign in first, then sends (still a demonstration). On phones, and when the panel is hidden, the avatar moves to the top bar. |
 
 Three views: **ColdRoute**, **Shortest route**, and **Compare**. Switching views redraws the map, list and timeline.
@@ -76,8 +76,8 @@ One solid primary button per screen, so the next step is always obvious.
 
 | State | Solid primary | Supporting actions |
 | --- | --- | --- |
-| Draft | **Optimise route**, under the run title | **Dispatch to driver** is shown in the top bar but stays disabled until there is a plan |
-| Optimised | **Dispatch to driver**, top right | **Re-optimise** is a tonal (tinted) primary for the panel; **Edit stops** is a compact secondary; **Share** is secondary |
+| Draft | **Optimise route**, under the run title | **Export for driver** is shown in the top bar but stays disabled until there is a plan |
+| Optimised | **Export for driver**, top right | **Re-optimise** is a tonal (tinted) primary for the panel; **Edit stops** is a compact secondary; **Share** is secondary |
 | Shared view | **Make a copy** | Nothing else can change the run |
 
 Actions live at the top: the top bar for the run, the top of the panel for the plan. The bottom of the panel is for the account.
