@@ -54,8 +54,8 @@ describe('userFromClaims', () => {
   })
 
   it.each([
-    ['jay.kim@nus.edu', 'Jay Kim'],
-    ['e0893439@u.nus.edu', 'E0893439'],
+    ['tan.wei.ling@example.com', 'Tan Wei Ling'],
+    ['e0000000@u.nus.edu', 'E0000000'],
     ['ops-team+sg@coldroute.sg', 'Ops Team Sg'],
     ['', ''],
   ])('names %s as %s', async (email, name) => {

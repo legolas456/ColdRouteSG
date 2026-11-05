@@ -9,8 +9,8 @@ type Position = number[]
 /** About 2 minutes per km on a straight line, and 3 more heading east (one-way streets), so a swapped pair shows. */
 export const fakeMinutes = (a: Position, b: Position) => Math.hypot((b[0] - a[0]) * 111, (b[1] - a[1]) * 110) * 2 + (b[0] > a[0] ? 3 : 0)
 
-/** DynamoDB holding cached pairs, and Location Service measuring the rest. */
-export function fakeRoads(cache = new Map<string, { minutes: number; km: number }>(), geoFails = false) {
+/** DynamoDB holding cached pairs, and Location Service measuring the rest (except pairs it has no route for). */
+export function fakeRoads(cache = new Map<string, { minutes: number; km: number }>(), geoFails = false, noRoute?: (a: Position, b: Position) => boolean) {
   const matrixCalls: { origins: Position[]; destinations: Position[] }[] = []
   const routeCalls: Position[][] = []
   const clients: RoadClients = {
@@ -39,7 +39,11 @@ export function fakeRoads(cache = new Map<string, { minutes: number; km: number 
           const origins = cmd.input.Origins!.map((o) => o.Position!)
           const destinations = cmd.input.Destinations!.map((d) => d.Position!)
           matrixCalls.push({ origins, destinations })
-          return { RouteMatrix: origins.map((o) => destinations.map((d) => ({ Duration: fakeMinutes(o, d) * 60, Distance: fakeMinutes(o, d) * 500 }))) }
+          return {
+            RouteMatrix: origins.map((o) =>
+              destinations.map((d) => (noRoute?.(o, d) ? { Error: 'OutOfBounds' } : { Duration: fakeMinutes(o, d) * 60, Distance: fakeMinutes(o, d) * 500 })),
+            ),
+          }
         }
         if (cmd instanceof CalculateRoutesCommand) {
           const stops = [cmd.input.Origin!, ...(cmd.input.Waypoints ?? []).map((w) => w.Position!), cmd.input.Destination!]

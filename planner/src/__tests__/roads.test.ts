@@ -44,6 +44,15 @@ describe('drive times from Location Service', () => {
     ])
   })
 
+  it('counts the pairs Location Service has no route for, and estimates them', async () => {
+    const points = run(3)
+    const [a, b] = points
+    const roads = fakeRoads(undefined, false, (o, d) => o[0] === a.lng && d[0] === b.lng)
+    expect(await ensureDriveTimes(points, roads.clients, 0)).toEqual({ source: 'location', cached: 0, measured: 5, billed: 8, failed: 1 })
+    expect(travel(a, b).real).toBe(false)
+    expect(travel(b, a).real).toBe(true)
+  })
+
   it('picks the fewest points to measure', () => {
     const [a, b, c] = run(3)
     expect(toMeasure([a, b, c], new Set(['a', 'b']))).toHaveLength(2)

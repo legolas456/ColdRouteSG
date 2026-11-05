@@ -45,7 +45,7 @@ export function explainStop(stop: Stop, result: OptimiseResult, names: Record<st
       : `Moved ${dir} ${from} so unloading starts after the rain over ${areaName(cell.area)} clears at ${hm(cell.end)}. ${kept}`
   }
   if (stop.parking.risk > 0.7) {
-    return `Nearest carpark is ${stop.parking.distanceKm} km away with ${stop.parking.freePct}% free, so unloading takes longer. Scheduled with ${Math.round(rec.slack)} min of slack.`
+    return `Nearest carpark is ${stop.parking.distanceKm} km away with ${stop.parking.freePct}% free: flagged as a parking risk (it does not change the order). Scheduled with ${Math.round(rec.slack)} min of slack.`
   }
   if (stop.cargo === 'PHARMA' && stop.windowEnd - stop.windowStart <= 90 && rec.seq <= 2) {
     return `Pharma with a ${stop.windowEnd - stop.windowStart}-minute window. Served early to protect it.`

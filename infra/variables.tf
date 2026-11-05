@@ -89,6 +89,18 @@ variable "log_retention_days" {
   default     = 14
 }
 
+variable "plan_throttle_rate" {
+  description = "Plans per second the API accepts from all users together (POST /api/plan)."
+  type        = number
+  default     = 5
+}
+
+variable "plan_throttle_burst" {
+  description = "Plans the API accepts at once before the rate applies (POST /api/plan)."
+  type        = number
+  default     = 10
+}
+
 variable "budget_email" {
   description = "Email for the monthly cost alert. Empty creates no budget."
   type        = string

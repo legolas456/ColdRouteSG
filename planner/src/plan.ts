@@ -40,7 +40,10 @@ export async function plan(req: PlanRequest, deps: PlanDeps): Promise<PlanRespon
   const paths: Point[][] = [result.recommended.order, result.baseline.order].map((order) => [req.depot, ...order.map((id) => byId[id])])
   roads.billed += await ensureRoadLines(paths, deps.roads)
 
-  const note = ROADS_NOTE[roads.source]
+  const failed = roads.failed
+    ? `Amazon Location Service could not route ${roads.failed} pair${roads.failed === 1 ? '' : 's'} of stops, so ${roads.failed === 1 ? 'it is' : 'they are'} estimated from straight-line distance.`
+    : null
+  const note = ROADS_NOTE[roads.source] ?? failed
   const traffic = cond.traffic === null ? null : cond.traffic === feeds.traffic.data ? rawTraffic : (typical?.raw ?? null)
   // measured times only: the console keeps estimating the rest itself
   const times: DriveTime[] = points.flatMap((a) =>

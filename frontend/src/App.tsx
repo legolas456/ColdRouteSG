@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Check, Copy, Eye, Loader2, Send } from 'lucide-react'
+import { Check, Copy, Download, Eye, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AccountBar, AccountButton, SignInDialog, type User } from './components/Account'
 import { BottomSheet, type Snap } from './components/BottomSheet'
@@ -25,7 +25,8 @@ import { ensureLive, isLoading, refreshLive, sgMinutes, typicalTraffic, useLiveF
 import { validDepot } from './lib/depot'
 import { optimise } from './lib/optimizer'
 import { MAX_STOPS } from './lib/places'
-import { allReal, ensureLegs, ensureMatrix } from './lib/roads'
+import { allReal, ensureLegs, ensureMatrix, restoreRecordedTimes } from './lib/roads'
+import { downloadCsv, routeCsv } from './lib/route-export'
 import { isTyping, PHONE_QUERY, useMediaQuery, usePersistentState } from './lib/hooks'
 import { hm } from './lib/time'
 import { applyTheme, THEME_BY_ID, type ThemeId } from './lib/themes'
@@ -212,6 +213,8 @@ export default function App() {
                 return liveConditions(stops, f, now, departure, typical)
               })
             : Promise.resolve(recordedConditions(stops))
+        // the recorded sample replays with its bundled drive times, even after live or cloud plans
+        if (dataMode === 'recorded') restoreRecordedTimes([depot, ...stops])
         // real drive times for stops outside the bundled snapshot (one OSRM call)
         return Promise.all([conditions, ensureMatrix([depot, ...stops])]).then(([c, roadsOk]) => ({
           c: roadsOk ? c : { ...c, notes: [...c.notes, 'OSRM did not respond, so drive times between new stops are estimated.'] },
@@ -270,6 +273,18 @@ export default function App() {
     },
     [depot, stops, departure, profile, dataMode],
   )
+
+  // a plan still being made is for the run as it was: if the run changes, drop it
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
+  useEffect(() => {
+    if (phaseRef.current !== 'optimising') return
+    runToken.current++
+    timers.current.forEach(clearTimeout)
+    timers.current = []
+    setPhase('draft')
+    setToast('The run changed while it was being optimised · optimise again')
+  }, [depot, stops, departure, profile, dataMode])
 
   // fetch real drive times as stops are added, so the estimate and the
   // optimiser do not wait for them later
@@ -407,19 +422,21 @@ export default function App() {
   ) : phase === 'optimised' ? (
     <Button
       variant="primary"
-      icon={<Send size={13} strokeWidth={2} />}
+      icon={<Download size={13} strokeWidth={2} />}
+      title="Download the ColdRoute plan as a CSV to send to the driver"
       onClick={() => {
-        const send = () => setToast(`Sent to Ahmad R. · ${stops.length} stops · first ETA ${result ? fmt(result.recommended.rows[0].arrival) : ''}`)
-        if (user) send()
-        else setSignIn({ reason: 'Sign in to send this run to the driver.', then: send })
+        // there is no driver app yet: the dispatcher sends the driver this file
+        if (!result) return
+        downloadCsv(routeCsv(result, stopById, 'coldroute', PROFILES[profile].label, departure, shownCond), 'coldroute-driver-run.csv')
+        setToast(`Saved the run for the driver as a CSV · ${stops.length} stops · first ETA ${fmt(result.recommended.rows[0].arrival)}`)
       }}
     >
-      Dispatch<span className="max-md:hidden"> to driver</span>
+      Export<span className="max-md:hidden"> for driver</span>
     </Button>
   ) : (
     <span title="Optimise the route first" className="inline-flex">
-      <Button variant="primary" icon={<Send size={13} strokeWidth={2} />} disabled>
-        Dispatch<span className="max-md:hidden"> to driver</span>
+      <Button variant="primary" icon={<Download size={13} strokeWidth={2} />} disabled>
+        Export<span className="max-md:hidden"> for driver</span>
       </Button>
     </span>
   )

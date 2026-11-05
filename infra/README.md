@@ -63,7 +63,7 @@ Cognito emails a temporary password; the first sign-in asks for a new one. Leave
 
 ### The console from elsewhere
 
-Apply deploys the console itself. To deploy it from CI instead, set `deploy_console = false`, put `AMPLIFY_APP_ID` (`terraform output amplify_app_id`) and the `VITE_*` values (`terraform output frontend_env`) in `.github/workflows/deploy.yml`, and store keys for a user that can deploy to this app as the repository secrets (see [docs/deployment.md](../docs/deployment.md#keys)).
+Apply deploys the console itself. To deploy it some other way, set `deploy_console = false` and build with the `VITE_*` values from `terraform output frontend_env`, then upload to the app in `terraform output amplify_app_id` (for example with `scripts/deploy-frontend.sh`).
 
 ## Check it
 

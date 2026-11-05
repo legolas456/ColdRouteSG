@@ -19,7 +19,7 @@ import {
 import { areaName, lotsLabel, parkingSource, rainFor, type Conditions } from '../lib/conditions'
 import { summarise } from '../lib/explain'
 import { travel } from '../lib/optimizer'
-import { routeCsv } from '../lib/route-export'
+import { downloadCsv, routeCsv } from '../lib/route-export'
 import { duration, hm, signed } from '../lib/time'
 import type { Depot, OptimiseResult, Plan, RainCell, Stop, StopResult } from '../lib/types'
 import { distanceLabel } from './ConditionsPanel'
@@ -62,15 +62,7 @@ export function ResultsPanel(props: Props) {
   const last = stops[shown.order[shown.order.length - 1]]
   const backAt = shown.end + (last ? travel(last, depot).minutes : 0)
 
-  const exportRoute = () => {
-    const csv = routeCsv(result, stops, view, profileLabel, departure, data)
-    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `coldroute-${view}-route.csv`
-    link.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
-  }
+  const exportRoute = () => downloadCsv(routeCsv(result, stops, view, profileLabel, departure, data), `coldroute-${view}-route.csv`)
 
   return (
     <div className="@container scroll-thin min-h-0 md:h-full md:overflow-y-auto">
