@@ -357,8 +357,9 @@ Lambda, Cognito and DynamoDB backend with a greedy optimiser; its saved-run and 
 
 \begin{figure}[h]
 \centering
-\fbox{\parbox[c][4.2cm][c]{0.96\linewidth}{\centering\fillin{Screenshot of the deployed console: stops panel, map with both routes, Compare view and Conditions panel. Replace with \texttt{\textbackslash includegraphics} after the final deploy.}}}
-\caption{The ColdRoute dispatcher console (deployed build).}\label{fig:ui}
+\includegraphics[width=0.8\linewidth]{figures/console-compare.jpg}
+\caption{The deployed console in \emph{Compare} view on the recorded sample (Pharma): ColdRoute's order (solid) against the
+shortest route (dashed), the rain cells it plans around, the trade-off metrics and the stop timeline with the rain period.}\label{fig:ui}
 \end{figure}
 
 \subsection{User journey}
@@ -439,7 +440,7 @@ can be personal data, so a commercial version would meet PDPA's Transfer Limitat
 provider's data-processing terms, or route inside Singapore with self-hosted OSRM. Scalability comes from the design: planner and API Lambdas scale per request,
 DynamoDB is on-demand, the drive-time cache makes repeat plans free, and one shared refresh serves all users, so LTA usage
 stays constant ($\approx$4,320 runs/month) however many users there are. Because each plan with new stops costs routing fees, \texttt{POST /api/plan} has its own throttle (5 requests/s for all users together), below the API's 50/s.
-\todo{Security/scalability caveats to decide on: the LTA key also sits in Terraform state (move to Secrets Manager/SSM?); the admin analytics endpoint scans the whole table (fine for the course, not for 500 accounts). The test counts in Section~4.1 and the \texttt{POST /api/plan} throttle below assume PR fix/demo-honesty is merged and deployed; check before submitting.}
+\todo{Security/scalability caveats to decide on: the LTA key also sits in Terraform state (move to Secrets Manager/SSM?); the admin analytics endpoint scans the whole table (fine for the course, not for 500 accounts).}
 
 % =====================================================================
 \section{Evaluation}
@@ -458,19 +459,18 @@ recorded demo route stays fixed. After deployment we ran an end-to-end checklist
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Deployment acceptance checks on the live AWS stack (\fillin{date}).}\label{tab:smoke}
+\caption{Deployment acceptance checks on the live AWS stack (5~November 2026).}\label{tab:smoke}
 \begin{tabularx}{\linewidth}{@{}Yl|Yl@{}}
 \toprule
 \textbf{Check} & \textbf{Result} & \textbf{Check} & \textbf{Result} \\
 \midrule
-Console loads from Amplify URL over HTTPS & \fillin{} & Unauthenticated \texttt{/api/routes} returns 401 & \fillin{} \\
-Dispatcher sign-in, first-login password change & \fillin{} & User B cannot read user A's run & \fillin{} \\
-Optimise $\rightarrow$ run saved, listed, reopened, deleted & \fillin{} & Admin sees team activity; dispatcher gets 403 & \fillin{} \\
-Speed grid in S3 $\le$10\,min old (Live traffic) & \fillin{} & Nightly typical slots published & \fillin{} \\
+Console loads from Amplify URL over HTTPS & Pass & Signed-out requests to all 6 protected routes return 401 & Pass \\
+Sign-in and first-login password change (3 accounts) & Pass & User B reading user A's run gets 404; B's delete changes nothing & Pass \\
+Optimise $\rightarrow$ run saved, listed, reopened, deleted & Pass & Admin sees team activity; dispatchers get 403 & Pass \\
+Speed grid in S3 refreshed every 10\,min (Live traffic) & Pass & Typical slots published nightly (02:30) & Pass \\
 \bottomrule
 \end{tabularx}
 \end{table}
-\todo{After the final deploy (Jay + Ishan): run these checks with the test accounts, take screenshots, and fill the table. Use a signed-out \texttt{curl} for the 401 checks and a second account's token for the cross-user checks.}
 
 \subsection{Route quality}\label{sec:quality}
 \textbf{Protocol.} We generated 60 scenarios: five types (an \emph{easy} control with no booked slots or rain; \emph{tight}
@@ -533,17 +533,19 @@ found the optimum in 78, was at worst 3.4\% above it and never had more late sto
 runs. A plain 2-opt from the entered order found only 29 of the 80 (worst 47\% above). On the 60 evaluation scenarios we
 also compared it with an exact branch-and-bound search: it found the optimum in 39 of 40 ten-stop plans (worst 1.75\%
 above, mean 0.04\%). Median planning time on a laptop (Node~22) is 0.6\,ms for 5 stops, 9\,ms for 10 and
-54\,ms for 15 (always under 100\,ms). \textbf{Cloud latency.} On the production stack, a first plan of the 7-stop sample took 3.7\,s including a Lambda
-cold start and 63 new routes; a repeat took 0.1--1.1\,s with every pair cached; adding one stop took 2.7\,s (12 routes). On
-\fillin{date}, timed in the browser from a laptop on \fillin{network}, \fillin{N} signed-in plans of the cached sample took a
-median of \fillin{} s (at most \fillin{} s), a plan with \fillin{k} new stops took \fillin{} s, and the live road-speed grid read every
-\fillin{} minutes over \fillin{} hours was never more than \fillin{} minutes old.
-\todo{Measure during the deployment test with the test accounts: time each plan (DevTools, Network tab, \texttt{/api/plan}), keep warm and first plans apart, and read \texttt{fetchedAt} from \texttt{GET /api/traffic/grid} every few minutes. Optional if space: a small load test on the cached sample (no routing fees) for latency under load, and a CloudWatch screenshot.}
+54\,ms for 15 (always under 100\,ms). \textbf{Cloud latency.} On the production stack, the first plan of the 7-stop sample took 3.7\,s including a Lambda
+cold start and 63 new routes. On 5~November 2026, timed end to end from a laptop in Singapore with a signed-in test account,
+9 repeat plans of the cached sample took a median of 0.40\,s (at most 1.1\,s; 0.33\,s inside the planner), and plans adding one
+to three never-planned stops took 0.9--2.7\,s for 16--38 new routes; repeating such a plan took 0.26\,s and billed nothing.
+Billing matched the cost model: one new stop on the 8-point sample was measured as $2\times8=16$ new pairs and billed 17--19
+routes including road lines. The live road-speed grid, read every 5 minutes over \fillin{2} hours, was never more than
+\fillin{} minutes old.
+\todo{Grid freshness: a 2-hour poll started 5 Nov 15:47 (every 5 min); fill the two numbers from it. Optional if space: a small load test on the cached sample (no routing fees) for latency under load.}
 
 \subsection{User evaluation}
 \textbf{Method.} \fillin{N} participants used the deployed console signed out, in Recorded mode, without help, and then
-answered an anonymous online form (about 10 minutes). They did five tasks on the sample run: switch from Balanced to the
-Pharma profile, change Tampines Mall Cold Store's closing time to 11:00, optimise, compare with the shortest route,
+answered an anonymous online form (about 10 minutes). They did five tasks on the sample run: switch to Balanced and back to
+Pharma, change Tampines Mall Cold Store's closing time to 11:00, optimise, compare with the shortest route,
 and export the CSV. Because every participant saw the same run, the first stop of their plan has one correct answer. We
 measured self-reported task completion, that answer, whether they could explain in their own words why the route differed
 from the shortest one (an answer counts if it names rain, a time window or lateness, or cargo exposure; two members coded
@@ -644,12 +646,12 @@ JWT authorizers and partition keys enforce ownership; how fixed reference scales
 \section*{Draft notes (not part of the report)}
 \begin{itemize}
 \item \textbf{Page limit:} build \texttt{report/final.tex} (notes hidden) and keep it to 10 pages including cover and references.
-\item \textbf{Checked against:} \texttt{main} at \texttt{8865fec} plus PRs \#28 (evaluation) and \#29 (fixes); re-check the test counts and the \texttt{/api/plan} throttle once they are merged.
+\item \textbf{Checked against:} \texttt{main} at \texttt{6a26188} (all PRs merged, deployed 5 Nov); test counts (340) and the \texttt{/api/plan} throttle (5/s, burst 10) re-checked there.
 \item \textbf{Cover:} names and group number only; the professor said the team number is enough, and Canvas has the IDs.
 \item \textbf{Chien's original:} kept unchanged on branch \texttt{docs/final-report-draft}, with his \texttt{materials.tex} and \texttt{planning\_notes.tex}; this draft is on \texttt{docs/final-report-v1}.
 \item \textbf{Older drafts:} \texttt{Final.docx}, the slides and Lian's backend reference describe an earlier version (camera-based traffic, backend greedy optimiser, SNS alarms, Python 3.11). This draft follows the final code; update the slides to match.
 \item \textbf{Sources for every number:} the references, the code on \texttt{main}, and \texttt{frontend/eval/results/} for Section~\ref{sec:quality}.
-\item \textbf{Spec checklist:} (1) business case \checkmark\ (2) business model + on-prem comparison \checkmark\ (3) architecture, algorithm, requirements, user journey \checkmark\ (4) system evaluation: route quality done (frontend/eval); deployment checks, live timings and user study still need results (5) conclusion \checkmark\ (6) code explanation + public URL: make repo public; assumptions stated \checkmark; diagrams \checkmark; AI declaration: each member.
+\item \textbf{Spec checklist:} (1) business case \checkmark\ (2) business model + on-prem comparison \checkmark\ (3) architecture, algorithm, requirements, user journey \checkmark\ (4) system evaluation: route quality done (frontend/eval); deployment checks and live timings done on 5 Nov (grid-freshness numbers pending); user study still needs results (5) conclusion \checkmark\ (6) code explanation + public URL: make repo public; assumptions stated \checkmark; diagrams \checkmark; AI declaration: each member.
 \end{itemize}
 \fi
 \end{document}
