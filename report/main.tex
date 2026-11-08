@@ -78,8 +78,8 @@ console that sequences one vehicle's 5--15 stops using delivery windows, LTA roa
 carpark availability and cargo sensitivity, and explains each trade-off against the shortest route. Signed-in plans on
 live data are computed by a Lambda function with drive times from Amazon Location Service, on a serverless AWS stack
 (Amplify, API Gateway, Lambda, DynamoDB, S3, Cognito, EventBridge) defined entirely in Terraform. A 50-account pilot would
-cost about \Sd132 per month, mostly routing fees, against roughly \Sd2,135 per month for an equivalent redundant on-premise deployment.
-On 60 generated scenarios, compared with a planner that only meets booked slots, it carries 18\% less cargo time on board for a median 1--7\% more driving, and unloads 40\% less in rain. On the deployed stack a signed-in plan returns in about 0.35\,s when its drive times are cached. \fillin{one clause on the user study.}
+cost about \Sd245 per month including operations time (\Sd132 of it AWS charges, mostly routing fees), against roughly \Sd2,135 per month for an equivalent redundant on-premise deployment.
+On 60 generated scenarios, compared with a planner that only meets booked slots, it carries 18\% less cargo time on board for a median 1--7\% more driving, and unloads 40\% less in rain. On the deployed stack a signed-in plan returns in about 0.35\,s when its drive times are cached. In a user study, 16 of 17 first-time users completed five set tasks unaided (mean SUS 76.5), but only 10 could explain why the route differed from the shortest one.
 \end{minipage}
 \vspace{0.2cm}
 \begin{minipage}{0.75\linewidth}
@@ -145,6 +145,9 @@ Spoke Dispatch & US\$125/month (1,000 stops) & Yes & Navigation & ? & ? & Former
 an available car lot is not proof of a legal loading bay. (A4)~``Cargo exposure'' is sensitivity-weighted time on board,
 not a temperature measurement. (A5)~All prices exclude GST; vendor prices are shown as published. (A6)~Cloud costs are modelled from AWS price lists and
 our measurements, not taken from a bill; user-study participants were mostly students, not dispatchers.
+(A7)~A run has 5--15 stops: one refrigerated van and one driver's shift, with roughly 20--40 minutes per drop for driving
+across Singapore and unloading, and the smaller runs of a two- or three-van operator. This is our assumption, not
+measured from operators; planning stays under 100\,ms at this size (Section~\ref{sec:quality}).
 
 \textbf{Response to preliminary feedback.} Table~\ref{tab:ta} lists where each of the TA's five comments is answered.
 \begin{table}[h]
@@ -231,29 +234,33 @@ making 20 plans per day and meeting about 120 uncached pairs per day (one 10-sto
 is a 1\,GB planner invocation of about 1\,s. We assume 200\,ms API calls, 8\,KiB saved plans and 5\,MiB of frontend download
 per account-day, exclude free tiers and convert at US\$1\,=\,\Sd1.2776~\cite{fx}. Routing dominates, so the result is
 most sensitive to the 120 new pairs: at 30 (mostly repeat customers) the pilot's routing falls from US\$90 to about US\$22.
-\todo{The biggest assumption, 120 uncached drive-time pairs per account-day, is about customer behaviour and cannot be measured without customers; keep it labelled as an assumption. What the deployment test can check is the billing arithmetic it rests on: the \texttt{/api/plan} response's \texttt{roads.billed} (browser DevTools, Network tab) should be $n^2-1$ routes for a run of $n$ new points, about $2n$ for one new stop, 0 for a cached repeat, plus 1--2 for road lines. If the account owner can share the actual bill for the test period, one sentence on it is optional; the comparison itself is modelled, as stated.}
 
 \textbf{On-premise equivalent.} The same service with comparable availability would need two servers in separately powered
 sites (active/standby), running the web app, API, scheduled collectors, replicated PostgreSQL and a self-hosted identity
 provider (Keycloak) instead of Cognito. Using a Dell PowerEdge R350 at its Singapore list price~\cite{dell}, a 36-month write-off,
 two business fibre links with static IPs~\cite{sptel}, SP Group electricity tariffs~\cite{sp} and 0.1 of a system
-administrator's time~\cite{indeed} gives about \textbf{\Sd2,135 per month plus \Sd21,336 up-front} (Table~\ref{tab:onprem}).
+administrator's time~\cite{indeed} gives about \textbf{\Sd2,135 per month plus \Sd21,336 up-front} (Table~\ref{tab:onprem}):
+the servers and UPS written off over 36 months (\Sd592.66), rack space at two sites (\Sd300), power and cooling (\Sd77.19),
+two business internet links (\Sd572.48), and backups plus 0.1 FTE of a sysadmin (\Sd592.80). For a fair comparison the cloud
+side also gets operations time, 0.02 FTE (\Sd112.56 a month), plus optional DynamoDB point-in-time backups; that is why the
+pilot is \Sd132 in Table~\ref{tab:aws} but \Sd245 in Table~\ref{tab:onprem}.
 That is a lower bound: it excludes failover testing, a quorum witness and hardware quotes, and two server rooms still do not
 match DynamoDB's replication across three Availability Zones~\cite{ddbrepl}.
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Cloud vs on-premise, monthly \Sd\ (excl.\ GST). Cloud includes 0.02 FTE of operations time; on-premise 0.10 FTE.}\label{tab:onprem}
-\begin{tabularx}{\linewidth}{@{}Yrr|Yr@{}}
+\caption{Cloud vs on-premise (\Sd, excl.\ GST). \emph{Monthly} includes operations time (cloud 0.02 FTE, on-premise
+0.10 FTE) and, on premise, the 36-month hardware write-off, so the up-front cost is not added to it again.
+\emph{3-year total} $=36\times$ monthly.}\label{tab:onprem}
+\begin{tabularx}{\linewidth}{@{}Yrrr@{}}
 \toprule
-\textbf{On-premise item} & \textbf{\Sd/month} & & \textbf{Comparison} & \textbf{\Sd/month} \\
+\textbf{Deployment option} & \textbf{Up-front (hardware)} & \textbf{Monthly} & \textbf{3-year total} \\
 \midrule
-2 servers + UPS/network, 36-month write-off & 592.66 & & AWS demo (incl.\ labour) & 118.07 \\
-Rack space, 2 sites (assumed) & 300.00 & & AWS pilot, 50 accounts & 245.38 \\
-Power and cooling (250\,W, $\times$1.5) & 77.19 & & AWS growth, 500 accounts & 1,396.56 \\
-2 business internet links, static IP & 572.48 & & On-premise (any scale here) & 2,135.13 \\
-Backups + 0.1 FTE sysadmin & 592.80 & & Up-front on-premise capex & 21,335.78 \\
-\textbf{Total, redundant on-premise} & \textbf{2,135.13} & & Minimal: 1 colocated server, no failover & 1,038.30 \\
+AWS, demo (10 accounts) & 0 & 118.07 & 4,250 \\
+AWS, pilot (50 accounts) & 0 & 245.38 & 8,834 \\
+AWS, growth (500 accounts) & 0 & 1,396.56 & 50,276 \\
+On-premise, redundant (2 servers, 2 sites; any scale here) & 21,335.78 & 2,135.13 & 76,865 \\
+On-premise, minimal (1 colocated server, no failover) & 9,917.89 & 1,038.30 & 37,379 \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -398,7 +405,10 @@ Traffic cameras & camera points, images & displayed near stops only; never used 
 \end{tabularx}
 \end{table}
 
-\todo{Known data-fusion limits to either fix before submission or keep in Section~5: (a) the traffic factor samples the straight line between stops, not the routed road; (b) one traffic snapshot is used for the whole run regardless of when each leg is driven; (c) weather beyond the forecast horizon is treated as dry rather than unknown; (d) parking availability is fixed for the run, not predicted for the arrival time.}
+These alignments make four deliberate simplifications for the prototype: (a)~the traffic factor samples the straight line
+between stops, not the routed road; (b)~one traffic snapshot is used for the whole run, whenever each leg is driven;
+(c)~beyond the two-hour forecast, rain is treated as dry (with a warning) rather than unknown; and (d)~parking availability is
+fixed for the run, not predicted for the arrival time. Section~5 returns to them as limitations and future work.
 
 \subsection{Route objective, normalisation and search}\label{sec:objective}
 For a stop order $r$, the simulator computes arrival $A_k$, start of service $S_k=\max(A_k,a_{r_k})$ (waiting if early) and finish
@@ -433,15 +443,19 @@ The API \emph{fails closed}: only health, public data, traffic grids, carparks a
 route, including \texttt{POST /api/plan}, requires a valid Cognito JWT checked by API Gateway (an unsigned plan request gets 401).
 The backend takes the user's identity only from the verified \texttt{sub} claim, and each DynamoDB query, read or delete is
 restricted to that user's partition, so guessing another run's ID returns nothing. Admin endpoints also check the
-\texttt{admin} group server-side. Each Lambda's IAM role allows only what it uses. The LTA key exists only in the refresh
-Lambda's environment and never reaches the browser; S3 blocks all public access. Saved runs, dispatcher e-mails and the
+\texttt{admin} group server-side. Each Lambda's IAM role allows only what it uses. The LTA key never reaches the browser:
+it is passed only to the refresh Lambda's environment, and S3 blocks all public access. Saved runs, dispatcher e-mails and the
 drive-time cache stay in \texttt{ap-southeast-1}. Only stop coordinates, never names or addresses, leave Singapore: to Location
 Service in Sydney and, if it fails, to the public OSRM server. Most stops are businesses, but a private home's coordinates
 can be personal data, so a commercial version would meet PDPA's Transfer Limitation Obligation~\cite{pdpa} through the
 provider's data-processing terms, or route inside Singapore with self-hosted OSRM. Scalability comes from the design: planner and API Lambdas scale per request,
 DynamoDB is on-demand, the drive-time cache makes repeat plans free, and one shared refresh serves all users, so LTA usage
 stays constant ($\approx$4,320 runs/month) however many users there are. Because each plan with new stops costs routing fees, \texttt{POST /api/plan} has its own throttle (5 requests/s for all users together), below the API's 50/s.
-\todo{Security/scalability caveats to decide on: the LTA key also sits in Terraform state (move to Secrets Manager/SSM?); the admin analytics endpoint scans the whole table (fine for the course, not for 500 accounts).}
+Two caveats remain. The LTA key is a Terraform variable marked \texttt{sensitive}, so it is hidden from plan output,
+but it is still stored in plain text in the Terraform state (kept on the deployer's machine) and in the Lambda's
+environment; a production version would keep it in AWS Secrets Manager and the state in an encrypted remote backend. The
+admin's team-activity endpoint scans the whole runs table, which is fine at course scale but would need a pre-aggregated
+table at hundreds of accounts.
 
 % =====================================================================
 \section{Evaluation}
@@ -545,18 +559,26 @@ sample is $2\times8=16$ new pairs, billed as 17 matrix routes plus up to 2 for r
 this window it never did, though with only about 2 minutes to spare.
 
 \subsection{User evaluation}
-\textbf{Method.} \fillin{N} participants used the deployed console signed out, in Recorded mode, without help, and then
+\textbf{Method.} Seventeen people used the deployed console signed out, in Recorded mode, without help, and then
 answered an anonymous online form (about 10 minutes). They did five tasks on the sample run: switch to Balanced and back to
 Pharma, change Tampines Mall Cold Store's closing time to 11:00, optimise, compare with the shortest route,
 and export the CSV. Because every participant saw the same run, the first stop of their plan has one correct answer. We
 measured self-reported task completion, that answer, whether they could explain in their own words why the route differed
-from the shortest one (an answer counts if it names rain, a time window or lateness, or cargo exposure; two members coded
-each answer separately), and usability with the standard 10-item System Usability Scale (SUS)~\cite{sus}. A SUS score of
+from the shortest one (an answer counts if it names rain, a time window or lateness, or cargo exposure), and usability with the standard 10-item System Usability Scale (SUS)~\cite{sus}. A SUS score of
 68 is commonly treated as average~\cite{bangor}. Our targets were 90\% task completion, 80\% correct explanations and
 SUS $\ge$70.
 
-\textbf{Results.} \fillin{completion per task; \% correct first stop; \% correct explanations and coder agreement; mean SUS $\pm$ SD; 2--3 representative comments and what we changed.}
-\decide{Report collected responses on their own, with their count. Any figure that is not from collected responses must be labelled ``for illustrative purposes'' next to it, with its count. State that participants were mostly students, so this tests the interface's usability, not the market. Analyse with \texttt{analyse\_form.py} (see the user-study kit).}
+\textbf{Results.} Seventeen people took part on 6--8 November: 12 students and 5 working adults, one of whom had
+planned deliveries before. 16 of 17 completed all five tasks (target 90\%), and 14 named the correct first stop, Holland V
+Bistro; the other three left it blank. Ten of 17 explained the change correctly, mostly by closing times or delivery
+windows, some also by rain or keeping cargo cold; the rest left it blank or gave no real reason, so the 80\% target was not
+met. Mean SUS was 76.5 (SD 14.4), above the target of 70, with 13 of 17 scoring 70 or more. The comments point the same way:
+people were unsure what the cold-chain exposure number meant, did not notice at first that a stop can be clicked to edit
+it, found the grey shortest route hard to see, and one found the screen busy for a beginner. One participant also suggested
+opening each stop in Google Maps for directions. So people can use the console unaided, but the ``Why this route''
+explanation and the risk numbers need to be clearer. Participants were mostly students, so this tests usability, not
+whether dispatchers would buy it.
+\decide{Second coder: one more member checks the 17 explanation answers blind against the rule (Manus's coding is in \texttt{user-study/results/summary-final-17.md}); then add ``two members agreed on X of 17''.}
 
 % =====================================================================
 \section{Conclusion and Future Work}
@@ -564,21 +586,23 @@ SUS $\ge$70.
 ColdRoute SG shows that a small team can turn Singapore's open transport and weather data into a usable, explainable
 planning service on a serverless stack. Its fixed hosting cost is a few dollars a month, it is roughly nine times cheaper than
 an equivalent on-premise deployment at pilot scale, signed-in plans return in about 0.35\,s from cached drive times, and the whole
-stack can be rebuilt with one \texttt{terraform apply}. On 60 test scenarios it meets nearly every booked slot and, compared with a planner that only respects slots, carries 18\% less cargo time on board for a median 1--7\% more driving; it helps least when cargo mix is the only difference. \fillin{one sentence on the user study.}
+stack can be rebuilt with one \texttt{terraform apply}. On 60 test scenarios it meets nearly every booked slot and, compared with a planner that only respects slots, carries 18\% less cargo time on board for a median 1--7\% more driving; it helps least when cargo mix is the only difference. Seventeen first-time users almost all completed the set tasks and rated
+its usability above average, but only 10 could explain why the route changed, so the explanation needs to be clearer.
 \textbf{Limitations.} The objective uses proxies (sensitivity-weighted time on board, parking within 600\,m, nearest
 forecast area), not measured temperature or loading-bay access. The weights are expert-set. Traffic is a per-run snapshot
-sampled along the straight line between stops, and the parking term cannot change the order. Plans cover one vehicle
-without a return leg, and our users were not professional dispatchers.
-\textbf{Future work.} Multi-vehicle planning; a driver app with live re-optimisation; reefer temperature telemetry to replace
-the exposure proxy; time-dependent traffic per leg; weights calibrated from operators' choices; and a pilot with real operators
+sampled along the straight line between stops, rain beyond the two-hour forecast counts as dry, and parking is fixed for
+the run, so the parking term cannot change the order. Plans cover one vehicle
+without a return leg, and our 17 users were mostly not dispatchers.
+\textbf{Future work.} A clearer, per-stop explanation of each reordering; a ``send to Google Maps'' link per stop, as a participant suggested; multi-vehicle planning; a driver app with live re-optimisation; reefer temperature telemetry to replace
+the exposure proxy; time-dependent traffic per leg along the routed road; parking predicted for the arrival time; the LTA key in Secrets Manager; weights calibrated from operators' choices; and a pilot with real operators
 to test the \Sd49 price.
 
 % =====================================================================
 \section{Code Explanation}
 % =====================================================================
 \textbf{Repository:} \url{https://github.com/legolas456/ColdRouteSG} (public until marks are released).
-\textbf{Live service:} \url{https://main.d1f8mppryelp5v.amplifyapp.com/}. Test login for graders: \fillin{e-mail / password, or ``on request''}.
-\todo{Make the repository public (agreed) and check the link works when logged out. Delete merged branches first.}
+\textbf{Live service:} \url{https://main.d1f8mppryelp5v.amplifyapp.com/}. Signed-out use in Recorded or Live mode needs no account; saved runs and the cloud planner need an
+administrator-created account, and a test account for graders is available on request.
 
 \begin{table}[h]
 \centering\footnotesize
@@ -653,7 +677,7 @@ JWT authorizers and partition keys enforce ownership; how fixed reference scales
 \item \textbf{Chien's original:} kept unchanged on branch \texttt{docs/final-report-draft}, with his \texttt{materials.tex} and \texttt{planning\_notes.tex}; this draft is on \texttt{docs/final-report-v1}.
 \item \textbf{Older drafts:} \texttt{Final.docx}, the slides and Lian's backend reference describe an earlier version (camera-based traffic, backend greedy optimiser, SNS alarms, Python 3.11). This draft follows the final code; update the slides to match.
 \item \textbf{Sources for every number:} the references, the code on \texttt{main}, and \texttt{frontend/eval/results/} for Section~\ref{sec:quality}.
-\item \textbf{Spec checklist:} (1) business case \checkmark\ (2) business model + on-prem comparison \checkmark\ (3) architecture, algorithm, requirements, user journey \checkmark\ (4) system evaluation: route quality done (frontend/eval); deployment checks and live timings done on 5 Nov (grid-freshness numbers pending); user study still needs results (5) conclusion \checkmark\ (6) code explanation + public URL: make repo public; assumptions stated \checkmark; diagrams \checkmark; AI declaration: each member.
+\item \textbf{Spec checklist:} (1) business case \checkmark\ (2) business model + on-prem comparison \checkmark\ (3) architecture, algorithm, requirements, user journey \checkmark\ (4) system evaluation: route quality done (frontend/eval); deployment checks, live timings and grid freshness done on 5 Nov; user study: 17 real responses analysed 8 Nov; 25 AI-generated test submissions were deleted from the form and are not used (5) conclusion \checkmark\ (6) code explanation + public URL (public since 6 Nov); assumptions stated \checkmark; diagrams \checkmark; AI declaration: each member.
 \end{itemize}
 \fi
 \end{document}
