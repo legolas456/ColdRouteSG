@@ -9,7 +9,7 @@
 %          Build report/final.tex to hide every TO DO/DECIDE box and
 %          check the 10-page limit (cover, ToC, figures, refs included).
 % Facts:   every technical statement was checked against the final code
-%          (main at 8865fec on 4 Nov 2026, incl. the cloud planner #26 and #27).
+%          (main at 6a26188, deployed 5 Nov 2026).
 % =====================================================================
 \documentclass[10.5pt,a4paper]{article}
 \usepackage[a4paper,margin=17mm,top=15mm,bottom=17mm]{geometry}
@@ -62,7 +62,7 @@
 \vspace{0.25cm}
 {\large Weather-, traffic- and parking-aware route planning\\ for cold-chain deliveries in Singapore\par}
 \vspace{0.45cm}
-{\normalsize CS5224 Cloud Computing --- Group Project Final Report\par}
+{\normalsize CS5224 Cloud Computing: Group Project Final Report\par}
 \vspace{0.35cm}
 {\bfseries Group 36\par}
 \vspace{0.15cm}
@@ -74,14 +74,15 @@ Code: \url{https://github.com/legolas456/ColdRouteSG}\par}
 \begin{minipage}{0.9\linewidth}
 \small\textbf{Abstract.} Small Singapore food and healthcare distributors plan chilled and frozen delivery runs
 by hand or with general routing tools that minimise driving time. ColdRoute SG is a browser-based Software-as-a-Service
-console that sequences one vehicle's 5--15 stops using delivery windows, LTA road speeds, NEA rain forecasts,
+console that sequences one vehicle's 5-15 stops using delivery windows, LTA road speeds, NEA rain forecasts,
 carpark availability and cargo sensitivity, and explains each trade-off against the shortest route. Signed-in plans on
 live data are computed by a Lambda function with drive times from Amazon Location Service, on a serverless AWS stack
 (Amplify, API Gateway, Lambda, DynamoDB, S3, Cognito, EventBridge) defined entirely in Terraform. A 50-account pilot would
 cost about \Sd245 per month including operations time (\Sd132 of it AWS charges, mostly routing fees), against roughly \Sd2,135 per month for an equivalent redundant on-premise deployment.
-On 60 generated scenarios, compared with a planner that only meets booked slots, it carries 18\% less cargo time on board for a median 1--7\% more driving, and unloads 40\% less in rain. On the deployed stack a signed-in plan returns in about 0.35\,s when its drive times are cached. In a user study, 16 of 17 first-time users completed five set tasks unaided (mean SUS 76.5), but only 10 could explain why the route differed from the shortest one.
+On 60 generated scenarios, compared with a planner that only meets booked slots, it carries 18\% less cargo time on board for a median 1-7\% more driving, and unloads 40\% less in rain. On the deployed stack a signed-in plan returns in about 0.35\,s when its drive times are cached. In a user study, 16 of 17 first-time users completed five set tasks unaided (mean SUS 76.5), but only 10 could explain why the route differed from the shortest one.
 \end{minipage}
-\vspace{0.2cm}
+
+\vspace{0.5cm}
 \begin{minipage}{0.75\linewidth}
 \small
 \renewcommand{\contentsname}{\normalsize Contents}
@@ -103,18 +104,18 @@ unloading in a storm, at a stop with no parking nearby, or keeping vaccines on b
 optimisers answer a simpler question: \emph{what is the shortest feasible tour?}
 
 \textbf{Target users.} Our buyer is a small Singapore food, pharmaceutical or healthcare-supply operator that runs its own
-vans. The user is its dispatcher or operations coordinator, who plans one known run from one depot to roughly 5--15 stops
+vans. The user is its dispatcher or operations coordinator, who plans one known run from one depot to roughly 5-15 stops
 before the driver leaves. Receiving restaurants and clinics are not buyers. ColdRoute is a planning aid; it does not
 navigate, track drivers or measure cargo temperature.
 
 \textbf{Purpose of the service.} ColdRoute (i)~fuses Singapore open data that a small operator would never integrate by
-itself---LTA DataMall speed bands and carparks, NEA two-hour forecasts, HDB carpark availability~\cite{lta,datagov}---with
+itself (LTA DataMall speed bands and carparks, NEA two-hour forecasts, HDB carpark availability~\cite{lta,datagov}) with
 road travel times; (ii)~searches stop orders with a transparent, normalised objective whose weights reflect the cargo
 (Pharma, Balanced, Fastest); and (iii)~shows the recommended route side by side with the shortest-drive route, with
 plain-language reasons for every change. Runs are saved per dispatcher account so that teams can reopen and replan them.
 
 \textbf{Comparison with existing services.} Several mature SaaS products already plan delivery routes
-(Table~\ref{tab:competitors}). They offer full fleet operations---driver apps, tracking, proof of delivery---that ColdRoute does
+(Table~\ref{tab:competitors}). They offer full fleet operations, such as driver apps, tracking and proof of delivery, which ColdRoute does
 not try to reproduce. Their public pages, however, do not show the three things ColdRoute is built around: Singapore-specific
 weather and parking feeds, a cargo-sensitivity term, and an explicit explanation of what the chosen order costs and saves
 compared with the shortest route. We do not claim that competitors \emph{cannot} do these things; where a vendor page is
@@ -145,7 +146,7 @@ Spoke Dispatch & US\$125/month (1,000 stops) & Yes & Navigation & ? & ? & Former
 an available car lot is not proof of a legal loading bay. (A4)~``Cargo exposure'' is sensitivity-weighted time on board,
 not a temperature measurement. (A5)~All prices exclude GST; vendor prices are shown as published. (A6)~Cloud costs are modelled from AWS price lists and
 our measurements, not taken from a bill; user-study participants were mostly students, not dispatchers.
-(A7)~A run has 5--15 stops: one refrigerated van and one driver's shift, with roughly 20--40 minutes per drop for driving
+(A7)~A run has 5-15 stops: one refrigerated van and one driver's shift, with roughly 20-40 minutes per drop for driving
 across Singapore and unloading, and the smaller runs of a two- or three-van operator. This is our assumption, not
 measured from operators; planning stays under 100\,ms at this size (Section~\ref{sec:quality}).
 
@@ -224,7 +225,7 @@ Data transfer out & 0.06 & 2.08 & 20.23 \\
 priced it with AWS's official price lists, for Singapore and, for Location Service, Sydney~\cite{awsprice}
 (Table~\ref{tab:aws}). Two loads matter. The \emph{fixed} load is the traffic refresh (1\,GB, about 7\,s, every 10 minutes:
 4,320 runs per month) and the nightly typical-traffic build; it costs under a dollar. The \emph{per-use} load is dominated by
-routing: Amazon Location Service bills US\$0.50 per 1,000 Core routes~\cite{awsloc}, and a matrix bills every origin--destination cell
+routing: Amazon Location Service bills US\$0.50 per 1,000 Core routes~\cite{awsloc}, and a matrix bills every origin-destination cell
 (a new stop in a run of $n$ points costs about $2n$ routes). Every pair is cached in DynamoDB for 30 days, so replans and
 recurring customers cost little; on the deployed stack the first plan of the 7-stop sample (8 points) billed 63 routes, a
 repeat none, and one new stop 17 (its row and column) plus up to 2 for road lines. Drawing the two plans' road lines adds one or two routes per plan unless the planner
@@ -397,10 +398,10 @@ frozen when the user presses Optimise, so both routes are scored on an identical
 \textbf{Signal} & \textbf{Native granularity} & \textbf{Spatial / temporal alignment} & \textbf{Freshness and fallback} \\
 \midrule
 Road travel time & point-to-point matrix & base minutes $t^0_{ij}$ per ordered pair from Amazon Location Service (cloud) or OSRM (browser) & pairs cached 30 days; OSRM, then a 1.35$\times$ distance at 38\,km/h estimate if routing fails \\
-LTA speed bands & road links, 5-min updates & length-weighted night/current speed ratio per 1.1\,km cell (clipped 1--3); a leg averages cells at points every 0.5\,km & live grid if $\le$20\,min old and departure within $\pm$60\,min, else typical median for that slot, else factor 1 \\
+LTA speed bands & road links, 5-min updates & length-weighted night/current speed ratio per 1.1\,km cell (clipped 1-3); a leg averages cells at points every 0.5\,km & live grid if $\le$20\,min old and departure within $\pm$60\,min, else typical median for that slot, else factor 1 \\
 NEA 2-h forecast & 47 named areas, 2-h validity & stop takes the nearest area; rain counts if the unloading interval overlaps the forecast validity & recorded sample if the feed fails; outside the forecast horizon no rain penalty, with a warning \\
 HDB / URA / mall carparks & carpark, $\sim$1-min updates & nearest reporting carpark within 600\,m; risk from walk distance and free share & URA/mall counts older than 30\,min dropped; otherwise the stop keeps its recorded estimate \\
-Traffic cameras & camera points, images & displayed near stops only; never used as numbers & -- \\
+Traffic cameras & camera points, images & displayed near stops only; never used as numbers & not used \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -422,7 +423,7 @@ per-stop reference scale, so the weights are unit-free and comparable:
 J(r)=\alpha\frac{T}{20n}+\beta\frac{L}{15n}+\gamma\frac{W}{15n}+\delta\frac{P}{15n}+\varepsilon\frac{C}{120n},
 \qquad \alpha+\beta+\gamma+\delta+\varepsilon=1 .
 \end{equation}
-The scales are fixed rather than rescaled per candidate, because min--max scaling would change the meaning of a weight from one run to the next. Lateness is not capped. The weights are
+The scales are fixed rather than rescaled per candidate, because min-max scaling would change the meaning of a weight from one run to the next. Lateness is not capped. The weights are
 profiles chosen by the dispatcher: \emph{Pharma} $(0.15,0.35,0.10,0.05,0.35)$ protects windows and on-board time;
 \emph{Balanced} $(0.30,0.30,0.10,0.10,0.20)$ trades a little driving for lower risk; \emph{Fastest} $(1,0,0,0,0)$ reproduces
 shortest-drive routing. They are pilot hypotheses chosen by the team, not values fitted to data. Section~\ref{sec:quality} tests how much the result depends on the weights: moving any one weight by $\pm$20\% changes few routes and moves exposure and driving by about 1\%; lateness is the most sensitive. One term needs care:
@@ -432,8 +433,8 @@ arrival time, which the feeds do not give.
 
 \textbf{Search.} With up to 8 stops ($8!=40{,}320$ orders) the optimiser enumerates every permutation and is exact. Above 8 it
 runs deterministic local search from four starts (shortest-drive, entered order, earliest deadline, nearest neighbour), applying
-Or-opt moves of 1--3 stops, 2-opt reversals and swaps until no improvement. The shortest-drive baseline is solved exactly up
-to 15 stops with Held--Karp dynamic programming~\cite{heldkarp}. Starting the search from the baseline guarantees that the
+Or-opt moves of 1-3 stops, 2-opt reversals and swaps until no improvement. The shortest-drive baseline is solved exactly up
+to 15 stops with Held-Karp dynamic programming~\cite{heldkarp}. Starting the search from the baseline guarantees that the
 recommendation scores no worse than it. The same code runs on the planner Lambda and in the browser; only the drive times
 differ (Location Service in the cloud, OSRM in the browser), so the same run can be ordered differently in the two places.
 
@@ -450,11 +451,13 @@ can be personal data, so a commercial version would meet PDPA's Transfer Limitat
 provider's data-processing terms, or route inside Singapore with self-hosted OSRM. Scalability comes from the design: planner and API Lambdas scale per request,
 DynamoDB is on-demand, the drive-time cache makes repeat plans free, and one shared refresh serves all users, so LTA usage
 stays constant ($\approx$4,320 runs/month) however many users there are. Because each plan with new stops costs routing fees, \texttt{POST /api/plan} has its own throttle (5 requests/s for all users together), below the API's 50/s.
-Two caveats remain. The LTA key is a Terraform variable marked \texttt{sensitive}, so it is hidden from plan output,
+Three caveats remain. The LTA key is a Terraform variable marked \texttt{sensitive}, so it is hidden from plan output,
 but it is still stored in plain text in the Terraform state (kept on the deployer's machine) and in the Lambda's
 environment; a production version would keep it in AWS Secrets Manager and the state in an encrypted remote backend. The
 admin's team-activity endpoint scans the whole runs table, which is fine at course scale but would need a pre-aggregated
-table at hundreds of accounts.
+table at hundreds of accounts. Finally, one deployment serves one customer team: all accounts share one user pool and the
+admin sees every run. To host many customer firms on one stack (multitenancy), each account would carry a tenant ID in its
+token and in the table's partition key, and admin views and plan quotas would be scoped to that tenant.
 
 % =====================================================================
 \section{Evaluation}
@@ -488,7 +491,7 @@ Speed grid in S3 refreshed every 10\,min (Live traffic) & Pass & Typical slots p
 
 \subsection{Route quality}\label{sec:quality}
 \textbf{Protocol.} We generated 60 scenarios: five types (an \emph{easy} control with no booked slots or rain; \emph{tight}
-30--60\,min booked slots at half the stops; heavy \emph{rain} over some stops' areas; \emph{mixed} Pharma, Frozen and Chilled
+30-60\,min booked slots at half the stops; heavy \emph{rain} over some stops' areas; \emph{mixed} Pharma, Frozen and Chilled
 cargo, all at least 8\,km from the depot; and all \emph{combined}), each with 5, 10 and 15 stops and four seeds. Stops come
 from 43 real Singapore addresses: the ten sample customers, plus one HDB block per mainland NEA forecast area standing in
 for a customer there. Every run leaves the Jurong depot at 09:00, with drive times from one saved OSRM matrix and no traffic.
@@ -529,11 +532,11 @@ consistent: on the 24 runs with slots Balanced carries 18\% less cargo exposure 
 runs and worse in 1 (sign test $p<0.001$); Pharma cuts 18\% for 7\% more driving (20 better, 1 worse). The price is a little
 lateness: Balanced is late 56\,min in total against slots-only's 12, because its cargo term accepts a few late minutes to
 shorten time on board. Meeting slots is what costs driving: on runs with slots, Balanced drives a median 26\% more than the
-shortest route (IQR 14--33\%) and slots-only 23\%. In the rain runs ColdRoute unloads 40\% less in rain for no extra median
+shortest route (IQR 14-33\%) and slots-only 23\%. In the rain runs ColdRoute unloads 40\% less in rain for no extra median
 driving (better in 4 runs, never worse). On the easy control Balanced kept the shortest route's driving in 9 of 12 runs.
 \textbf{Where it helps least.} With mixed cargo but no slots, most orders keep cargo on board for similar times, so exposure
-falls only 4--7\%, below the 10\% target for that type. With slots and rain together, both profiles still unload in rain for
-67--79\,min (slots-only: 82), because they weight a late minute about three times a wet one.
+falls only 4-7\%, below the 10\% target for that type. With slots and rain together, both profiles still unload in rain for
+67-79\,min (slots-only: 82), because they weight a late minute about three times a wet one.
 
 \textbf{Ablation and sensitivity.} Switching off one Balanced term (the rest renormalised, 48 constrained runs): without
 weather, 6 routes change and rain unloading rises from 120 to 182\,min; without cargo, 27 change, exposure rises 13.5\% and late
@@ -547,10 +550,10 @@ found the optimum in 78, was at worst 3.4\% above it and never had more late sto
 runs. A plain 2-opt from the entered order found only 29 of the 80 (worst 47\% above). On the 60 evaluation scenarios we
 also compared it with an exact branch-and-bound search: it found the optimum in 39 of 40 ten-stop plans (worst 1.75\%
 above, mean 0.04\%). Median planning time on a laptop (Node~22) is 0.6\,ms for 5 stops, 9\,ms for 10 and
-54\,ms for 15 (always under 100\,ms). \textbf{Cloud latency.} On the production stack (3~Nov), the first plan of the 7-stop sample took 3.7\,s including a Lambda
+56\,ms for 15 (always under 100\,ms). \textbf{Cloud latency.} On the production stack (3~Nov), the first plan of the 7-stop sample took 3.7\,s including a Lambda
 cold start and 63 new routes. On 5~November 2026, timed end to end from a laptop in Singapore with a
 signed-in test account, 18 repeat plans of the cached sample over two runs took a median of 0.35\,s (0.29\,s inside the
-planner; at most 1.2\,s). Plans adding one or two stops new to the cache took 1.0--2.7\,s for 16--38 new pairs (17--40 billed
+planner; at most 1.2\,s). Plans adding one or two stops new to the cache took 1.0-2.7\,s for 16-38 new pairs (17-40 billed
 routes); repeating such a plan took 0.26\,s and billed nothing. Billing matched the cost model: one new stop on the 8-point
 sample is $2\times8=16$ new pairs, billed as 17 matrix routes plus up to 2 for road lines. Read every 5 minutes over
 2 hours (24 reads, none failed), our copy of the road-speed grid was at most 10 minutes old and LTA's own timestamp at most
@@ -567,7 +570,7 @@ from the shortest one (an answer counts if it names rain, a time window or laten
 68 is commonly treated as average~\cite{bangor}. Our targets were 90\% task completion, 80\% correct explanations and
 SUS $\ge$70.
 
-\textbf{Results.} Seventeen people took part on 6--8 November: 12 students and 5 working adults, one of whom had
+\textbf{Results.} Seventeen people took part on 6-8 November: 12 students and 5 working adults, one of whom had
 planned deliveries before. 16 of 17 completed all five tasks (target 90\%), and 14 named the correct first stop, Holland V
 Bistro; the other three left it blank. Ten of 17 explained the change correctly, mostly by closing times or delivery
 windows, some also by rain or keeping cargo cold; the rest left it blank or gave no real reason, so the 80\% target was not
@@ -584,7 +587,7 @@ whether dispatchers would buy it.
 ColdRoute SG shows that a small team can turn Singapore's open transport and weather data into a usable, explainable
 planning service on a serverless stack. Its fixed hosting cost is a few dollars a month, it is roughly nine times cheaper than
 an equivalent on-premise deployment at pilot scale, signed-in plans return in about 0.35\,s from cached drive times, and the whole
-stack can be rebuilt with one \texttt{terraform apply}. On 60 test scenarios it meets nearly every booked slot and, compared with a planner that only respects slots, carries 18\% less cargo time on board for a median 1--7\% more driving; it helps least when cargo mix is the only difference. Seventeen first-time users almost all completed the set tasks and rated
+stack can be rebuilt with one \texttt{terraform apply}. On 60 test scenarios it meets nearly every booked slot and, compared with a planner that only respects slots, carries 18\% less cargo time on board for a median 1-7\% more driving; it helps least when cargo mix is the only difference. Seventeen first-time users almost all completed the set tasks and rated
 its usability above average, but only 10 could explain why the route changed, so the explanation needs to be clearer.
 \textbf{Limitations.} The objective uses proxies (sensitivity-weighted time on board, parking within 600\,m, nearest
 forecast area), not measured temperature or loading-bay access. The weights are expert-set. Traffic is a per-run snapshot
@@ -638,7 +641,7 @@ We used ChatGPT, Claude and Manus throughout the project to help write and revie
 \bibitem{lta} Land Transport Authority, ``LTA DataMall API User Guide'' (Traffic Speed Bands, Carpark Availability). \url{https://datamall.lta.gov.sg/content/dam/datamall/datasets/LTA_DataMall_API_User_Guide.pdf}
 \bibitem{datagov} data.gov.sg, ``2-hour Weather Forecast'' and ``HDB Carpark Availability.'' \url{https://api.data.gov.sg/v1/environment/2-hour-weather-forecast}, \url{https://data.gov.sg/datasets/d_ca933a644e55d34fe21f28b8052fac63/view}
 \bibitem{vendors} Vendor pricing and feature pages: OptimoRoute \url{https://optimoroute.com/pricing/}, \url{https://optimoroute.com/features/}; Routific \url{https://www.routific.com/pricing}; Onfleet \url{https://onfleet.com/pricing}; Spoke \url{https://help.spoke.com/en/articles/1925291-spoke-products-pricing}
-\bibitem{esg} Enterprise Singapore, ``Annual Report 2020--2021,'' p.\,27. \url{https://www.enterprisesg.gov.sg/-/media/esg/files/resources/publications/annual-reports/esg_ar2020_21.pdf}
+\bibitem{esg} Enterprise Singapore, ``Annual Report 2020-2021,'' p.\,27. \url{https://www.enterprisesg.gov.sg/-/media/esg/files/resources/publications/annual-reports/esg_ar2020_21.pdf}
 \bibitem{awsprice} AWS, Price List files for Lambda, API Gateway, DynamoDB, S3, Amplify, Cognito, CloudWatch and data transfer, \texttt{ap-southeast-1}. \url{https://aws.amazon.com/pricing/}
 \bibitem{awsloc} AWS, ``Amazon Location Service pricing'' and Routes pricing (Core bucket), \texttt{ap-southeast-2}. \url{https://aws.amazon.com/location/pricing/}
 \bibitem{fx} US Federal Reserve, ``H.10 Foreign Exchange Rates'' (30 Oct 2026). \url{https://www.federalreserve.gov/releases/h10/current/}
