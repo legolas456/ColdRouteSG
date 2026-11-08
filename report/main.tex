@@ -66,7 +66,7 @@
 \vspace{0.35cm}
 {\bfseries Group 36\par}
 \vspace{0.15cm}
-{\small Agarwal Ishan \enspace\textperiodcentered\enspace Chao Chien Hung \enspace\textperiodcentered\enspace Huang Xuan Kun \enspace\textperiodcentered\enspace Kim Jae Hyeok \enspace\textperiodcentered\enspace Ler Lian Ping \enspace\textperiodcentered\enspace Passion Goh Wei Ling\par}
+{\small Agarwal Ishan \ \textperiodcentered\  Chao Chien Hung \ \textperiodcentered\  Huang Xuan Kun \ \textperiodcentered\  Kim Jae Hyeok \ \textperiodcentered\  Ler Lian Ping \ \textperiodcentered\  Passion Goh Wei Ling\par}
 \vspace{0.3cm}
 {\small Live service: \url{https://main.d1f8mppryelp5v.amplifyapp.com/}\quad
 Code: \url{https://github.com/legolas456/ColdRouteSG}\par}
@@ -385,7 +385,7 @@ The plan is saved to \emph{Your runs} and can be exported as CSV.
 
 \subsection{Combining data with different granularity}
 The feeds come at different spatial and temporal scales, so we never mix them raw. Each source
-keeps its native key and timestamp, and is converted into one of two derived inputs: a \emph{leg factor} that scales an OSRM
+keeps its native key and timestamp, and is converted into one of two derived inputs: a \emph{leg factor} that scales the base
 travel time, or a \emph{stop condition} evaluated at the simulated unloading time (Table~\ref{tab:fusion}). Conditions are
 frozen when the user presses Optimise, so both routes are scored on an identical snapshot.
 
@@ -425,11 +425,10 @@ J(r)=\alpha\frac{T}{20n}+\beta\frac{L}{15n}+\gamma\frac{W}{15n}+\delta\frac{P}{1
 The scales are fixed rather than rescaled per candidate, because min--max scaling would change the meaning of a weight from one run to the next. Lateness is not capped. The weights are
 profiles chosen by the dispatcher: \emph{Pharma} $(0.15,0.35,0.10,0.05,0.35)$ protects windows and on-board time;
 \emph{Balanced} $(0.30,0.30,0.10,0.10,0.20)$ trades a little driving for lower risk; \emph{Fastest} $(1,0,0,0,0)$ reproduces
-shortest-drive routing. They are pilot hypotheses chosen by the team, not values fitted to data. One term needs care:
+shortest-drive routing. They are pilot hypotheses chosen by the team, not values fitted to data. Section~\ref{sec:quality} tests how much the result depends on the weights: moving any one weight by $\pm$20\% changes few routes and moves exposure and driving by about 1\%; lateness is the most sensitive. One term needs care:
 $P$ is the same for every order of a given run (a fixed risk times a fixed unloading time), so parking shifts the score but
 cannot change the route. We keep it as a per-stop risk flag; making it order-dependent would need parking predicted for each
 arrival time, which the feeds do not give.
-Section~\ref{sec:quality} tests how much the result depends on them: moving any one weight by $\pm$20\% changes few routes and moves exposure and driving by about 1\%; lateness is the most sensitive.
 
 \textbf{Search.} With up to 8 stops ($8!=40{,}320$ orders) the optimiser enumerates every permutation and is exact. Above 8 it
 runs deterministic local search from four starts (shortest-drive, entered order, earliest deadline, nearest neighbour), applying
@@ -578,7 +577,6 @@ it, found the grey shortest route hard to see, and one found the screen busy for
 opening each stop in Google Maps for directions. So people can use the console unaided, but the ``Why this route''
 explanation and the risk numbers need to be clearer. Participants were mostly students, so this tests usability, not
 whether dispatchers would buy it.
-\decide{Second coder: one more member checks the 17 explanation answers blind against the rule (Manus's coding is in \texttt{user-study/results/summary-final-17.md}); then add ``two members agreed on X of 17''.}
 
 % =====================================================================
 \section{Conclusion and Future Work}
