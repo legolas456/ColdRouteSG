@@ -623,7 +623,7 @@ administrator-created account, and a test account for graders is available on re
 
 \textbf{Run locally:} \texttt{make setup \&\& make dev} starts the API on port 8000 and the console on port 5173; \texttt{make test}
 runs the backend and console tests (the planner's are in \texttt{planner/}, \texttt{npm test}). The console works without the backend in Recorded mode. Live LTA traffic needs a DataMall key in
-\texttt{backend/.env}. \textbf{Deploy:} copy \texttt{infra/terraform.tfvars.example}, set the LTA key, then run
+\texttt{backend/.env}. \textbf{Deploy:} in \texttt{infra/}, copy \texttt{terraform.tfvars.example}, set the LTA key, then run
 \texttt{terraform init \&\& terraform apply}. Terraform prints the console URL, API URL and Cognito IDs; dispatcher accounts
 are created in Cognito by an administrator.
 
@@ -631,13 +631,7 @@ are created in Cognito by an administrator.
 \section*{Declaration of AI Use}
 \addcontentsline{toc}{section}{Declaration of AI Use}
 % =====================================================================
-\fillin{Each member's statement.} Example structure: \emph{Where:} AI coding assistants were used to draft parts of the
-frontend and Terraform, to review pull requests, to gather and check competitor and AWS pricing, and to draft sections of
-this report. \emph{How:} every generated change went through a pull request, automated tests and review by another member;
-every fact and price in this report was checked against the code or the cited source. \emph{What we learned:} \fillin{e.g.\ how
-JWT authorizers and partition keys enforce ownership; how fixed reference scales make weights interpretable; reading AWS price lists}.
-\decide{Each member writes 1--2 lines on what AI they used, where and what they learned (the course requires where, how and learning). Ishan: Manus was used for PR review and fixes (PRs \#20--24), fact-checking and this draft; Claude (Claude Code) for an independent review of the code and this draft, re-checking AWS prices against the official price lists, and the form-analysis script.}
-
+We used ChatGPT, Claude and Manus throughout the project to help write and review parts of the code, tests and evaluation scripts, check competitor and AWS prices, and draft parts of the preliminary report, this report and the slides. Every AI-written code change went through a pull request, the automated tests and a review by a team member, and we checked every number in this report against our code, results or sources. Reviewing and testing the AI's work taught us how the serverless pieces fit together, from Cognito and JWT checks controlling access to DynamoDB keeping each user's runs private, and how to turn AWS price lists into a realistic cost model. It also taught us that AI output always has to be checked, because it often sounded right when it wasn't.
 % =====================================================================
 \small
 \begin{thebibliography}{99}\setlength{\itemsep}{0pt}
