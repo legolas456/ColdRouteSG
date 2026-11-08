@@ -66,7 +66,7 @@
 \vspace{0.35cm}
 {\bfseries Group 36\par}
 \vspace{0.15cm}
-{\small Agarwal Ishan \enspace·\enspace Chao Chien Hung \enspace·\enspace Huang Xuan Kun \enspace·\enspace Kim Jae Hyeok \enspace·\enspace Ler Lian Ping \enspace·\enspace Passion Goh Wei Ling\par}
+{\small Agarwal Ishan \enspace\textperiodcentered\enspace Chao Chien Hung \enspace\textperiodcentered\enspace Huang Xuan Kun \enspace\textperiodcentered\enspace Kim Jae Hyeok \enspace\textperiodcentered\enspace Ler Lian Ping \enspace\textperiodcentered\enspace Passion Goh Wei Ling\par}
 \vspace{0.3cm}
 {\small Live service: \url{https://main.d1f8mppryelp5v.amplifyapp.com/}\quad
 Code: \url{https://github.com/legolas456/ColdRouteSG}\par}
@@ -384,7 +384,7 @@ The plan is saved to \emph{Your runs} and can be exported as CSV.
 \end{enumerate}
 
 \subsection{Combining data with different granularity}
-The TA asked how signals measured on different spatial and temporal scales are combined. We never mix raw feeds. Each source
+The feeds come at different spatial and temporal scales, so we never mix them raw. Each source
 keeps its native key and timestamp, and is converted into one of two derived inputs: a \emph{leg factor} that scales an OSRM
 travel time, or a \emph{stop condition} evaluated at the simulated unloading time (Table~\ref{tab:fusion}). Conditions are
 frozen when the user presses Optimise, so both routes are scored on an identical snapshot.
@@ -416,7 +416,7 @@ $F_k=S_k+s_{r_k}$, with leg times $t_k=t^0 f$ scaled by the traffic factor $f$. 
 $T=\sum t_k$; lateness $L=\sum\max(0,S_k-b_{r_k})$; weather exposure $W=\sum q_k s_{r_k}$, where $q_k=1$ for heavy or thundery
 rain and $0.5$ for other rain overlapping the service; parking difficulty $P=\sum p_{r_k}s_{r_k}$, with
 $p=\min(1,\,0.6\min(d/1.2\,\text{km},1)+0.4(1-\text{free}\%))$; and cargo exposure $C=\sum h_{r_k}(S_k-t_0)$ for departure time $t_0$, where the sensitivity
-$h$ is 1.0 for Pharma, 0.8 for Frozen and 0.6 for Chilled. Following the TA's advice, each term is divided by a fixed,
+$h$ is 1.0 for Pharma, 0.8 for Frozen and 0.6 for Chilled. Each term is divided by a fixed,
 per-stop reference scale, so the weights are unit-free and comparable:
 \begin{equation}
 J(r)=\alpha\frac{T}{20n}+\beta\frac{L}{15n}+\gamma\frac{W}{15n}+\delta\frac{P}{15n}+\varepsilon\frac{C}{120n},
@@ -637,7 +637,6 @@ this report. \emph{How:} every generated change went through a pull request, aut
 every fact and price in this report was checked against the code or the cited source. \emph{What we learned:} \fillin{e.g.\ how
 JWT authorizers and partition keys enforce ownership; how fixed reference scales make weights interpretable; reading AWS price lists}.
 \decide{Each member writes 1--2 lines on what AI they used, where and what they learned (the course requires where, how and learning). Ishan: Manus was used for PR review and fixes (PRs \#20--24), fact-checking and this draft; Claude (Claude Code) for an independent review of the code and this draft, re-checking AWS prices against the official price lists, and the form-analysis script.}
-\decide{Optional, 2--3 lines if space allows: who did what. Proposed from the chats and PRs, for each member to correct: Kun redesigned the console (PRs \#1--9); Lian built the first AWS backend (Cognito, DynamoDB, admin); Chien wrote the normalised objective, depot picker and CSV export, and started the LaTeX report; Jay integrated the planner and built the Terraform stack, live traffic and the cloud planner (\#12--27); Ishan wrote the first optimiser tests, reviewed \#15--19 with fixes \#20--24, ran the user study and drafted this report; Passion drafted the business and early report sections.}
 
 % =====================================================================
 \small
