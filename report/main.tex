@@ -79,7 +79,7 @@ carpark availability and cargo sensitivity, and explains each trade-off against 
 live data are computed by a Lambda function with drive times from Amazon Location Service, on a serverless AWS stack
 (Amplify, API Gateway, Lambda, DynamoDB, S3, Cognito, EventBridge) defined entirely in Terraform. A 50-account pilot would
 cost about \Sd245 per month including operations time (\Sd132 of it AWS charges, mostly routing fees), against roughly \Sd2,135 per month for an equivalent redundant on-premise deployment.
-On 60 generated scenarios, compared with a planner that only meets booked slots, it carries 18\% less cargo time on board for a median 1-7\% more driving, and unloads 40\% less in rain. On the deployed stack a signed-in plan returns in about 0.35\,s when its drive times are cached. In a user study, 16 of 17 first-time users completed five set tasks unaided (mean SUS 76.5), but only 10 could explain why the route differed from the shortest one.
+We evaluated 60 generated scenarios. On the 24 scenarios with delivery windows, Balanced and Pharma reduced total sensitivity-weighted time on board by about 18\% versus the slots-only planner, for median driving increases of 1.1\% and 6.8\%, respectively. On the 12 rain scenarios, Balanced reduced rain-exposed unloading time by 40\%. On the deployed stack a signed-in plan returns in about 0.35\,s when its drive times are cached. In a user study, 16 of 17 first-time users completed five set tasks unaided (mean SUS 76.5), but only 10 could explain why the route differed from the shortest one.
 \end{minipage}
 
 \vspace{0.5cm}
@@ -240,7 +240,7 @@ most sensitive to the 120 new pairs: at 30 (mostly repeat customers) the pilot's
 sites (active/standby), running the web app, API, scheduled collectors, replicated PostgreSQL and a self-hosted identity
 provider (Keycloak) instead of Cognito. Using a Dell PowerEdge R350 at its Singapore list price~\cite{dell}, a 36-month write-off,
 two business fibre links with static IPs~\cite{sptel}, SP Group electricity tariffs~\cite{sp} and 0.1 of a system
-administrator's time~\cite{indeed} gives about \textbf{\Sd2,135 per month plus \Sd21,336 up-front} (Table~\ref{tab:onprem}):
+administrator's time~\cite{indeed} requires about \textbf{\Sd21,336 in up-front hardware expenditure} and has an \textbf{equivalent monthly cost of \Sd2,135}, including that hardware cost amortised over 36 months (Table~\ref{tab:onprem}):
 the servers and UPS written off over 36 months (\Sd592.66), rack space at two sites (\Sd300), power and cooling (\Sd77.19),
 two business internet links (\Sd572.48), and backups plus 0.1 FTE of a sysadmin (\Sd592.80). For a fair comparison the cloud
 side also gets operations time, 0.02 FTE (\Sd112.56 a month), plus optional DynamoDB point-in-time backups; that is why the
@@ -524,7 +524,7 @@ Slots-only & 2 & 12 & 0\% & 0\% & 88.7 & 0\% & 0\% \\
 \end{tabular}
 \end{table}
 
-\textbf{Results.} The three targets set before the run are met on the 48 constrained runs: against the shortest route,
+\textbf{Results.} On the 48 constrained runs, the acceptance criteria were at least 20\% fewer total late minutes and 10\% less total cargo exposure than the shortest route, with a median driving increase of no more than 15\%. Both profiles met these criteria: against the shortest route,
 Balanced cuts late minutes by 99.7\% and cargo exposure by 36.5\% for a median 5.3\% more driving (Pharma: 99.9\%, 37.1\%,
 10.7\%). These figures flatter us, because the shortest route ignores slots: it misses 97 of them by 171\,min on average,
 and that lateness also counts as time on board. Against slots-only, which meets the slots too, the gain is smaller but
@@ -587,7 +587,7 @@ whether dispatchers would buy it.
 ColdRoute SG shows that a small team can turn Singapore's open transport and weather data into a usable, explainable
 planning service on a serverless stack. Its fixed hosting cost is a few dollars a month, it is roughly nine times cheaper than
 an equivalent on-premise deployment at pilot scale, signed-in plans return in about 0.35\,s from cached drive times, and the whole
-stack can be rebuilt with one \texttt{terraform apply}. On 60 test scenarios it meets nearly every booked slot and, compared with a planner that only respects slots, carries 18\% less cargo time on board for a median 1-7\% more driving; it helps least when cargo mix is the only difference. Seventeen first-time users almost all completed the set tasks and rated
+stack can be rebuilt with one \texttt{terraform apply}. Across 60 generated scenarios, the clearest gains came from the 24 with delivery windows: Balanced and Pharma reduced total sensitivity-weighted time on board by about 18\% versus slots-only, for median driving increases of 1.1\% and 6.8\%. These gains involved trade-offs in lateness; improvements were smaller when cargo mix was the only difference. Seventeen first-time users almost all completed the set tasks and rated
 its usability above average, but only 10 could explain why the route changed, so the explanation needs to be clearer.
 \textbf{Limitations.} The objective uses proxies (sensitivity-weighted time on board, parking within 600\,m, nearest
 forecast area), not measured temperature or loading-bay access. The weights are expert-set. Traffic is a per-run snapshot
